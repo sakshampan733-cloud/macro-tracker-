@@ -104,8 +104,41 @@ function energyTile(t, targets, s, key) {
 
     el('div.divider'),
     targetBasis(targets, s, key),
+    ...safetyNotes(targets),
   );
   return tile;
+}
+
+/*
+ * Say plainly when the app has overridden what was asked for, or when the
+ * pace being aimed at is one that usually costs muscle. A tracker that
+ * silently hands back a smaller number is not being helpful.
+ */
+function safetyNotes(targets) {
+  const b = targets.basis || {};
+  const out = [];
+
+  if (b.floored) {
+    out.push(el('div.note.warn', {},
+      el('div', {},
+        el('b', {}, 'Held at your resting burn'),
+        el('div.fine', { style: { marginTop: '3px' } },
+          `The pace you picked works out to ${kcal(b.wanted)} kcal a day, which is below the `
+          + `${kcal(b.floor.bmr)} your body spends just existing. Eating under that for weeks tends to cost muscle `
+          + `and stall progress anyway, so the target is held here. Pick a slower pace in Settings if you want the number to mean something.`))));
+  }
+
+  if (b.rate && !b.floored) {
+    out.push(el('div', { class: 'note ' + (b.rate.severe ? 'warn' : 'info') },
+      el('div', {},
+        el('b', {}, b.rate.severe ? 'That is fast' : 'That is brisk'),
+        el('div.fine', { style: { marginTop: '3px' } },
+          `You are aiming to lose ${b.rate.pctPerWeek.toFixed(1)}% of your bodyweight a week. `
+          + `Past about 1% the weight still comes off, but more of it is muscle. `
+          + `Around ${b.rate.suggested} kg a week would be the steadier choice at your size.`))));
+  }
+
+  return out;
 }
 
 function confidenceLabel(t) {

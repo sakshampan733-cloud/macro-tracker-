@@ -11,6 +11,7 @@ import {
   ACTIVITY, GOALS, bmrFor, predictedTDEE, macroTargets, bestTDEE, waterTarget, age,
 } from '../nutrition.js';
 import { openWhoopImport, openWhoopConnect } from './body.js';
+import { openTrust } from './trust.js';
 
 /* ── Onboarding ─────────────────────────────────────────────────────── */
 
@@ -229,6 +230,15 @@ export function renderSettings(root, ctx) {
               ? `${Object.keys(s.whoop.rows).length} days imported`
               : 'Not imported')),
         el('button.btn.sm', { onclick: () => openWhoopConnect(ctx) }, 'Set up'))),
+
+    el('div.section-label', {}, el('span.micro', {}, 'How much to trust this')),
+    el('div.tile', {},
+      el('div.between', {},
+        el('div', {},
+          el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'What to trust'),
+          el('div.fine', { style: { marginTop: '3px' } },
+            'Which parts of this app are solid, which are guesses, and what it cannot see at all.')),
+        el('button.btn.sm', { onclick: () => openTrust() }, 'Read'))),
 
     el('div.section-label', {}, el('span.micro', {}, 'Your data')),
     el('div.tile', {},

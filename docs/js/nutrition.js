@@ -237,11 +237,51 @@ export function bestTDEE(store, profile) {
  * for hormone function. Carbohydrate takes whatever energy is left, which
  * is what actually fuels training.
  */
+/*
+ * Two floors, not one.
+ *
+ * A flat 1,200 kcal is the wrong floor for a 91 kg man and the wrong floor
+ * for a 50 kg woman. The one that actually means something is your own
+ * resting burn: the energy your body spends existing, before you stand up.
+ * Eating under that for weeks is how people lose muscle, wreck their
+ * training and stall anyway.
+ *
+ * So the target never drops below resting burn, and the app says when it
+ * has stepped in rather than quietly handing back a smaller number.
+ */
+export function safeFloor(profile) {
+  const bmr = bmrFor(profile).kcal;
+  return { kcal: Math.max(1200, Math.round(bmr)), bmr, reason: bmr > 1200 ? 'resting burn' : 'absolute minimum' };
+}
+
+/*
+ * How fast is too fast?
+ *
+ * Losing more than about 1% of bodyweight a week reliably costs muscle
+ * alongside fat, and the heavier you are the more absolute loss that
+ * allows. Expressed as a share of bodyweight rather than a flat number so
+ * it scales with the person.
+ */
+export function rateAdvice(profile, rateKgPerWeek) {
+  if (rateKgPerWeek >= 0) return null;
+  const pctPerWeek = (Math.abs(rateKgPerWeek) / profile.weightKg) * 100;
+  if (pctPerWeek <= 0.55) return null;
+  return {
+    pctPerWeek,
+    severe: pctPerWeek > 1.0,
+    suggested: +(profile.weightKg * 0.005).toFixed(2),
+  };
+}
+
 export function macroTargets(profile, tdeeKcal) {
   const goal = GOALS[profile.goal] || GOALS.maintain;
   const rateKgPerWeek = profile.rate ?? goal.rate;
   const delta = (rateKgPerWeek * KCAL_PER_KG_TISSUE) / 7;
-  const kcal = Math.max(1200, Math.round(tdeeKcal + delta));
+
+  const floor = safeFloor(profile);
+  const wanted = Math.round(tdeeKcal + delta);
+  const kcal = Math.max(floor.kcal, wanted);
+  const floored = kcal > wanted;
 
   const lean = profile.bodyFatPct > 0
     ? profile.weightKg * (1 - profile.bodyFatPct / 100)
@@ -267,7 +307,12 @@ export function macroTargets(profile, tdeeKcal) {
     water: waterTarget(profile),
     na: 2300,
     sug: Math.round((kcal * 0.10) / 4),
-    basis: { tdee: Math.round(tdeeKcal), delta: Math.round(delta), rateKgPerWeek, proteinPerKg: lean ? null : perKg },
+    basis: {
+      tdee: Math.round(tdeeKcal), delta: Math.round(delta), rateKgPerWeek,
+      proteinPerKg: lean ? null : perKg,
+      floored, floor, wanted,
+      rate: rateAdvice(profile, rateKgPerWeek),
+    },
   };
 }
 
