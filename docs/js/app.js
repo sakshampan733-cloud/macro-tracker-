@@ -1,5 +1,12 @@
 /* Application shell: routing, the tab bar, and first-run. */
 
+/*
+ * Bump this whenever something ships. It shows in Settings, so when the
+ * phone and the laptop disagree about what the app can do, you can see
+ * which one is stale instead of guessing.
+ */
+export const VERSION = '2026.08.20-meals';
+
 import { el, clear, icon, toast, $ } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';
 import { solveDensities } from './dishes.js';
@@ -150,8 +157,26 @@ subscribe(evt => {
   }
 });
 
+/*
+ * Keep the installed app current.
+ *
+ * A home-screen PWA keeps its own copy of everything so it works offline,
+ * which also means it can happily run last week's code forever. So: check
+ * for a new worker on every launch, and when one takes over, reload once so
+ * the running page is not left half-old.
+ */
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.update().catch(() => {});
+    setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+  }).catch(() => {});
+
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
 }
 
 /* Top up from Whoop in the background; redraw only if something arrived. */

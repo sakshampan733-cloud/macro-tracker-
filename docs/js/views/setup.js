@@ -12,6 +12,7 @@ import {
 } from '../nutrition.js';
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
+import { VERSION } from '../app.js';
 
 /* ── Onboarding ─────────────────────────────────────────────────────── */
 
@@ -260,6 +261,23 @@ export function renderSettings(root, ctx) {
           })) { reset(); location.reload(); }
         },
       }, 'Erase all data')),
+
+    el('div.tile', {},
+      el('div.between', {},
+        el('div', {},
+          el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Version'),
+          el('div.micro', { style: { marginTop: '3px' } }, VERSION)),
+        el('button.btn.sm', {
+          onclick: async () => {
+            toast('Checking…');
+            try {
+              const regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map(r => r.unregister()));
+              for (const k of await caches.keys()) await caches.delete(k);
+            } catch { /* nothing cached, nothing to clear */ }
+            location.reload();
+          },
+        }, 'Force update'))),
 
     el('div', { style: { height: '20px' } }),
   );
