@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.20-meals';
+export const VERSION = '2026.08.20-checkin';
 
 import { el, clear, icon, toast, $ } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';

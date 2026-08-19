@@ -348,3 +348,161 @@ export function trendWeight(series, halfLife = 10) {
     return { ...pt, trend: +ema.toFixed(2) };
   });
 }
+
+
+/* ── The check-in ──────────────────────────────────────────────────── */
+
+/*
+ * A weekly or fortnightly look back, not a daily one.
+ *
+ * Day to day, weight bounces on water and gut contents by up to a kilo, and
+ * one bad-adherence day proves nothing. A window this short is why the
+ * scale feels like it's lying and why people quit. Give the same data a
+ * week to breathe and the signal is unmistakable — which is the entire
+ * argument for checking in on this cadence rather than daily.
+ */
+export function checkIn(store, days = 7) {
+  const dayKeys = Object.keys(store.days).sort();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const from = new Date(cutoff.getTime() - cutoff.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 10);
+
+  const window_ = dayKeys.filter(k => k >= from);
+  const logged = window_.filter(k => store.days[k].entries?.length >= 2);
+  const weighed = window_.filter(k => store.days[k].weight > 0);
+
+  if (logged.length < Math.ceil(days * 0.4)) {
+    return { ready: false, days, logged: logged.length, needed: Math.ceil(days * 0.4) };
+  }
+
+  // Intake, with its own uncertainty carried through rather than dropped.
+  let kcalSum = 0, sigmaSq = 0, adherence = 0;
+  const targets = [];
+  for (const k of logged) {
+    const t = totalsFor(store.days[k]);
+    kcalSum += t.kcal;
+    sigmaSq += t.sigma * t.sigma;
+  }
+  const meanIntake = kcalSum / logged.length;
+  const intakeSigma = Math.sqrt(sigmaSq) / logged.length;
+
+  // Weight change across the window, from the first and last available
+  // reading rather than a single noisy pair.
+  let weightChange = null, startKg = null, endKg = null;
+  if (weighed.length >= 2) {
+    startKg = store.days[weighed[0]].weight;
+    endKg = store.days[weighed[weighed.length - 1]].weight;
+    weightChange = endKg - startKg;
+  }
+
+  // How much of the window was actually logged.
+  const coverage = logged.length / window_.length;
+
+  return {
+    ready: true,
+    days, from, to: window_[window_.length - 1],
+    loggedDays: logged.length, totalDays: window_.length, coverage,
+    weighIns: weighed.length,
+    meanIntake: Math.round(meanIntake), intakeSigma: Math.round(intakeSigma),
+    weightChange: weightChange != null ? +weightChange.toFixed(2) : null,
+    startKg, endKg,
+    weeklyRate: weightChange != null ? +(weightChange * (7 / days)).toFixed(2) : null,
+  };
+}
+
+function totalsFor(day) {
+  let kcal = 0, varSum = 0;
+  const M = { weighed: 0.02, label: 0.05, portion: 0.12, estimate: 0.25, dish: 0.18 };
+  const G = { A: 1.0, B: 1.2, C: 1.6, D: 2.2 };
+  for (const e of day.entries || []) {
+    if (e.dish) {
+      const d = e.grams * (e.density || 1.2);
+      kcal += d;
+      varSum += (e.grams * (e.densitySd || 0.2)) ** 2;
+      continue;
+    }
+    const k = (e.per100.kcal || 0) * e.grams / 100;
+    kcal += k;
+    const s = k * (M[e.method] ?? 0.12) * (G[e.grade] ?? 1.3);
+    varSum += s * s;
+  }
+  return { kcal, sigma: Math.sqrt(varSum) };
+}
+
+/*
+ * Turn the numbers into a sentence, in the register the app uses
+ * throughout: plain, specific, no cheerleading and no scolding. A
+ * fortnightly loss target that expects 0.5 kg and got 0.1 is a fact to
+ * report, not a failure to soften.
+ */
+export function checkInVerdict(ci, profile, targetRateKgPerWeek) {
+  if (!ci.ready) {
+    return {
+      tone: 'info',
+      headline: 'Not enough logged yet',
+      body: `${ci.logged} of the last ${ci.days} days have a real log. `
+          + `With ${ci.needed}+ the app can tell you something true instead of guessing.`,
+    };
+  }
+
+  const parts = [];
+  const tone1 = ci.coverage >= 0.85 ? 'good' : ci.coverage >= 0.5 ? 'info' : 'warn';
+  parts.push(
+    `Logged ${ci.loggedDays} of ${ci.totalDays} days`
+    + (ci.coverage < 0.85 ? ` (${Math.round(ci.coverage * 100)}%) — the gaps make everything below softer than it looks.` : '.'));
+
+  if (ci.weightChange == null) {
+    parts.push('No weigh-ins to compare, so no trend to report — the calorie side is real, the weight side is a guess until you weigh in a few times.');
+  } else {
+    const wantedKg = -(targetRateKgPerWeek || 0) * (ci.days / 7);
+    const gotKg = -ci.weightChange;   // loss framed positive, matching how people think about it
+    const diff = gotKg - wantedKg;
+
+    if (targetRateKgPerWeek < 0) {
+      if (Math.abs(diff) < 0.15) {
+        parts.push(`Lost ${gotKg.toFixed(1)} kg, right where the ${wantedKg.toFixed(1)} kg target aimed. This is working.`);
+      } else if (diff > 0) {
+        parts.push(`Lost ${gotKg.toFixed(1)} kg against a ${wantedKg.toFixed(1)} kg target — faster than planned. Worth checking the pace isn't costing more than fat.`);
+      } else if (gotKg > 0) {
+        parts.push(`Lost ${gotKg.toFixed(1)} kg against a ${wantedKg.toFixed(1)} kg target — real progress, just slower than aimed. That is usually intake creeping up, not a broken metabolism.`);
+      } else {
+        /*
+         * Weight moved the wrong way. Whether that means "too many
+         * calories" depends on how much was actually logged: with most
+         * days covered, the intake figure is trustworthy enough to blame.
+         * With half the window missing, the honest read is that the gap
+         * is unmeasured, not that the logged number was too high — saying
+         * otherwise would tell someone eating 785 kcal that they ate too
+         * much, which is backwards and would send them the wrong way.
+         */
+        if (ci.coverage >= 0.7) {
+          parts.push(`Weight moved ${(-gotKg).toFixed(1)} kg the wrong way against an average of ${kcal_(ci.meanIntake)} kcal a day. `
+            + `That is a real gap between what was eaten and what was logged, or the target itself needs revisiting.`);
+        } else {
+          parts.push(`Weight moved ${(-gotKg).toFixed(1)} kg the wrong way, but only ${Math.round(ci.coverage * 100)}% of days were logged. `
+            + `The ${kcal_(ci.meanIntake)} kcal average is from the days that were tracked — the unlogged days are the more likely explanation, not those numbers.`);
+        }
+      }
+    } else {
+      parts.push(`Weight moved ${ci.weightChange >= 0 ? '+' : ''}${ci.weightChange.toFixed(1)} kg over ${ci.days} days.`);
+    }
+  }
+
+  const severity = ci.weightChange != null && targetRateKgPerWeek < 0
+    && (-ci.weightChange) < 0 ? 'warn'
+    : ci.coverage < 0.5 ? 'warn' : 'good';
+
+  return { tone: severity, headline: checkInHeadline(ci, targetRateKgPerWeek), body: parts.join(' ') };
+}
+
+function kcal_(n) { return Math.round(n).toLocaleString('en-IN'); }
+
+function checkInHeadline(ci, targetRateKgPerWeek) {
+  if (!ci.ready) return 'Keep logging';
+  if (ci.weightChange == null) return 'Intake tracked, no weight trend yet';
+  const onTrack = targetRateKgPerWeek < 0
+    ? (-ci.weightChange) > 0
+    : targetRateKgPerWeek > 0 ? ci.weightChange > 0 : Math.abs(ci.weightChange) < 0.3;
+  return onTrack ? 'On track' : 'Off from the plan';
+}

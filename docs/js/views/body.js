@@ -15,7 +15,7 @@ import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
   nutritionVsRecovery,
 } from '../whoop.js';
-import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE } from '../nutrition.js';
+import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict } from '../nutrition.js';
 import { calibrationTile } from './dish.js';
 
 export function renderBody(root, ctx) {
@@ -24,12 +24,90 @@ export function renderBody(root, ctx) {
 
   root.append(
     el('h1', { style: { marginBottom: '14px' } }, 'Body'),
+    checkInTile(s, ctx),
     weightTile(ctx),
     tdeeTile(s),
     calibrationTile(s) || el('div'),
     vitalsSection(s, ctx),
     correlationTile(s),
   );
+}
+
+/* ── Check-in ───────────────────────────────────────────────────────── */
+
+const CADENCES = { 7: 'week', 14: 'fortnight', 30: 'month' };
+
+/*
+ * A look back, not a daily nag.
+ *
+ * Day to day the scale is mostly water and gut contents; the true signal
+ * only separates from that noise over a week or more. So this is the one
+ * place in the app that deliberately does not update every time you log
+ * something — it reports on a cadence you set, and says the same plain
+ * things a person would: on track, behind, or not enough data yet.
+ */
+function checkInTile(s, ctx) {
+  const days = s.settings.checkInDays || 14;
+  const ci = checkIn(s, days);
+  const profile = s.profile;
+  const rate = profile.rate ?? 0;
+  const verdict = checkInVerdict(ci, profile, rate);
+
+  const toneColour = { good: 'var(--good)', warn: 'var(--warn)', info: 'var(--m-p)' };
+
+  return el('div.tile', {},
+    el('div.tile-head', {},
+      el('h3', {}, `Last ${CADENCES[days] || days + ' days'}`),
+      el('button.btn.sm.ghost', { onclick: () => openCadencePicker(s, ctx) },
+        CADENCES[days] || `${days}d`)),
+
+    el('div', { style: { display: 'flex', gap: '10px', alignItems: 'flex-start' } },
+      el('div', {
+        style: {
+          width: '8px', height: '8px', borderRadius: '50%', marginTop: '6px', flex: 'none',
+          background: toneColour[verdict.tone] || 'var(--muted)',
+        },
+      }),
+      el('div', {},
+        el('div', { style: { fontSize: '15px', fontWeight: '600' } }, verdict.headline),
+        el('div.fine', { style: { marginTop: '4px' } }, verdict.body))),
+
+    ci.ready ? el('div', { style: { display: 'flex', gap: '18px', marginTop: '14px', flexWrap: 'wrap' } },
+      stat('Logged', `${ci.loggedDays}/${ci.totalDays} days`),
+      stat('Weighed in', `${ci.weighIns}×`),
+      stat('Avg intake', `${ci.meanIntake.toLocaleString('en-IN')} ±${ci.intakeSigma}`),
+      ci.weightChange != null ? stat('Weight', `${ci.weightChange >= 0 ? '+' : ''}${ci.weightChange} kg`) : null,
+    ) : null,
+  );
+}
+
+const stat = (label, value) =>
+  el('div', {},
+    el('div.micro', {}, label),
+    el('div.num', { style: { fontSize: '14px', marginTop: '2px' } }, value));
+
+function openCadencePicker(s, ctx) {
+  const body = el('div', {},
+    el('p', { style: { color: 'var(--text-2)', marginTop: 0, lineHeight: '1.55' } },
+      'Daily weight is mostly water — a bad night\'s sleep or a salty meal moves it more than a real week of eating does. '
+      + 'Give it long enough to breathe and the actual trend stops hiding.'),
+    el('div.tile.flush', {},
+      ...Object.entries(CADENCES).map(([days, label]) => el('button.row', {
+        onclick: () => {
+          commit(st => { st.settings.checkInDays = +days; });
+          toast(`Checking in every ${label}.`);
+          s2.close(); ctx.refresh();
+        },
+      },
+        el('span.grow', {},
+          el('div.title', {}, label.charAt(0).toUpperCase() + label.slice(1)),
+          el('div.sub', {},
+            days === '7' ? 'Fast feedback, but noisier — a lot of the swing is still water.'
+            : days === '14' ? 'The usual choice. Long enough for the trend to be real, soon enough to still act on it.'
+            : 'Steadiest read, slowest to tell you something is off.')),
+        el('span.micro', {}, days + 'd'),
+      ))));
+  const s2 = sheet({ title: 'How often to check in', body });
 }
 
 /* ── Weight ─────────────────────────────────────────────────────────── */

@@ -62,6 +62,8 @@ const EMPTY = () => ({
     glassMl: 250,
     autoBackup: true,
     tdeeSource: 'auto',
+    checkInDays: 14,        // fortnight by default — see the Body screen for why
+    lastCheckInSeen: null,
   },
 });
 
