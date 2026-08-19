@@ -62,7 +62,7 @@ function drawNav() {
 function drawHeader() {
   const s = get();
   return el('div.topbar', {},
-    el('div.brand', {}, 'ASS', el('span', {}, 'AY')),
+    el('div.brand', {}, 'BAS', el('span', {}, 'AL')),
     el('div.grow'),
     s.profile ? el('button.x-btn', {
       'aria-label': 'Settings',

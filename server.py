@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Assay — local server.
+Basal — local server.
 
 Serves the web app and proxies Open Food Facts so the phone never has to
 deal with CORS or rate limits. Lookups are cached to disk forever, so a
@@ -50,7 +50,7 @@ WHOOP_API = "https://api.prod.whoop.com/developer/v1"
 WHOOP_SCOPES = "read:recovery read:cycles read:sleep read:profile read:body_measurement offline"
 WHOOP_CREDS = os.path.join(DATA, "whoop_credentials.json")
 WHOOP_TOKENS = os.path.join(DATA, "whoop_tokens.json")
-UA = "Assay/1.0 (personal macro tracker; contact: local)"
+UA = "Basal/1.0 (personal macro tracker; contact: local)"
 FIELDS = ",".join([
     "code", "product_name", "product_name_en", "generic_name", "brands",
     "quantity", "serving_size", "serving_quantity", "nutriments",
@@ -186,7 +186,7 @@ def whoop_redirect(host=None):
     authorisation is done once, on the Mac, at a fixed address — and the
     phone simply reads whatever the Mac has already fetched.
     """
-    port = os.environ.get("ASSAY_PORT", "8443")
+    port = os.environ.get("BASAL_PORT", "8443")
     return f"https://localhost:{port}/api/whoop/callback"
 
 
@@ -537,7 +537,7 @@ class Handler(SimpleHTTPRequestHandler):
             tok["expires_at"] = time.time() + int(tok.get("expires_in", 3600))
             _write_json(WHOOP_TOKENS, tok)
             return self._html("Whoop connected",
-                              "You can close this tab. Assay will keep itself up to date from now on.")
+                              "You can close this tab. Basal will keep itself up to date from now on.")
 
         if u.path == "/api/whoop/sync":
             return self._json(whoop_sync(int((qs.get("days") or ["120"])[0])))
@@ -614,7 +614,7 @@ distinguished_name = dn
 x509_extensions = ext
 prompt = no
 [dn]
-CN = Assay
+CN = Basal
 [ext]
 subjectAltName = DNS:localhost, IP:127.0.0.1, IP:{ip}
 basicConstraints = critical, CA:FALSE
@@ -640,7 +640,7 @@ def main():
     ap.add_argument("--http", action="store_true", help="serve without TLS")
     args = ap.parse_args()
 
-    os.environ.setdefault("ASSAY_PORT", str(args.port))
+    os.environ.setdefault("BASAL_PORT", str(args.port))
     ip = lan_ip()
     use_tls = not args.http and ensure_cert(ip)
     scheme = "https" if use_tls else "http"
@@ -653,7 +653,7 @@ def main():
 
     cached = len(os.listdir(CACHE))
     print(f"""
-  ASSAY  ready.
+  BASAL  ready.
 
   On this Mac      {scheme}://localhost:{args.port}
   On your iPhone   {scheme}://{ip}:{args.port}

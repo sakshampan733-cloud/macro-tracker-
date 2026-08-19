@@ -350,7 +350,7 @@ export const BY_ID = Object.fromEntries(FOODS.map(f => [f.id, f]));
  * Protein and carbohydrate yield ~4 kcal/g, fat ~9, alcohol ~7. If a food's
  * stated calories disagree with its own macros by more than a few percent,
  * something is wrong — a mistyped label, a rounded panel, or a hidden
- * ingredient. Assay refuses to let that pass silently.
+ * ingredient. Basal refuses to let that pass silently.
  */
 export function atwater(per100) {
   const p = +per100.p || 0, c = +per100.c || 0, f = +per100.f || 0;

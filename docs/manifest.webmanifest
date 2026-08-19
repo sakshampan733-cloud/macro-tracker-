@@ -1,6 +1,6 @@
 {
-  "name": "Assay",
-  "short_name": "Assay",
+  "name": "Basal",
+  "short_name": "Basal",
   "description": "A measuring instrument for what you eat.",
   "start_url": "./",
   "scope": "./",

@@ -8,7 +8,8 @@
 
 import { per100For, STYLES } from './dishes.js';
 
-const KEY = 'assay.v1';
+const KEY = 'basal.v1';
+const LEGACY_KEYS = ['assay.v1'];   // the app was called Assay before this
 const listeners = new Set();
 
 export const MEALS = ['breakfast', 'lunch', 'snack', 'dinner'];
@@ -67,7 +68,26 @@ let state = load();
 
 function load() {
   try {
-    const raw = localStorage.getItem(KEY);
+    let raw = localStorage.getItem(KEY);
+
+    /*
+     * Carry over a log written under the old name. Renaming the app must
+     * never cost someone their history, and a bare key change silently
+     * would — the data would still be sitting in the browser, invisible.
+     */
+    if (!raw) {
+      for (const old of LEGACY_KEYS) {
+        const legacy = localStorage.getItem(old);
+        if (legacy) {
+          localStorage.setItem(KEY, legacy);
+          localStorage.removeItem(old);
+          raw = legacy;
+          console.info(`Carried your log over from ${old}.`);
+          break;
+        }
+      }
+    }
+
     if (!raw) return EMPTY();
     const parsed = JSON.parse(raw);
     return { ...EMPTY(), ...parsed, settings: { ...EMPTY().settings, ...(parsed.settings || {}) } };
@@ -352,7 +372,7 @@ export function exportJSON() {
 export function importJSON(text) {
   const parsed = JSON.parse(text);
   if (!parsed || typeof parsed !== 'object' || !('days' in parsed)) {
-    throw new Error('That file is not an Assay backup.');
+    throw new Error('That file is not an Basal backup.');
   }
   state = { ...EMPTY(), ...parsed };
   persist();

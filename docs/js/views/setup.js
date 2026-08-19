@@ -91,7 +91,7 @@ export function renderOnboarding(root, ctx) {
 
   root.append(
     el('div', { style: { padding: '30px 0 18px' } },
-      el('div.brand', {}, 'ASS', el('span', {}, 'AY')),
+      el('div.brand', {}, 'BAS', el('span', {}, 'AL')),
       el('h1', { style: { marginTop: '14px', fontSize: '30px' } }, 'Measure what you eat.'),
       el('p', { style: { color: 'var(--text-2)', lineHeight: '1.55', marginTop: '8px' } },
         'Six answers and you are logging. Every one of them is used in a calculation you can see.')),
@@ -257,7 +257,7 @@ export function renderSettings(root, ctx) {
   function doExport() {
     const blob = new Blob([exportJSON()], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = el('a', { href: url, download: `assay-${new Date().toISOString().slice(0, 10)}.json` });
+    const a = el('a', { href: url, download: `basal-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }

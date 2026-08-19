@@ -1,8 +1,8 @@
-# Assay
+# Basal
 
 A macro tracker built around one idea: **every number carries a known error, and the app should tell you what it is.**
 
-Most trackers show "1,847 kcal" as though it were a fact. It isn't. If half of that came from a scanned packet and half from eyeballing a restaurant plate, the honest reading is 1,847 ± 190. Assay tracks how you measured each thing, propagates the error, and shows you the band.
+Most trackers show "1,847 kcal" as though it were a fact. It isn't. If half of that came from a scanned packet and half from eyeballing a restaurant plate, the honest reading is 1,847 ± 190. Basal tracks how you measured each thing, propagates the error, and shows you the band.
 
 ---
 
@@ -46,7 +46,7 @@ That's what the `± 54` next to your remaining calories means, and what the hatc
 
 ### Reconciliation
 
-Protein and carbohydrate yield ~4 kcal/g, fat ~9, fibre ~2. Every food is checked against its own macros. If a packet's stated calories disagree with what its macros imply, Assay says so before you save it — that's almost always a typo or the per-serving column mixed up with the per-100 g one. All 136 reference foods pass this check.
+Protein and carbohydrate yield ~4 kcal/g, fat ~9, fibre ~2. Every food is checked against its own macros. If a packet's stated calories disagree with what its macros imply, Basal says so before you save it — that's almost always a typo or the per-serving column mixed up with the per-100 g one. All 136 reference foods pass this check.
 
 ---
 
@@ -98,17 +98,17 @@ The keys and tokens stay in `data/`, mode 600, and never reach the phone.
 
 Three things it earns:
 
-**Day-adjusted targets.** A flat daily number overfeeds rest days and starves training days. Assay takes the *level* from your adaptive maintenance and the *movement* from how today's Whoop burn compares to your own 28-day Whoop average. Whoop's absolute calorie figure is not trusted — it runs high — but its sense of a hard day versus an easy one is good. The adjustment is clamped so one bad sensor day can't swing your target wildly.
+**Day-adjusted targets.** A flat daily number overfeeds rest days and starves training days. Basal takes the *level* from your adaptive maintenance and the *movement* from how today's Whoop burn compares to your own 28-day Whoop average. Whoop's absolute calorie figure is not trusted — it runs high — but its sense of a hard day versus an easy one is good. The adjustment is clamped so one bad sensor day can't swing your target wildly.
 
 **Your ranges, not a population's.** Every metric shows where today sits inside your own recorded history — percentile, standard deviations from your mean, the middle-half band. "Is 58 ms of HRV good?" has no general answer; "that's your 34th percentile, below your normal" does.
 
-**Food against next-day recovery.** Once 14 days have both a food log and a Whoop recovery the next morning, Assay correlates your intake — calories, protein, fibre, sugar, sodium, alcohol, water, how late you ate — against how you woke up. Weak associations are labelled as noise. These are correlations across your own days, not causes; use them to pick something worth testing deliberately for a fortnight.
+**Food against next-day recovery.** Once 14 days have both a food log and a Whoop recovery the next morning, Basal correlates your intake — calories, protein, fibre, sugar, sodium, alcohol, water, how late you ate — against how you woke up. Weak associations are labelled as noise. These are correlations across your own days, not causes; use them to pick something worth testing deliberately for a fortnight.
 
 ---
 
 ## Food data
 
-- **136 reference foods**, each stating whether it's weighed raw, dry, cooked, or as-served. This matters more than anything else: 100 g of dry rice is 360 kcal, the same rice cooked is 130. Assay never silently converts between the two.
+- **136 reference foods**, each stating whether it's weighed raw, dry, cooked, or as-served. This matters more than anything else: 100 g of dry rice is 360 kcal, the same rice cooked is 130. Basal never silently converts between the two.
 - Household servings throughout — 1 katori, 1 roti, 1 scoop, 1 medium — because that's how food arrives.
 - **Barcodes** resolve through Open Food Facts, which holds about 22,500 Indian products. Verified working on Parle-G, Maggi, Lay's India, Haldiram's. Lookups are cached to disk permanently, so a scanned barcode resolves instantly forever after and works offline.
 - **Your own foods** outrank everything. Build one from a packet — name, serving weight, the panel — and it's yours permanently, barcode attached if you scanned one. Your library beats the public database on every lookup, because you may have corrected it yourself.

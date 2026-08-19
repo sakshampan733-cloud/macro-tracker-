@@ -2,7 +2,7 @@
  * Energy and macro maths.
  *
  * Three ways to know your maintenance calories, in ascending order of
- * accuracy. Assay uses the best one it has data for and always tells you
+ * accuracy. Basal uses the best one it has data for and always tells you
  * which one it used.
  *
  *   1. Predicted   Mifflin-St Jeor (or Katch-McArdle if body fat is known)
