@@ -11,7 +11,7 @@ import {
 } from '../ui.js';
 import {
   get, day, totals, byMeal, MEALS, METHODS, dayKey, shiftDay,
-  removeEntry, addWater, undoWater, entryMacros, setWeight,
+  removeEntry, addWater, undoWater, entryMacros, setWeight, saveMeal,
 } from '../store.js';
 import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
 import { dayFactor } from '../whoop.js';
@@ -266,11 +266,60 @@ function mealsTile(key, ctx) {
     tile.append(
       el('div.meal-head', {},
         el('span.name', {}, MEAL_LABELS[meal]),
-        el('span.amt', {}, `${kcal(mt.kcal)} kcal · ${Math.round(mt.p)} g P`)),
+        el('span.amt', {}, `${kcal(mt.kcal)} kcal · ${Math.round(mt.p)} g P`),
+        list.length > 1
+          ? el('button.btn.sm.ghost', {
+              style: { padding: '4px 9px', fontSize: '11px' },
+              title: 'Save these items as a meal you can log in one tap',
+              onclick: () => promptSaveMeal(meal, list, ctx),
+            }, 'Save')
+          : null),
       ...list.map(e => entryRow(e, key, ctx)),
     );
   }
   return tile;
+}
+
+/*
+ * Turn what's already on the plate into a reusable meal. Naming it after
+ * the sitting is right nine times out of ten, so that is what it offers.
+ */
+function promptSaveMeal(meal, list, ctx) {
+  const nameInput = el('input', {
+    type: 'text', value: MEAL_LABELS[meal],
+    placeholder: 'Usual breakfast',
+  });
+
+  const t = list.reduce((a, e) => {
+    const m = entryMacros(e);
+    a.kcal += m.kcal; a.p += m.p; return a;
+  }, { kcal: 0, p: 0 });
+
+  const s = sheet({
+    title: 'Save as a meal',
+    body: el('div', {},
+      el('p', { style: { color: 'var(--text-2)', marginTop: 0, lineHeight: '1.55' } },
+        `${list.length} items, ${kcal(t.kcal)} kcal, ${Math.round(t.p)} g protein. `
+        + 'Saved with the weights exactly as they are now — one tap logs the lot.'),
+      el('div.tile.flush', { style: { margin: '12px 0' } },
+        ...list.map(e => el('div.row', {},
+          el('span.grow', {},
+            el('div.title', {}, e.name),
+            el('div.sub', {}, `${grams(e.grams)} g`)),
+          el('span.kcal', {}, kcal(entryMacros(e).kcal))))),
+      el('div.field', {}, el('label', {}, 'Call it'), nameInput),
+    ),
+    foot: el('button.btn.primary.block', {
+      onclick: () => {
+        const n = nameInput.value.trim();
+        if (!n) { toast('Give it a name.', 'err'); return; }
+        saveMeal(n, list, meal);
+        toast(`"${n}" saved. Log it from Add.`);
+        s.close();
+        ctx.refresh();
+      },
+    }, 'Save meal'),
+  });
 }
 
 function entryRow(e, key, ctx) {

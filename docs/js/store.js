@@ -51,6 +51,7 @@ const EMPTY = () => ({
   targets: null,
   days: {},
   library: {},
+  meals: {},
   recipes: {},
   cache: {},
   whoop: { rows: {}, importedAt: null },
@@ -307,6 +308,83 @@ export function weightSeries() {
     .filter(([, d]) => d.weight)
     .map(([k, d]) => ({ date: k, kg: d.weight }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* ── Saved meals ────────────────────────────────────────────────────── */
+
+/*
+ * A meal you eat the same way most days, stored once and logged in a tap.
+ *
+ * It keeps each item's own numbers rather than a single combined total, so
+ * a saved breakfast still shows as eggs, whites and bread in the timeline —
+ * and swapping one item out later is an edit, not a rebuild. Home dishes
+ * keep their style rather than a frozen calorie figure, so a saved meal
+ * containing dal still improves as the app learns your kitchen.
+ */
+export function saveMeal(name, entries, meal) {
+  const items = entries.map(e => ({
+    name: e.name, brand: e.brand || '', ref: e.ref || null, barcode: e.barcode || null,
+    per100: e.per100, serv: e.serv || [], grams: e.grams,
+    method: e.method, grade: e.grade,
+    dish: e.dish || null,
+  }));
+  const id = 'meal:' + uid();
+  const record = {
+    id, name: name.trim(), meal: meal || mealForNow(),
+    items, createdAt: Date.now(), lastUsed: null, uses: 0,
+  };
+  commit(s => { s.meals[id] = record; }, 'meals');
+  return record;
+}
+
+export function deleteMeal(id) {
+  commit(s => { delete s.meals[id]; }, 'meals');
+}
+
+export function updateMeal(id, patch) {
+  commit(s => { if (s.meals[id]) Object.assign(s.meals[id], patch); }, 'meals');
+}
+
+export function renameMeal(id, name) {
+  commit(s => { if (s.meals[id]) s.meals[id].name = name.trim(); }, 'meals');
+}
+
+/* Log every item, stamped now, into whichever sitting you're in. */
+export function logMeal(key, id, targetMeal) {
+  const m = state.meals[id];
+  if (!m) return 0;
+  const when = targetMeal || m.meal || mealForNow();
+  commit(s => {
+    const d = day(key);
+    for (const it of m.items) {
+      d.entries.push({
+        id: uid(), ts: Date.now(), meal: when,
+        name: it.name, brand: it.brand, ref: it.ref, barcode: it.barcode,
+        per100: it.per100, serv: it.serv, grams: it.grams,
+        method: it.method, grade: it.grade,
+        ...(it.dish ? { dish: it.dish } : {}),
+        fromMeal: id,
+      });
+    }
+    s.meals[id].lastUsed = Date.now();
+    s.meals[id].uses = (s.meals[id].uses || 0) + 1;
+  }, 'entry:add');
+  return m.items.length;
+}
+
+export function mealsList() {
+  return Object.values(state.meals)
+    .sort((a, b) => (b.uses || 0) - (a.uses || 0) || (b.lastUsed || 0) - (a.lastUsed || 0));
+}
+
+/* What a saved meal comes to, using current numbers. */
+export function mealTotals(m) {
+  const sum = { kcal: 0, p: 0, c: 0, f: 0, fib: 0 };
+  for (const it of m.items) {
+    const mac = entryMacros(it);
+    for (const k in sum) sum[k] += mac[k] || 0;
+  }
+  return sum;
 }
 
 /* ── Personal food library ──────────────────────────────────────────── */

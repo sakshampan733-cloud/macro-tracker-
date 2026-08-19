@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-v2';
+const CACHE = 'basal-v3';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -14,7 +14,7 @@ const SHELL = [
   'js/off.js', 'js/scanner.js', 'js/ui.js', 'js/data/foods.js',
   'js/views/today.js', 'js/views/add.js', 'js/views/plan.js',
   'js/views/body.js', 'js/views/foods.js', 'js/views/setup.js', 'js/views/portion.js',
-  'js/views/dish.js', 'js/views/pot.js', 'js/views/trust.js', 'js/dishes.js',
+  'js/views/dish.js', 'js/views/pot.js', 'js/views/trust.js', 'js/views/meal.js', 'js/dishes.js',
   'vendor/zxing.min.js',
   'fonts/ibm-plex-sans-400.woff2', 'fonts/ibm-plex-sans-500.woff2', 'fonts/ibm-plex-sans-600.woff2',
   'fonts/ibm-plex-sans-condensed-500.woff2', 'fonts/ibm-plex-sans-condensed-600.woff2',

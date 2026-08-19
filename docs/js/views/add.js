@@ -9,13 +9,17 @@
 import {
   el, clear, sheet, toast, icon, kcal, grams, g, empty, field, segmented, confirmSheet,
 } from '../ui.js';
-import { get, saveFood, frequentFoods, recentFoods, dayKey } from '../store.js';
+import {
+  get, saveFood, frequentFoods, recentFoods, dayKey,
+  mealsList, mealTotals, logMeal, deleteMeal, renameMeal, MEALS,
+} from '../store.js';
 import { FOODS, GROUPS, atwater } from '../data/foods.js';
 import { resolveBarcode, searchProducts, validEAN, isIndian } from '../off.js';
 import { Scanner, cameraSupported, secureEnough } from '../scanner.js';
 import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
 import { openPot } from './pot.js';
+import { openMealBuilder } from './meal.js';
 
 export function renderAdd(root, ctx) {
   const s = get();
@@ -34,13 +38,14 @@ export function renderAdd(root, ctx) {
 
     el('div.btn-row', { style: { marginBottom: '10px' } },
       el('button.btn.primary', { onclick: () => openScanner(ctx) }, icon('scan', 18), 'Scan'),
-      el('button.btn', { onclick: () => openBuilder({ onSaved: ctx.refresh }) }, icon('plus', 18), 'New food')),
+      el('button.btn.primary', { onclick: () => openMealBuilder({ onSaved: ctx.refresh }) },
+        icon('plus', 18), 'New meal')),
 
     el('div.btn-row', { style: { marginBottom: '14px' } },
       el('button.btn', { onclick: () => openDish({ dateKey: ctx.date || dayKey(), onSaved: ctx.refresh }) },
         icon('pot', 18), 'Home dish'),
-      el('button.btn', { onclick: () => openPot({ onSaved: ctx.refresh }) },
-        icon('bolt', 18), 'Build a pot')),
+      el('button.btn', { onclick: () => openBuilder({ onSaved: ctx.refresh }) },
+        icon('foods', 18), 'New food')),
 
     el('div.field', {}, search),
     results,
@@ -125,6 +130,13 @@ export function renderAdd(root, ctx) {
     clear(results);
     const freq = frequentFoods(10);
     const recent = recentFoods(10);
+    const meals = mealsList();
+
+    // The whole point: the thing you eat every morning should be one tap,
+    // not five searches. So it sits above everything else.
+    if (meals.length) {
+      results.append(sectionLabel('Your meals'), mealsTile(meals, ctx));
+    }
 
     if (freq.length) {
       results.append(sectionLabel('You eat these most'), listTile(freq.map(toItem), ctx));
@@ -136,7 +148,7 @@ export function renderAdd(root, ctx) {
     if (lib.length) {
       results.append(sectionLabel('Your foods'), listTile(lib.slice(0, 12).map(toItem), ctx));
     }
-    if (!freq.length && !recent.length && !lib.length) {
+    if (!freq.length && !recent.length && !lib.length && !meals.length) {
       results.append(el('div.tile', {}, empty(
         'Start with what you actually eat',
         'Scan a barcode, or build a food once from its packet and it stays in your library for good.',
@@ -148,6 +160,92 @@ export function renderAdd(root, ctx) {
 }
 
 const sectionLabel = text => el('div.section-label', {}, el('span.micro', {}, text));
+
+const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
+
+function mealsTile(meals, ctx) {
+  const tile = el('div.tile.flush');
+  for (const m of meals) {
+    const t = mealTotals(m);
+    tile.append(el('div.row', {},
+      el('button', {
+        class: 'grow', style: { textAlign: 'left', padding: 0 },
+        onclick: () => {
+          const n = logMeal(ctx.date || dayKey(), m.id);
+          toast(`${m.name} logged — ${n} items, ${kcal(t.kcal)} kcal.`);
+          ctx.go('today');
+        },
+      },
+        el('div.title', {}, m.name),
+        el('div.sub', {},
+          `${m.items.length} items · ${Math.round(t.p)}P ${Math.round(t.c)}C ${Math.round(t.f)}F`
+          + (m.uses ? ` · used ${m.uses}×` : ''))),
+      el('span.kcal', {}, kcal(t.kcal)),
+      el('button.x-btn', {
+        'aria-label': 'Options for ' + m.name,
+        onclick: () => openMealOptions(m, ctx),
+      }, icon('edit', 15)),
+    ));
+  }
+  return tile;
+}
+
+function openMealOptions(m, ctx) {
+  const t = mealTotals(m);
+  const nameInput = el('input', { type: 'text', value: m.name });
+
+  let target = m.meal;
+  const mealBox = el('div', {}, segmented(
+    MEALS.map(x => ({ value: x, label: MEAL_LABELS[x] })), target, v => { target = v; }));
+
+  const s = sheet({
+    title: m.name,
+    body: el('div', {},
+      el('div.tile', {},
+        el('div.readout', {},
+          el('div', {},
+            el('div.micro', {}, 'Whole meal'),
+            el('div.readout-main', { style: { fontSize: '32px' } }, kcal(t.kcal))),
+          el('div.readout-side', {},
+            el('div.micro', {}, 'Protein'),
+            el('div.v', {}, Math.round(t.p) + ' g')))),
+
+      el('div.tile.flush', {},
+        ...m.items.map(it => el('div.row', {},
+          el('span.grow', {},
+            el('div.title', {}, it.name),
+            el('div.sub', {}, `${grams(it.grams)} g`)),
+          el('span.kcal', {}, kcal((it.per100.kcal || 0) * it.grams / 100))))),
+
+      el('div.field', {}, el('label', {}, 'Name'), nameInput),
+      el('div.field', {}, el('label', {}, 'Log it into'), mealBox),
+
+      el('button.btn.block', {
+        onclick: () => { s.close(); openMealBuilder({ meal: m, onSaved: ctx.refresh }); },
+      }, icon('edit', 16), 'Change what is in it'),
+    ),
+    foot: el('div.btn-row', {},
+      el('button.btn.danger', {
+        onclick: async () => {
+          s.close();
+          if (await confirmSheet({
+            title: 'Delete this meal?',
+            message: `"${m.name}" will be removed. Anything already logged from it stays.`,
+            confirmLabel: 'Delete', danger: true,
+          })) { deleteMeal(m.id); toast('Deleted.'); ctx.refresh(); }
+        },
+      }, 'Delete'),
+      el('button.btn.primary', {
+        onclick: () => {
+          if (nameInput.value.trim()) renameMeal(m.id, nameInput.value);
+          logMeal(ctx.date || dayKey(), m.id, target);
+          toast(`${nameInput.value.trim() || m.name} logged.`);
+          s.close();
+          ctx.go('today');
+        },
+      }, 'Log it')),
+  });
+}
 
 /*
  * A food from any source, in the shape the rest of the app expects.
