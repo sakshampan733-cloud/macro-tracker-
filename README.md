@@ -16,7 +16,7 @@ That prints two addresses. Open the second one on your iPhone, on the same WiFi:
 
 ```
 On this Mac      https://localhost:8443
-On your iPhone   https://192.168.29.62:8443
+On your iPhone   https://<your-mac's-lan-ip>:8443
 ```
 
 Safari will warn about the certificate the first time — tap **Show Details → visit this website**. You only do this once, and it is what allows the camera scanner to run. iOS refuses camera access to any page that isn't on a secure connection.
