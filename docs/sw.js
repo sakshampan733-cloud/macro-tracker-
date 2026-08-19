@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'assay-v2';
+const CACHE = 'assay-v3';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',

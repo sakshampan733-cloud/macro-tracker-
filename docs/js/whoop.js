@@ -375,3 +375,101 @@ export function dayFactor(store, dateKey, windowDays = 28) {
     days: recent.length,
   };
 }
+
+/* ── Reading the export straight from the zip ────────────────────────── */
+
+/*
+ * Whoop hands you a zip. On a Mac that is a double-click; on a phone it is
+ * a genuine chore — save to Files, long-press, uncompress, find the right
+ * csv among six. Since this is the only route to Whoop data when the app is
+ * running without a server, it should not be the fiddly part.
+ *
+ * So the file picker takes the zip as-is. This reads the archive's central
+ * directory, finds the physiological cycles file, and inflates it with
+ * DecompressionStream, which Safari has had since 16.4. No library.
+ */
+
+const dv = buf => new DataView(buf);
+const str = (buf, off, len) => new TextDecoder().decode(new Uint8Array(buf, off, len));
+
+export function looksLikeZip(bytes) {
+  return bytes.byteLength > 4 && dv(bytes).getUint32(0, true) === 0x04034b50;
+}
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('This browser cannot open zip files. Unzip it first and pick the CSV.');
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Response(stream).arrayBuffer();
+}
+
+/* Walk the central directory rather than scanning local headers: only the
+   central directory reliably carries the compressed sizes. */
+export async function readZip(buf) {
+  const view = dv(buf);
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 66000); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('That does not look like a zip file.');
+
+  const count = view.getUint16(eocd + 10, true);
+  let p = view.getUint32(eocd + 16, true);
+  const entries = [];
+
+  for (let i = 0; i < count; i++) {
+    if (view.getUint32(p, true) !== 0x02014b50) break;
+    const method = view.getUint16(p + 10, true);
+    const compSize = view.getUint32(p + 20, true);
+    const nameLen = view.getUint16(p + 28, true);
+    const extraLen = view.getUint16(p + 30, true);
+    const commentLen = view.getUint16(p + 32, true);
+    const localOff = view.getUint32(p + 42, true);
+    const name = str(buf, p + 46, nameLen);
+    entries.push({ name, method, compSize, localOff });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+
+  return {
+    entries,
+    async read(entry) {
+      const lv = dv(buf);
+      if (lv.getUint32(entry.localOff, true) !== 0x04034b50) throw new Error('Damaged zip entry.');
+      const nameLen = lv.getUint16(entry.localOff + 26, true);
+      const extraLen = lv.getUint16(entry.localOff + 28, true);
+      const start = entry.localOff + 30 + nameLen + extraLen;
+      const raw = buf.slice(start, start + entry.compSize);
+      const out = entry.method === 0 ? raw : await inflateRaw(raw);
+      return new TextDecoder().decode(new Uint8Array(out));
+    },
+  };
+}
+
+/*
+ * Take whatever the picker gave us — the zip, or a single csv — and return
+ * imported Whoop rows. Picking the wrong csv out of the export is the other
+ * easy mistake, so the right one is found by name.
+ */
+export async function importWhoopFile(file) {
+  const buf = await file.arrayBuffer();
+
+  if (!looksLikeZip(buf)) {
+    return importWhoopCSV(new TextDecoder().decode(new Uint8Array(buf)));
+  }
+
+  const zip = await readZip(buf);
+  const csvs = zip.entries.filter(e => /\.csv$/i.test(e.name) && !/__MACOSX/.test(e.name));
+  if (!csvs.length) throw new Error('No CSV inside that zip. Is it the Whoop export?');
+
+  const wanted = csvs.find(e => /physiological[_ -]?cycles/i.test(e.name))
+              || csvs.find(e => /cycles/i.test(e.name));
+  if (!wanted) {
+    const names = csvs.map(e => e.name.split('/').pop()).join(', ');
+    throw new Error(`No physiological_cycles.csv in that zip. It contains: ${names}`);
+  }
+
+  const res = importWhoopCSV(await zip.read(wanted));
+  res.filename = wanted.name.split('/').pop();
+  return res;
+}

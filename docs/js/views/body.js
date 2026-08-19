@@ -12,7 +12,7 @@ import {
 } from '../ui.js';
 import { get, commit, dayKey, setWeight, peekDay, weightSeries, totals } from '../store.js';
 import {
-  importWhoopCSV, summary, METRICS, seriesFor, placeInRange, baseline,
+  importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
   nutritionVsRecovery,
 } from '../whoop.js';
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE } from '../nutrition.js';
@@ -382,18 +382,18 @@ export async function autoSyncWhoop() {
 }
 
 export function openWhoopImport(ctx) {
-  const file = el('input', { type: 'file', accept: '.csv,text/csv' });
+  const file = el('input', { type: 'file', accept: '.zip,.csv,text/csv,application/zip' });
   const status = el('div');
 
   const load = async f => {
     if (!f) return;
     status.replaceChildren(el('div.flex', {}, el('div.spinner'), el('span', {}, 'Reading…')));
     try {
-      const text = await f.text();
-      const res = importWhoopCSV(text);
+      const res = await importWhoopFile(f);
       commit(st => { st.whoop = { rows: res.rows, importedAt: Date.now() }; }, 'whoop');
       status.replaceChildren(el('div.note.good', {},
-        el('div', {}, `Imported ${res.count} days, ${res.from} to ${res.to}.`)));
+        el('div', {}, `Imported ${res.count} days, ${res.from} to ${res.to}.`
+          + (res.filename ? ` From ${res.filename} inside the zip.` : ''))));
       toast(`${res.count} days of Whoop data in.`);
       setTimeout(() => { s.close(); ctx.refresh(); }, 900);
     } catch (e) {
@@ -409,12 +409,13 @@ export function openWhoopImport(ctx) {
       el('ol', { style: { color: 'var(--text-2)', fontSize: '13.5px', lineHeight: '1.7', paddingLeft: '18px', marginTop: 0 } },
         el('li', {}, 'Open whoop.com and sign in.'),
         el('li', {}, 'Settings, then Download my data.'),
-        el('li', {}, 'Whoop emails you a zip. Unzip it.'),
-        el('li', {}, 'Choose ', el('b', {}, 'physiological_cycles.csv'), ' below.')),
+        el('li', {}, 'Whoop emails you a zip. Save it to Files.'),
+        el('li', {}, 'Pick the ', el('b', {}, 'zip itself'), ' below — no need to unzip it.')),
       el('button.btn.primary.block', { onclick: () => { s.close(); openWhoopConnect(ctx); } },
         'Set up automatic sync instead'),
       el('div.divider'),
-      field('Whoop CSV', file),
+      field('Whoop export', file,
+        'The .zip straight from Whoop, or a single .csv if you have already unzipped it.'),
       status,
       el('div.note', {}, el('div', {},
         'Nothing leaves this device. The file is parsed in the browser and stored locally.'))),
