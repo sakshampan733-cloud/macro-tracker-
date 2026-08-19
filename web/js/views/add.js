@@ -1,0 +1,491 @@
+/*
+ * Adding food.
+ *
+ * Four ways in, in the order a specific eater actually needs them: the
+ * things you eat constantly, the barcode in your hand, a search, and
+ * finally building the food yourself from a packet.
+ */
+
+import {
+  el, clear, sheet, toast, icon, kcal, grams, g, empty, field, segmented, confirmSheet,
+} from '../ui.js';
+import { get, saveFood, frequentFoods, recentFoods, dayKey } from '../store.js';
+import { FOODS, GROUPS, atwater } from '../data/foods.js';
+import { resolveBarcode, searchProducts, validEAN, isIndian } from '../off.js';
+import { Scanner, cameraSupported, secureEnough } from '../scanner.js';
+import { openPortion } from './portion.js';
+import { openDish } from './dish.js';
+import { openPot } from './pot.js';
+
+export function renderAdd(root, ctx) {
+  const s = get();
+  clear(root);
+
+  const search = el('input', {
+    type: 'search', placeholder: 'Search your foods and the database',
+    autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false',
+    oninput: e => runSearch(e.target.value),
+  });
+
+  const results = el('div');
+
+  root.append(
+    el('h1', { style: { marginBottom: '14px' } }, 'Add food'),
+
+    el('div.btn-row', { style: { marginBottom: '10px' } },
+      el('button.btn.primary', { onclick: () => openScanner(ctx) }, icon('scan', 18), 'Scan'),
+      el('button.btn', { onclick: () => openBuilder({ onSaved: ctx.refresh }) }, icon('plus', 18), 'New food')),
+
+    el('div.btn-row', { style: { marginBottom: '14px' } },
+      el('button.btn', { onclick: () => openDish({ dateKey: ctx.date || dayKey(), onSaved: ctx.refresh }) },
+        icon('pot', 18), 'Home dish'),
+      el('button.btn', { onclick: () => openPot({ onSaved: ctx.refresh }) },
+        icon('bolt', 18), 'Build a pot')),
+
+    el('div.field', {}, search),
+    results,
+  );
+
+  let seq = 0;
+  async function runSearch(q) {
+    const mine = ++seq;
+    q = q.trim();
+    if (q.length < 2) { showShortcuts(); return; }
+
+    clear(results);
+    results.append(sectionLabel('Your foods and reference database'));
+
+    const local = searchLocal(q);
+    if (local.length) {
+      results.append(listTile(local, ctx));
+    } else {
+      results.append(el('div.tile', {}, el('div.dim', { style: { fontSize: '13.5px' } },
+        'Nothing local matches. Checking packaged products…')));
+    }
+
+    if (validEAN(q.replace(/\s/g, ''))) {
+      await lookupTyped(q.replace(/\s/g, ''));
+      return;
+    }
+
+    const loading = el('div.tile.flex', {}, el('div.spinner'),
+      el('span.dim', { style: { fontSize: '13.5px' } }, 'Searching packaged products…'));
+    results.append(sectionLabel('Packaged products'), loading);
+
+    const r = await searchProducts(q);
+    if (mine !== seq) return;
+    loading.remove();
+
+    if (r.offline) {
+      results.append(el('div.tile', {}, el('div.dim', { style: { fontSize: '13.5px' } },
+        'Packaged product search needs the Mac server running. Local results still work.')));
+    } else if (!r.products.length) {
+      results.append(el('div.tile', {}, el('div.dim', { style: { fontSize: '13.5px' } },
+        'No packaged product found. Build it from the packet instead.'),
+        el('button.btn.sm', { style: { marginTop: '10px' },
+          onclick: () => openBuilder({ name: q, onSaved: ctx.refresh }) }, 'Build it')));
+    } else {
+      results.append(listTile(r.products.map(toItem), ctx));
+    }
+  }
+
+  /*
+   * Someone typed a barcode into the search box instead of scanning it —
+   * the fallback offered whenever the print is scuffed or the light is bad.
+   * It has to land in the same place a good scan does.
+   */
+  async function lookupTyped(code) {
+    clear(results);
+    results.append(sectionLabel('Barcode ' + code));
+    const pending = el('div.tile.flex', {}, el('div.spinner'),
+      el('span.dim', { style: { fontSize: '13.5px' } }, 'Looking it up…'));
+    results.append(pending);
+
+    const food = await resolveBarcode(code);
+    pending.remove();
+
+    if (food.found) {
+      results.append(listTile([toItem(food)], ctx));
+      openPortion(toItem(food), { dateKey: ctx.date || dayKey(), onSaved: ctx.refresh });
+      return;
+    }
+
+    results.append(el('div.tile', {},
+      el('div', { style: { fontSize: '13.5px', color: 'var(--text-2)', lineHeight: '1.55' } },
+        food.offline
+          ? 'The Mac server is not reachable, so packaged lookups are off. You can still build this food by hand.'
+          : `Open Food Facts has no entry for ${code}${isIndian(code) ? ', an Indian product code' : ''}. `
+            + 'Build it once from the packet and it is yours permanently.'),
+      el('button.btn.primary.block', { style: { marginTop: '12px' },
+        onclick: () => openBuilder({ barcode: code, onSaved: ctx.refresh }) },
+        'Enter it from the packet')));
+  }
+
+  function showShortcuts() {
+    clear(results);
+    const freq = frequentFoods(10);
+    const recent = recentFoods(10);
+
+    if (freq.length) {
+      results.append(sectionLabel('You eat these most'), listTile(freq.map(toItem), ctx));
+    }
+    if (recent.length) {
+      results.append(sectionLabel('Recent'), listTile(recent.map(toItem), ctx));
+    }
+    const lib = Object.values(s.library);
+    if (lib.length) {
+      results.append(sectionLabel('Your foods'), listTile(lib.slice(0, 12).map(toItem), ctx));
+    }
+    if (!freq.length && !recent.length && !lib.length) {
+      results.append(el('div.tile', {}, empty(
+        'Start with what you actually eat',
+        'Scan a barcode, or build a food once from its packet and it stays in your library for good.',
+        el('button.btn.primary', { onclick: () => openBuilder({ onSaved: ctx.refresh }) }, 'Build a food'))));
+    }
+  }
+
+  showShortcuts();
+}
+
+const sectionLabel = text => el('div.section-label', {}, el('span.micro', {}, text));
+
+/*
+ * A food from any source, in the shape the rest of the app expects.
+ *
+ * Grade matters: it multiplies the measurement error. A packaged product
+ * with a printed panel is grade B; defaulting everything to C would widen
+ * the error bars on the most reliable data in the app.
+ */
+function toItem(f) {
+  return {
+    id: f.id || f.ref,
+    n: f.n || f.name,
+    brand: f.brand || '',
+    per100: f.per100,
+    serv: (f.serv || []).map(x => Array.isArray(x) ? { l: x[0], g: x[1] } : x),
+    grade: f.grade || (f.src === 'openfoodfacts' || f.barcode ? 'B' : 'C'),
+    grp: f.grp || '',
+    basis: f.basis,
+    barcode: f.barcode,
+    src: f.src,
+  };
+}
+
+/* Ranked so an exact word match beats a substring buried mid-name. */
+function searchLocal(q) {
+  const s = get();
+  const needle = q.toLowerCase();
+  const pool = [...Object.values(s.library).map(toItem), ...FOODS.map(toItem)];
+  const hits = [];
+
+  for (const f of pool) {
+    const name = (f.n || '').toLowerCase();
+    const brand = (f.brand || '').toLowerCase();
+    let score = 0;
+    if (name === needle) score = 100;
+    else if (name.startsWith(needle)) score = 70;
+    else if (name.split(/[\s,/()-]+/).some(w => w.startsWith(needle))) score = 55;
+    else if (name.includes(needle)) score = 35;
+    else if (brand.includes(needle)) score = 20;
+    if (!score) continue;
+    if (String(f.id).startsWith('my:')) score += 25;
+    hits.push({ f, score });
+  }
+  hits.sort((a, b) => b.score - a.score);
+  return hits.slice(0, 25).map(h => h.f);
+}
+
+function listTile(items, ctx) {
+  const tile = el('div.tile.flush');
+  for (const f of items) {
+    const per = f.per100 || {};
+    tile.append(el('button.row', {
+      onclick: () => openPortion(f, { dateKey: ctx.date || dayKey(), onSaved: ctx.refresh }),
+    },
+      el('span.grow', {},
+        el('div.title', {}, f.n),
+        el('div.sub', {},
+          [f.brand, f.basis, basisNote(f.basis)].filter(Boolean).join(' · ') || 'per 100 g',
+          ` · ${Math.round(per.p || 0)}P ${Math.round(per.c || 0)}C ${Math.round(per.f || 0)}F`)),
+      el('span.kcal', {}, kcal(per.kcal), el('div.micro', { style: { marginTop: '2px' } }, '/100g')),
+      icon('chevron', 15),
+    ));
+  }
+  return tile;
+}
+
+const basisNote = b => (b === 'raw' ? 'weighed raw' : b === 'dry' ? 'weighed dry' : b === 'cooked' ? 'weighed cooked' : '');
+
+/* ── Scanner ────────────────────────────────────────────────────────── */
+
+export function openScanner(ctx) {
+  const video = el('video', { playsinline: true, muted: true });
+  const status = el('div.scan-status', {}, el('div.spinner'), el('span', {}, 'Starting camera…'));
+  const wrap = el('div.scan-wrap', {}, video,
+    el('div.reticle', {}, el('div.reticle-line')), status);
+
+  const manual = el('input.num-in', {
+    type: 'text', inputmode: 'numeric', placeholder: 'or type the digits under the barcode',
+    autocomplete: 'off',
+  });
+
+  let scanner = null;
+  let busy = false;
+
+  const s = sheet({
+    title: 'Scan a barcode',
+    body: el('div', {}, wrap,
+      el('div', { style: { height: '14px' } }),
+      field('Barcode number', manual, 'Useful when the print is scuffed or the light is bad.'),
+      el('button.btn.block', {
+        onclick: () => {
+          const code = manual.value.replace(/\D/g, '');
+          if (!code) { toast('Enter the digits first.', 'err'); return; }
+          handle(code);
+        },
+      }, 'Look it up')),
+    onClose: () => scanner && scanner.stop(),
+  });
+
+  async function handle(code) {
+    if (busy) return;
+    busy = true;
+    status.replaceChildren(el('div.spinner'), el('span', {}, `Looking up ${code}…`));
+
+    const food = await resolveBarcode(code);
+    busy = false;
+
+    if (!food.found) {
+      status.replaceChildren(el('span', {}, food.offline
+        ? 'Server unreachable — start it on the Mac, or build the food by hand.'
+        : `Not in the database yet.`));
+      scanner && scanner.stop();
+      s.close();
+      notFound(code, food, ctx);
+      return;
+    }
+
+    scanner && scanner.stop();
+    s.close();
+    openPortion(toItem(food), { dateKey: ctx.date || dayKey(), onSaved: ctx.refresh });
+  }
+
+  function notFound(code, food, ctx) {
+    sheet({
+      title: 'Not in the database',
+      body: el('div', {},
+        el('p', { style: { color: 'var(--text-2)', marginTop: 0, lineHeight: '1.55' } },
+          `Barcode ${code}`, isIndian(code) ? ' is an Indian product code' : '',
+          ` but Open Food Facts has no entry for it. Build it once from the packet and it's yours permanently.`),
+        el('button.btn.primary.block', {
+          onclick: () => openBuilder({ barcode: code, onSaved: ctx.refresh }),
+        }, 'Enter it from the packet')),
+    });
+  }
+
+  scanner = new Scanner(video, {
+    onResult: handle,
+    onError: msg => {
+      status.replaceChildren(el('span', {}, msg));
+      wrap.style.aspectRatio = 'auto';
+      wrap.style.minHeight = '120px';
+    },
+  });
+
+  scanner.start().then(ok => {
+    if (ok) {
+      status.replaceChildren(el('span', {},
+        `Hold the barcode inside the frame · ${scanner.engine === 'native' ? 'fast decoder' : 'compatibility decoder'}`));
+      if (scanner.hasTorch()) {
+        const torch = el('button.btn.sm', { style: { marginLeft: 'auto' } }, 'Light');
+        let on = false;
+        torch.onclick = async () => { on = !on; await scanner.torch(on); torch.textContent = on ? 'Light off' : 'Light'; };
+        status.append(torch);
+      }
+    }
+  });
+
+  return s;
+}
+
+/* ── Custom food builder ────────────────────────────────────────────── */
+
+/*
+ * Building a food by hand.
+ *
+ * Packets in India list per 100 g, per serving, or both, and the two often
+ * disagree. You enter whichever the packet actually shows and the app
+ * converts, rather than making you do arithmetic at the kitchen counter.
+ */
+export function openBuilder({ name = '', barcode = null, food = null, onSaved = () => {} } = {}) {
+  let mode = 'per100';
+  let servingG = food?.serv?.[0]?.g || 100;
+
+  const inp = (ph, val = '', step = '0.1') => el('input.num-in', {
+    type: 'number', inputmode: 'decimal', step, min: '0',
+    placeholder: ph, value: val === 0 || val ? String(val) : '',
+  });
+
+  const p100 = food?.per100 || {};
+  const fName = el('input', { type: 'text', value: food?.n || name, placeholder: 'Whey isolate, chocolate' });
+  const fBrand = el('input', { type: 'text', value: food?.brand || '', placeholder: 'Brand, optional' });
+  const fBarcode = el('input.num-in', { type: 'text', inputmode: 'numeric', value: food?.barcode || barcode || '', placeholder: 'Barcode, optional' });
+
+  const fKcal = inp('kcal', p100.kcal, '1');
+  const fP = inp('protein g', p100.p);
+  const fC = inp('carbs g', p100.c);
+  const fF = inp('fat g', p100.f);
+  const fFib = inp('fibre g', p100.fib);
+  const fSug = inp('sugar g', p100.sug);
+  const fSat = inp('sat fat g', p100.sat);
+  const fNa = inp('sodium mg', p100.na, '1');
+
+  const fServG = inp('grams', servingG, '0.1');
+  const fServL = el('input', { type: 'text', value: food?.serv?.[0]?.l || '', placeholder: '1 scoop' });
+
+  const basisBox = el('div');
+  let basis = food?.basis || 'as-served';
+  basisBox.append(segmented([
+    { value: 'as-served', label: 'As eaten' },
+    { value: 'raw', label: 'Raw' },
+    { value: 'dry', label: 'Dry' },
+    { value: 'cooked', label: 'Cooked' },
+  ], basis, v => { basis = v; }, { wrap: true }));
+
+  const checkBox = el('div');
+
+  const readValues = () => {
+    const raw = {
+      kcal: +fKcal.value || 0, p: +fP.value || 0, c: +fC.value || 0, f: +fF.value || 0,
+      fib: +fFib.value || 0, sug: +fSug.value || 0, sat: +fSat.value || 0, na: +fNa.value || 0,
+    };
+    if (mode === 'perServing') {
+      const sg = +fServG.value || 0;
+      if (sg > 0) {
+        const k = 100 / sg;
+        for (const key in raw) raw[key] = +(raw[key] * k).toFixed(2);
+      }
+    }
+    return raw;
+  };
+
+  /*
+   * A printed nutrition panel should reconcile with its own macros to within
+   * a few percent. Anything wider is a typo, a mixed-up column, or a
+   * rounded panel — and the app says which band you are in rather than
+   * passing everything under one loose threshold.
+   */
+  const validate = () => {
+    const per100 = readValues();
+    const check = atwater(per100);
+    checkBox.replaceChildren();
+
+    if (!per100.kcal && !per100.p && !per100.c && !per100.f) return;
+
+    const off = Math.abs(check.delta);
+    const pctOff = Math.round(off * 100);
+    const gap = Math.abs(check.stated - check.derived);
+
+    let tone, head, detail;
+    if (off <= 0.04 || gap <= 8) {
+      tone = 'good';
+      head = 'Reconciles';
+      detail = `Its macros account for ${check.derived} kcal against the ${check.stated} stated. That is what a correct panel looks like.`;
+    } else if (off <= 0.10) {
+      tone = 'info';
+      head = `${pctOff}% apart`;
+      detail = `Macros come to ${check.derived} kcal, the panel says ${check.stated}. Rounding on the packet explains a gap this size, but it is worth a second look.`;
+    } else {
+      tone = 'warn';
+      head = `Off by ${pctOff}%`;
+      detail = `You entered ${check.stated} kcal per 100 g, but the macros you entered come to ${check.derived}. `
+             + `That is too wide to be rounding — usually a typo, or the per-serving column mixed in with the per-100 g one.`;
+    }
+
+    checkBox.append(el('div', { class: 'note ' + tone },
+      el('div', {},
+        el('b', {}, head),
+        el('div.fine', { style: { marginTop: '3px' } }, detail))));
+  };
+
+  [fKcal, fP, fC, fF, fFib, fServG].forEach(i => i.addEventListener('input', validate));
+
+  const modeBox = el('div');
+  const modeHelp = el('div.help');
+
+  const syncModeHelp = () => {
+    modeHelp.textContent = mode === 'per100'
+      ? 'Enter the numbers from the per-100 g column.'
+      : 'Enter the numbers from the per-serving column. The serving weight above is what they get divided by.';
+  };
+
+  modeBox.append(segmented([
+    { value: 'per100', label: 'Per 100 g' },
+    { value: 'perServing', label: 'Per serving' },
+  ], mode, v => { mode = v; syncModeHelp(); validate(); }));
+  syncModeHelp();
+
+  const body = el('div', {},
+    field('Name', fName),
+    el('div.field-2', {}, field('Brand', fBrand), field('Barcode', fBarcode)),
+    field('Weighed how?', basisBox,
+      'Say which state you weigh this in. Dry oats and cooked oats are not the same food.'),
+
+    el('div.section-label', {}, el('span.micro', {}, 'Nutrition panel')),
+    el('div.field', {},
+      el('label', {}, 'The packet lists values'),
+      modeBox,
+      modeHelp),
+    el('div.field-2', {}, field('Serving weight (g)', fServG), field('Serving name', fServL)),
+
+    el('div.field-2', {}, field('Energy (kcal)', fKcal), field('Protein (g)', fP)),
+    el('div.field-2', {}, field('Carbohydrate (g)', fC), field('Fat (g)', fF)),
+    el('div.field-2', {}, field('Fibre (g)', fFib), field('Sugar (g)', fSug)),
+    el('div.field-2', {}, field('Saturated fat (g)', fSat), field('Sodium (mg)', fNa)),
+
+    checkBox,
+  );
+
+  const s = sheet({
+    title: food ? 'Edit food' : 'New food',
+    body,
+    foot: el('div.btn-row', {},
+      el('button.btn', {
+        onclick: () => { const f = build(); if (f) { saveFood(f); toast('Saved to your foods.'); s.close(); onSaved(); } },
+      }, 'Save only'),
+      el('button.btn.primary', {
+        onclick: () => {
+          const f = build();
+          if (!f) return;
+          const saved = saveFood(f);
+          s.close(); onSaved();
+          openPortion(saved, { onSaved });
+        },
+      }, 'Save and log')),
+  });
+
+  function build() {
+    const n = fName.value.trim();
+    if (!n) { toast('Give it a name.', 'err'); return null; }
+    const per100 = readValues();
+    if (!per100.kcal) { toast('Energy is required.', 'err'); return null; }
+
+    const serv = [];
+    const sg = +fServG.value || 0;
+    if (sg > 0) serv.push({ l: fServL.value.trim() || `1 serving (${sg} g)`, g: sg });
+    serv.push({ l: '100 g', g: 100 });
+
+    return {
+      id: food?.id,
+      n, brand: fBrand.value.trim(),
+      barcode: fBarcode.value.replace(/\D/g, '') || null,
+      basis, per100, serv,
+      grade: 'B',
+      grp: 'Yours',
+      diet: 'veg',
+    };
+  }
+
+  validate();
+  return s;
+}

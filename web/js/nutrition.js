@@ -1,0 +1,305 @@
+/*
+ * Energy and macro maths.
+ *
+ * Three ways to know your maintenance calories, in ascending order of
+ * accuracy. Assay uses the best one it has data for and always tells you
+ * which one it used.
+ *
+ *   1. Predicted   Mifflin-St Jeor (or Katch-McArdle if body fat is known)
+ *                  times an activity factor. A population average. Routinely
+ *                  off by 15% for any given person.
+ *   2. Measured    Whoop's own daily energy expenditure. Device-measured,
+ *                  but the calorie model is proprietary and drifts.
+ *   3. Adaptive    Back-calculated from your logged intake and the observed
+ *                  trend in your weight. This is the only method that uses
+ *                  *your* physiology instead of a stand-in for it, and it
+ *                  gets sharper every day you log.
+ */
+
+const KCAL_PER_KG_TISSUE = 7700;   // ~1 kg of mixed body tissue
+
+/* Day keys are local dates. toISOString() is UTC, so east of Greenwich it
+   names yesterday for the first hours of every morning — which would drop a
+   day off the front of the adaptive window. */
+function localDayKey(d = new Date()) {
+  const t = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return t.toISOString().slice(0, 10);
+}
+
+export const ACTIVITY = {
+  sedentary:  { f: 1.20, label: 'Sedentary',   hint: 'Desk work, little movement' },
+  light:      { f: 1.375, label: 'Light',      hint: 'Training 1–3 days a week' },
+  moderate:   { f: 1.55, label: 'Moderate',    hint: 'Training 3–5 days a week' },
+  high:       { f: 1.725, label: 'High',       hint: 'Training 6–7 days a week' },
+  athlete:    { f: 1.90, label: 'Very high',   hint: 'Twice a day, or physical job' },
+};
+
+export const GOALS = {
+  cut:      { label: 'Lose fat',      rate: -0.5, hint: 'Deficit, protein held high' },
+  lean:     { label: 'Lean slowly',   rate: -0.25, hint: 'Small deficit, keeps training quality' },
+  maintain: { label: 'Maintain',      rate: 0,    hint: 'Hold weight, recomposition' },
+  gain:     { label: 'Build',         rate: 0.25, hint: 'Slow surplus, minimal fat gain' },
+  bulk:     { label: 'Gain fast',     rate: 0.5,  hint: 'Larger surplus' },
+};
+
+export function age(birthYear, birthMonth = 6) {
+  const now = new Date();
+  return now.getFullYear() - birthYear - (now.getMonth() + 1 < birthMonth ? 1 : 0);
+}
+
+/* Mifflin-St Jeor — the best-validated prediction equation for BMR. */
+export function bmrMifflin({ sex, weightKg, heightCm, years }) {
+  const base = 10 * weightKg + 6.25 * heightCm - 5 * years;
+  return Math.round(sex === 'female' ? base - 161 : base + 5);
+}
+
+/* Katch-McArdle — better than Mifflin when body fat % is actually known,
+   because lean mass, not total mass, drives resting expenditure. */
+export function bmrKatch({ weightKg, bodyFatPct }) {
+  const lean = weightKg * (1 - bodyFatPct / 100);
+  return Math.round(370 + 21.6 * lean);
+}
+
+export function bmrFor(profile) {
+  if (profile.bodyFatPct > 0) {
+    return { kcal: bmrKatch(profile), method: 'Katch-McArdle', note: 'uses your lean mass' };
+  }
+  return {
+    kcal: bmrMifflin({ ...profile, years: age(profile.birthYear) }),
+    method: 'Mifflin-St Jeor',
+    note: 'add body fat % for a sharper figure',
+  };
+}
+
+export function predictedTDEE(profile) {
+  const bmr = bmrFor(profile);
+  const f = (ACTIVITY[profile.activity] || ACTIVITY.moderate).f;
+  return { kcal: Math.round(bmr.kcal * f), bmr: bmr.kcal, method: bmr.method, source: 'predicted' };
+}
+
+/*
+ * Adaptive TDEE.
+ *
+ * Energy balance says: intake - expenditure = tissue change. Rearranged,
+ * expenditure = mean intake - (weight slope x 7700 / days). Weight is noisy
+ * day to day — water, glycogen, gut contents swing it by a kilo — so the
+ * slope comes from a least-squares fit over the window rather than
+ * first-minus-last, and short or sparse windows are reported as low
+ * confidence instead of being quietly trusted.
+ */
+export function adaptiveTDEE(store, windowDays = 28) {
+  const days = Object.entries(store.days)
+    .map(([date, d]) => ({ date, d }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - windowDays);
+  const key = localDayKey(cutoff);
+  const win = days.filter(x => x.date >= key);
+
+  const intakeDays = win.filter(x => x.d.entries.length >= 2);
+  const weights = win.filter(x => x.d.weight > 0);
+
+  if (intakeDays.length < 10 || weights.length < 4) {
+    return {
+      kcal: null,
+      source: 'adaptive',
+      ready: false,
+      have: { intakeDays: intakeDays.length, weighIns: weights.length },
+      need: { intakeDays: 10, weighIns: 4 },
+    };
+  }
+
+  // Least-squares slope of weight against day index.
+  const t0 = new Date(weights[0].date).getTime();
+  const pts = weights.map(w => ({
+    x: (new Date(w.date).getTime() - t0) / 86400000,
+    y: w.d.weight,
+  }));
+  const n = pts.length;
+  const mx = pts.reduce((a, p) => a + p.x, 0) / n;
+  const my = pts.reduce((a, p) => a + p.y, 0) / n;
+  const num = pts.reduce((a, p) => a + (p.x - mx) * (p.y - my), 0);
+  const den = pts.reduce((a, p) => a + (p.x - mx) ** 2, 0);
+  const slopeKgPerDay = den ? num / den : 0;
+
+  // Residual scatter around the fit tells us how trustworthy the slope is.
+  const resid = pts.map(p => p.y - (my + slopeKgPerDay * (p.x - mx)));
+  const rms = Math.sqrt(resid.reduce((a, r) => a + r * r, 0) / n);
+  const spanDays = Math.max(1, pts[n - 1].x - pts[0].x);
+
+  let intakeSum = 0, sigmaSq = 0;
+  for (const x of intakeDays) {
+    const t = dayTotals(x.d);
+    intakeSum += t.kcal;
+    sigmaSq += t.sigma * t.sigma;
+  }
+  const meanIntake = intakeSum / intakeDays.length;
+  const intakeSigma = Math.sqrt(sigmaSq) / intakeDays.length;
+
+  const tdee = meanIntake - slopeKgPerDay * KCAL_PER_KG_TISSUE;
+
+  // Uncertainty in the slope translates straight into uncertainty in TDEE.
+  const slopeSigma = den ? rms / Math.sqrt(den) : 0.05;
+  const sigma = Math.sqrt(
+    intakeSigma ** 2 + (slopeSigma * KCAL_PER_KG_TISSUE) ** 2
+  );
+
+  return {
+    kcal: Math.round(tdee),
+    sigma: Math.round(sigma),
+    source: 'adaptive',
+    ready: true,
+    slopeKgPerWeek: +(slopeKgPerDay * 7).toFixed(3),
+    meanIntake: Math.round(meanIntake),
+    spanDays: Math.round(spanDays),
+    samples: { intakeDays: intakeDays.length, weighIns: n },
+    scatterKg: +rms.toFixed(2),
+  };
+}
+
+/*
+ * Local copy of the totals maths so this module stays independent of store.
+ * Home dishes carry no fixed per100 block, so they are valued from whatever
+ * density estimate was current when they were logged.
+ */
+function dayTotals(d) {
+  const M = { weighed: 0.02, label: 0.05, portion: 0.12, estimate: 0.25 };
+  const G = { A: 1.0, B: 1.2, C: 1.6, D: 2.2 };
+  let kcal = 0, varSum = 0;
+  for (const e of d.entries) {
+    if (e.dish) {
+      const density = e.density || 1.2;
+      const k = e.grams * density;
+      kcal += k;
+      const s = e.grams * (e.densitySd || 0.2);
+      varSum += s * s;
+      continue;
+    }
+    const k = (e.per100.kcal || 0) * e.grams / 100;
+    kcal += k;
+    const s = k * (M[e.method] ?? 0.12) * (G[e.grade] ?? 1.3);
+    varSum += s * s;
+  }
+  return { kcal, sigma: Math.sqrt(varSum) };
+}
+
+/* Whoop reports total daily energy expenditure directly. */
+export function whoopTDEE(store, windowDays = 14) {
+  const rows = Object.entries(store.whoop?.rows || {}).sort();
+  const recent = rows.slice(-windowDays).filter(([, r]) => r.kcal > 0);
+  if (recent.length < 5) return { kcal: null, source: 'whoop', ready: false, have: recent.length };
+  const vals = recent.map(([, r]) => r.kcal);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const sd = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
+  return {
+    kcal: Math.round(mean),
+    sigma: Math.round(sd),
+    source: 'whoop',
+    ready: true,
+    days: recent.length,
+  };
+}
+
+/*
+ * Pick the best available estimate. Adaptive wins once it has enough data,
+ * because it is measured on the actual person rather than predicted for a
+ * population or modelled by a wrist strap.
+ */
+export function bestTDEE(store, profile) {
+  const adaptive = adaptiveTDEE(store);
+  const whoop = whoopTDEE(store);
+  const predicted = predictedTDEE(profile);
+  const pref = store.settings?.tdeeSource || 'auto';
+
+  if (pref === 'predicted') return { ...predicted, why: 'You chose the formula estimate.' };
+  if (pref === 'whoop' && whoop.ready) return { ...whoop, why: `Mean of your last ${whoop.days} Whoop days.` };
+  if (pref === 'adaptive' && adaptive.ready) return { ...adaptive, why: 'Back-calculated from your own log.' };
+
+  if (adaptive.ready) {
+    return { ...adaptive, why: `From ${adaptive.samples.intakeDays} logged days and ${adaptive.samples.weighIns} weigh-ins.`, alternatives: { whoop, predicted } };
+  }
+  if (whoop.ready) {
+    return { ...whoop, why: `Mean of your last ${whoop.days} Whoop days.`, alternatives: { adaptive, predicted } };
+  }
+  return {
+    ...predicted,
+    why: 'Formula estimate. Log 10 days and 4 weigh-ins and this switches to your real number.',
+    alternatives: { adaptive, whoop },
+  };
+}
+
+/*
+ * Macro targets.
+ *
+ * Protein is set per kg of bodyweight (or lean mass when known) and held
+ * high in a deficit, because that is what protects muscle. Fat gets a floor
+ * for hormone function. Carbohydrate takes whatever energy is left, which
+ * is what actually fuels training.
+ */
+export function macroTargets(profile, tdeeKcal) {
+  const goal = GOALS[profile.goal] || GOALS.maintain;
+  const rateKgPerWeek = profile.rate ?? goal.rate;
+  const delta = (rateKgPerWeek * KCAL_PER_KG_TISSUE) / 7;
+  const kcal = Math.max(1200, Math.round(tdeeKcal + delta));
+
+  const lean = profile.bodyFatPct > 0
+    ? profile.weightKg * (1 - profile.bodyFatPct / 100)
+    : null;
+
+  const cutting = rateKgPerWeek < 0;
+  const perKg = cutting ? 2.2 : 1.8;
+  const proteinG = Math.round((lean ? lean * (cutting ? 2.6 : 2.2) : profile.weightKg * perKg));
+
+  const fatFloor = Math.round(profile.weightKg * 0.8);
+  const fatFromPct = Math.round((kcal * 0.27) / 9);
+  const fatG = Math.max(fatFloor, fatFromPct);
+
+  const remaining = kcal - proteinG * 4 - fatG * 9;
+  const carbG = Math.max(40, Math.round(remaining / 4));
+
+  return {
+    kcal,
+    p: proteinG,
+    c: carbG,
+    f: fatG,
+    fib: Math.round(Math.min(45, Math.max(25, kcal / 1000 * 14))),
+    water: waterTarget(profile),
+    na: 2300,
+    sug: Math.round((kcal * 0.10) / 4),
+    basis: { tdee: Math.round(tdeeKcal), delta: Math.round(delta), rateKgPerWeek, proteinPerKg: lean ? null : perKg },
+  };
+}
+
+/* 35 ml per kg, plus a litre on hard training days. */
+export function waterTarget(profile) {
+  const base = Math.round(profile.weightKg * 35 / 50) * 50;
+  const bump = ['high', 'athlete'].includes(profile.activity) ? 500 : 0;
+  return base + bump;
+}
+
+/* What's left of each target for the rest of the day. */
+export function remaining(targets, totals) {
+  const r = {};
+  for (const k of ['kcal', 'p', 'c', 'f', 'fib', 'water']) {
+    r[k] = Math.round((targets[k] || 0) - (totals[k] || 0));
+  }
+  return r;
+}
+
+/*
+ * A trend weight, not a scale weight.
+ *
+ * Daily bodyweight swings by up to a kilo on water alone, which is why the
+ * scale lies and people quit. An exponentially weighted moving average with
+ * a ~10-day half-life shows the signal underneath.
+ */
+export function trendWeight(series, halfLife = 10) {
+  if (!series.length) return [];
+  const alpha = 1 - Math.pow(0.5, 1 / halfLife);
+  let ema = series[0].kg;
+  return series.map((pt, i) => {
+    ema = i === 0 ? pt.kg : ema + alpha * (pt.kg - ema);
+    return { ...pt, trend: +ema.toFixed(2) };
+  });
+}

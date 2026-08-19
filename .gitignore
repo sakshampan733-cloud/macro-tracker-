@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────
+# Everything under data/ is either a secret or your own health record.
+# None of it belongs in a repository, public or private.
+# ─────────────────────────────────────────────────────────────────────
+
+# TLS keypair for the local HTTPS server. key.pem is a PRIVATE KEY.
+# Regenerated automatically on first run.
+data/cert.pem
+data/key.pem
+data/cert.cnf
+
+# Whoop OAuth. client_secret and refresh tokens — treat as passwords.
+data/whoop_credentials.json
+data/whoop_tokens.json
+data/whoop_cache.json
+
+# Your food log, weight history and vitals.
+data/backup.json
+data/backup-*.json
+
+# Open Food Facts lookups. Rebuilds itself as you scan.
+data/cache/
+
+# Anything else that lands in data/ later is assumed private by default.
+data/*
+!data/.gitkeep
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Scratch
+*.log
+_test_*.csv
