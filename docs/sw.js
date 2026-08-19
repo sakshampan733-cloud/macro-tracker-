@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'assay-v1';
+const CACHE = 'assay-v2';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -75,8 +75,18 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  /*
+   * App code, network-first — and forced to revalidate.
+   *
+   * GitHub Pages serves assets with max-age=600, so a plain fetch can hand
+   * back a ten-minute-old module from the browser's own HTTP cache even
+   * though this looks like it went to the network. `cache: 'no-cache'`
+   * makes it a conditional request: a 304 when nothing changed, the new
+   * file the moment it does. Cheap, and it means a push actually reaches
+   * the phone.
+   */
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' })
       .then(r => {
         if (r.ok && url.origin === location.origin) {
           const copy = r.clone();

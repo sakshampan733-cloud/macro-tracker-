@@ -51,7 +51,14 @@ export function mealsLeft(now = new Date()) {
 export function mealBudget(targets, totals, now = new Date()) {
   const left = remaining(targets, totals);
   const ahead = mealsLeft(now);
-  if (!ahead.length) return { meal: 'dinner', budget: left, share: 1, ahead: [] };
+
+  // Past the last meal window — late at night. Everything still owed for the
+  // day belongs to this sitting, so the budget is simply what is left.
+  // (This branch previously omitted `left`, which crashed the Plan screen
+  // after 23:00 and at no other time.)
+  if (!ahead.length) {
+    return { meal: 'dinner', budget: left, left, share: 1, ahead: [] };
+  }
 
   const meal = currentMeal(now);
   const totalShare = ahead.reduce((a, m) => a + MEAL_SHARE[m], 0);

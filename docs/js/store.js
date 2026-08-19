@@ -359,15 +359,27 @@ export function importJSON(text) {
   emit('import', state);
 }
 
+/*
+ * Snapshot to the Mac, when there is a Mac.
+ *
+ * Served from GitHub Pages there is no server behind this, so the first
+ * failure switches it off for the session rather than firing a doomed
+ * request after every meal.
+ */
+let backupReachable = true;
+
 export async function pushBackup() {
-  if (!state.settings.autoBackup) return;
+  if (!state.settings.autoBackup || !backupReachable) return;
   try {
-    await fetch('/api/backup', {
+    const r = await fetch('api/backup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),
     });
-  } catch { /* offline is fine; it'll go up next time */ }
+    if (!r.ok) backupReachable = false;
+  } catch {
+    backupReachable = false;   // offline, or no helper running
+  }
 }
 
 export function reset() {

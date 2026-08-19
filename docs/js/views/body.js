@@ -278,7 +278,7 @@ export function openWhoopConnect(ctx) {
 
     let st;
     try {
-      st = await (await fetch('/api/whoop/status')).json();
+      st = await (await fetch('api/whoop/status')).json();
     } catch {
       body.replaceChildren(el('div.note.warn', {}, el('div', {},
         'The Mac server is not running, so syncing is unavailable. You can still load a CSV export.')));
@@ -318,7 +318,7 @@ export function openWhoopConnect(ctx) {
           el('div.fine', { style: { marginTop: '3px' } },
             'One authorisation left. Whoop will ask you to approve read access, then send you back here.'))),
         el('button.btn.primary.block', {
-          onclick: () => { window.open('/api/whoop/connect', '_blank'); },
+          onclick: () => { window.open('api/whoop/connect', '_blank'); },
         }, 'Authorise with Whoop'),
         el('div.fine', { style: { marginTop: '10px' } },
           'A tab opens on whoop.com. Approve it, then come back and press Sync.'),
@@ -338,7 +338,7 @@ export function openWhoopConnect(ctx) {
           if (await confirmSheet({ title: 'Disconnect Whoop?',
             message: 'The stored authorisation is deleted from this Mac. Data already imported stays.',
             confirmLabel: 'Disconnect', danger: true })) {
-            await fetch('/api/whoop/disconnect'); draw();
+            await fetch('api/whoop/disconnect'); draw();
           }
         } }, 'Disconnect'));
     }
@@ -350,7 +350,7 @@ export function openWhoopConnect(ctx) {
     body.replaceChildren(el('div.tile.flex', {}, el('div.spinner'),
       el('span.dim', {}, 'Pulling from Whoop…')));
     try {
-      const r = await (await fetch('/api/whoop/sync')).json();
+      const r = await (await fetch('api/whoop/sync')).json();
       if (!r.ok) {
         body.replaceChildren(el('div.note.warn', {}, el('div', {}, r.error)),
           el('button.btn.block', { style: { marginTop: '10px' }, onclick: draw }, 'Back'));
@@ -372,9 +372,9 @@ export function openWhoopConnect(ctx) {
 /* Quietly top up whenever the server is reachable and already authorised. */
 export async function autoSyncWhoop() {
   try {
-    const st = await (await fetch('/api/whoop/status')).json();
+    const st = await (await fetch('api/whoop/status')).json();
     if (!st.connected) return false;
-    const r = await (await fetch('/api/whoop/sync?days=120')).json();
+    const r = await (await fetch('api/whoop/sync?days=120')).json();
     if (!r.ok || !r.count) return false;
     commit(s => { s.whoop = { rows: r.rows, importedAt: Date.now(), source: 'api' }; }, 'whoop');
     return true;

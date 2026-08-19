@@ -30,7 +30,8 @@ import urllib.request
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-WEB = os.path.join(ROOT, "web")
+# Named docs/ because that is the folder GitHub Pages will serve from.
+WEB = os.path.join(ROOT, "docs")
 DATA = os.path.join(ROOT, "data")
 CACHE = os.path.join(DATA, "cache")
 CERT = os.path.join(DATA, "cert.pem")
