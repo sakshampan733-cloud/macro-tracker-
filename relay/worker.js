@@ -81,7 +81,18 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
 
-    if (!env.WHOOP_CLIENT_ID || !env.WHOOP_CLIENT_SECRET) {
+    /*
+     * Pasting a secret from a browser or a notes app very easily carries a
+     * leading or trailing space or newline along with it — invisible in the
+     * input box, and Whoop's OAuth server treats " abc" as a client that
+     * does not exist rather than as "abc" with padding. Trimming here means
+     * a stray whitespace character in the secret can never surface as a
+     * cryptic invalid_client error again.
+     */
+    const CLIENT_ID = (env.WHOOP_CLIENT_ID || '').trim();
+    const CLIENT_SECRET = (env.WHOOP_CLIENT_SECRET || '').trim();
+
+    if (!CLIENT_ID || !CLIENT_SECRET) {
       return json({ error: 'The relay is deployed but has no Whoop credentials set. '
         + 'Add WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET as secrets.' }, request, env, 500);
     }
@@ -102,7 +113,7 @@ export default {
       const nonce = crypto.randomUUID().replace(/-/g, '');
       const state = `${nonce}.${btoa(app).replace(/=/g, '')}`;
       const q = new URLSearchParams({
-        client_id: env.WHOOP_CLIENT_ID,
+        client_id: CLIENT_ID,
         response_type: 'code',
         scope: SCOPES,
         state,
@@ -131,8 +142,8 @@ export default {
       const body = new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        client_id: env.WHOOP_CLIENT_ID,
-        client_secret: env.WHOOP_CLIENT_SECRET,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
         redirect_uri: `${url.origin}/callback`,
       });
 
@@ -166,8 +177,8 @@ export default {
       const body = new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: incoming.refresh_token,
-        client_id: env.WHOOP_CLIENT_ID,
-        client_secret: env.WHOOP_CLIENT_SECRET,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
         scope: 'offline',
       });
       const r = await fetch(WHOOP_TOKEN, {
