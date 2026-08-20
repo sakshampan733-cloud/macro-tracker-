@@ -8,6 +8,7 @@
 
 import { per100For, STYLES } from './dishes.js';
 import { MICROS, NUTRIENTS } from './data/nutrients.js';
+import { supplementMicros } from './data/supplements.js';
 
 const KEY = 'basal.v1';
 const LEGACY_KEYS = ['assay.v1'];   // the app was called Assay before this
@@ -53,6 +54,7 @@ const EMPTY = () => ({
   days: {},
   library: {},
   meals: {},
+  supplementsTaken: [],     // which supplement ids the user actually takes
   recipes: {},
   cache: {},
   whoop: { rows: {}, importedAt: null },
@@ -145,7 +147,7 @@ export function shiftDay(key, n) {
   return dayKey(d);
 }
 
-const BLANK_DAY = Object.freeze({ entries: [], water: [], weight: null, note: '' });
+const BLANK_DAY = Object.freeze({ entries: [], water: [], weight: null, note: '', supps: [] });
 
 /*
  * The writable day record, created on demand. Only call this inside a
@@ -154,8 +156,9 @@ const BLANK_DAY = Object.freeze({ entries: [], water: [], weight: null, note: ''
  */
 export function day(key = dayKey()) {
   if (!state.days[key]) {
-    state.days[key] = { entries: [], water: [], weight: null, note: '' };
+    state.days[key] = { entries: [], water: [], weight: null, note: '', supps: [] };
   }
+  if (!state.days[key].supps) state.days[key].supps = [];
   return state.days[key];
 }
 
@@ -300,6 +303,14 @@ export function totals(key = dayKey()) {
     }
   }
 
+  /*
+   * Supplements count toward micronutrients but not toward calories.
+   * A multivitamin is real vitamin D even though the food log never saw it,
+   * and leaving it out would keep flagging a deficit already closed.
+   */
+  const supp = supplementMicros(d.supps || [], state);
+  for (const k in supp.micros) micro[k] = (micro[k] || 0) + supp.micros[k];
+
   const sigma = Math.sqrt(varSum);
   return {
     ...sum,
@@ -309,6 +320,8 @@ export function totals(key = dayKey()) {
     water: (d.water || []).reduce((a, w) => a + w.ml, 0),
     count: d.entries.length,
     micro,
+    suppOmega3: supp.omega3,
+    suppCount: (d.supps || []).length,
     // What share of today's calories actually carried micronutrient data —
     // the figure the UI uses to say "this is a partial picture" honestly.
     microCoverage: sum.kcal > 0 ? microKcal / sum.kcal : 0,
@@ -345,6 +358,27 @@ export function weightSeries() {
     .filter(([, d]) => d.weight)
     .map(([k, d]) => ({ date: k, kg: d.weight }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* ── Supplements ────────────────────────────────────────────────────── */
+
+/* Which supplements this person actually takes — the shortlist that shows
+   up each day, rather than the whole catalogue. */
+export function setSupplementList(ids) {
+  commit(s => { s.supplementsTaken = [...ids]; }, 'supplements');
+}
+
+export function toggleSupplement(key, id) {
+  commit(s => {
+    const d = day(key);
+    const i = d.supps.indexOf(id);
+    if (i >= 0) d.supps.splice(i, 1);
+    else d.supps.push(id);
+  }, 'supplements');
+}
+
+export function suppsTaken(key = dayKey()) {
+  return peekDay(key).supps || [];
 }
 
 /* ── Saved meals ────────────────────────────────────────────────────── */

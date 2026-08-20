@@ -8,7 +8,7 @@
 import { el, sheet, kcal, g, grams, rail, icon } from '../ui.js';
 import { get, byMeal, entryMacros, totals, dayKey } from '../store.js';
 import {
-  dayQuality, leucineByMeal, qualityAdvice, LEUCINE_THRESHOLD_G,
+  dayQuality, leucineByMeal, qualityAdvice, LEUCINE_THRESHOLD_G, ESSENTIAL_AA,
 } from '../data/quality.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
@@ -86,13 +86,26 @@ function proteinBody(q, mealLeu, targets) {
         + 'Grains are short of lysine, legumes short of methionine. Eaten together they fill each other’s gaps, which is what dal with roti has always been doing.')),
 
     p.sources.length ? el('div', {},
-      el('div.section-label', {}, el('span.micro', {}, 'Where it came from')),
+      el('div.section-label', {}, el('span.micro', {}, 'Which food did what')),
       sourceRows(p.sources, s => el('div.row', {},
         el('span.grow', {},
           el('div.title', {}, s.name),
-          el('div.sub', {}, `${s.cls}${s.complete ? '' : ' · incomplete'}`)),
+          el('div.sub', { style: { color: s.complete ? 'var(--good)' : 'var(--caution)' } },
+            s.complete
+              ? `complete · all 9 EAAs · DIAAS ${s.diaas}`
+              : `incomplete · limiting AA: ${s.limiting} · DIAAS ${s.diaas}`),
+          !s.complete && s.pairsWith
+            ? el('div.fine', { style: { marginTop: '2px' } }, `pair with ${s.pairsWith}`)
+            : null),
         el('span.kcal', {}, g(s.g, 0) + ' g',
-          el('div.micro', { style: { marginTop: '2px' } }, g(s.leucine, 1) + ' g leu'))))) : null,
+          el('div.micro', { style: { marginTop: '2px' } }, g(s.leucine, 2) + ' g leu')))),
+
+      el('div.note', {}, el('div.fine', {},
+        `A protein is complete when it supplies all nine essential amino acids — `
+        + `${ESSENTIAL_AA.join(', ')} — in usable proportion. `
+        + `Incomplete sources are not missing one outright; they are short of one relative to need, and that one is the limiting amino acid, `
+        + `because it caps how much of the rest can be used. Cereals are limited by lysine, pulses by methionine, `
+        + `which is exactly why dal with roti works as a pair.`))) : null,
   );
 }
 
@@ -117,19 +130,26 @@ function carbBody(q, targets) {
         'The distinction that matters is not sugar versus starch — it is whether the carbohydrate still has its fibre. '
         + 'Rice and refined flour are both starch, but whole grains, legumes and fruit release glucose slowly and bring micronutrients with them.')),
 
-    el('div.section-label', {}, el('span.micro', {}, 'Broken down')),
+    el('div.section-label', {}, el('span.micro', {}, 'Simple against complex')),
     el('div.tile', {},
       el('div.macros', {},
-        bar('Starch', c.starch, c.covered, 'var(--m-c)'),
-        bar('Sugar', c.sugar, c.covered, 'var(--warn)'),
-        bar('Fibre', c.fibre, c.covered, 'var(--m-fib)'))),
+        bar('Complex (polysaccharide)', c.starch, c.covered, 'var(--m-c)'),
+        bar('Simple (mono/disaccharide)', c.sugar, c.covered, 'var(--warn)'),
+        bar('Fibre (non-digestible)', c.fibre, c.covered, 'var(--m-fib)')),
+      el('div.fine', { style: { marginTop: '10px' } },
+        'Simple carbohydrates are single sugars (glucose, fructose) and pairs of them (sucrose, lactose) — absorbed fast. '
+        + 'Complex carbohydrates are long starch chains that have to be broken down first. '
+        + 'Fibre is carbohydrate your enzymes cannot cleave at all, which is why it feeds gut bacteria instead of you.')),
 
     c.sources.length ? el('div', {},
-      el('div.section-label', {}, el('span.micro', {}, 'Where it came from')),
+      el('div.section-label', {}, el('span.micro', {}, 'Which food did what')),
       sourceRows(c.sources, s => el('div.row', {},
         el('span.grow', {},
           el('div.title', {}, s.name),
-          el('div.sub', {}, `${s.cls}${s.gi ? ' · ' + s.gi + ' GI' : ''}`)),
+          el('div.sub', { style: { color: TIER_COLOUR[s.tier] || 'var(--muted)' } },
+            `${s.cls}${s.gi ? ' · ' + s.gi + ' glycaemic' : ''}`),
+          el('div.fine', { style: { marginTop: '2px' } },
+            `${g(s.complex, 0)} g complex · ${g(s.simple, 0)} g simple · ${g(s.fibre, 1)} g fibre`)),
         el('span.kcal', { style: { color: TIER_COLOUR[s.tier] || 'var(--text)' } }, g(s.g, 0) + ' g')))) : null,
   );
 }
@@ -144,9 +164,9 @@ function fatBody(q, targets) {
     el('div.section-label', {}, el('span.micro', {}, 'The three fats')),
     el('div.tile', {},
       el('div.macros', {},
-        bar('Saturated', f.sat, f.covered, 'var(--warn)'),
-        bar('Monounsaturated', f.mufa, f.covered, 'var(--good)'),
-        bar('Polyunsaturated', f.pufa, f.covered, 'var(--m-p)')),
+        bar('Saturated (SFA)', f.sat, f.covered, 'var(--warn)'),
+        bar('Monounsaturated (MUFA)', f.mufa, f.covered, 'var(--good)'),
+        bar('Polyunsaturated (PUFA)', f.pufa, f.covered, 'var(--m-p)')),
       el('div.fine', { style: { marginTop: '10px' } },
         'Saturated is the one to keep a lid on — ghee, butter, fatty meat, fried food. '
         + 'Monounsaturated is olive oil, nuts, avocado. Polyunsaturated includes the omega-3s your body cannot make at all.')),
@@ -162,14 +182,19 @@ function fatBody(q, targets) {
           el('div.num', { style: { fontSize: '22px', marginTop: '2px',
             color: f.trans > 1 ? 'var(--warn)' : 'var(--muted)' } }, g(f.trans, 2) + ' g'))),
       el('div.fine', { style: { marginTop: '10px' } },
-        'Omega-3 has to come from food — oily fish, walnuts, flax, chia. Trans fat has no safe intake and comes almost entirely from commercial frying and bakery fat.')),
+        'Omega-3 (ALA from plants, EPA and DHA from marine sources) cannot be synthesised — it has to come from food. '
+        + 'Trans-unsaturated fat has no safe intake and comes almost entirely from partially hydrogenated frying and bakery fat.')),
 
     f.sources.length ? el('div', {},
-      el('div.section-label', {}, el('span.micro', {}, 'Where it came from')),
+      el('div.section-label', {}, el('span.micro', {}, 'Which food did what')),
       sourceRows(f.sources, s => el('div.row', {},
         el('span.grow', {},
           el('div.title', {}, s.name),
-          el('div.sub', {}, `${s.cls} · ${g(s.sat, 1)} g saturated`)),
+          el('div.sub', { style: { color: s.sat / Math.max(0.1, s.g) > 0.5 ? 'var(--warn)' : 'var(--muted)' } },
+            `${s.cls} · ${Math.round((s.sat / Math.max(0.1, s.g)) * 100)}% SFA`),
+          el('div.fine', { style: { marginTop: '2px' } },
+            `${g(s.sat, 1)} SFA · ${g(s.mufa, 1)} MUFA · ${g(s.pufa, 1)} PUFA`
+            + (s.omega3 > 0.05 ? ` · ${g(s.omega3, 2)} g ω-3` : ''))),
         el('span.kcal', {}, g(s.g, 0) + ' g')))) : null,
   );
 }

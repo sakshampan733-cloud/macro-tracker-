@@ -8,18 +8,49 @@
  * day it could actually see, and only makes claims about that part.
  */
 
-import { el, rail, g } from '../ui.js';
-import { get, totals, dayKey } from '../store.js';
+import { el, rail, g, icon } from '../ui.js';
+import { get, commit, totals, dayKey } from '../store.js';
 import { NUTRIENTS, nutrientTargets } from '../data/nutrients.js';
 
 const ORDER = ['fe', 'ca', 'vd', 'b12', 'fol', 'zn', 'mg', 'k', 'vc', 'va'];
 
-export function nutrientsTile(s, key = dayKey()) {
+/*
+ * Collapsed by default on Today.
+ *
+ * Ten bars is the right amount of detail when you go looking for it and far
+ * too much when you are just checking how many calories are left. So it
+ * sits folded with a one-line summary of how many are short, and opens on
+ * tap. The choice sticks.
+ */
+export function nutrientsTile(s, key = dayKey(), ctx = null) {
   const t = totals(key);
-  if (!t.count) return null;
+  if (!t.count && !(t.suppCount > 0)) return null;
 
   const targets = nutrientTargets(s.profile);
   const coveragePct = Math.round((t.microCoverage || 0) * 100);
+  const open = s.settings.microOpen === true;
+
+  const short = ORDER.filter(k => (t.micro?.[k] || 0) < targets[k] * 0.6).length;
+
+  const header = el('button', {
+    style: { display: 'block', width: '100%', textAlign: 'left', padding: 0, background: 'none' },
+    'aria-expanded': String(open),
+    onclick: () => {
+      if (ctx) { commit(st => { st.settings.microOpen = !open; }); ctx.refresh(); }
+    },
+  },
+    el('div.between', {},
+      el('div.flex', {},
+        el('h3', {}, 'Micronutrients'),
+        el('span.micro', { style: { marginLeft: '8px' } }, open ? '▾' : '▸')),
+      el('span.micro', { style: { color: short > 3 ? 'var(--caution)' : 'var(--muted)' } },
+        short === 0 ? 'all on track' : `${short} well short`)));
+
+  if (!open) {
+    return el('div', {},
+      el('div.section-label', {}, el('span.micro', {}, 'Micronutrients, today')),
+      el('div.tile', {}, header));
+  }
 
   const rows = ORDER.map(k => {
     const info = NUTRIENTS[k];
@@ -39,6 +70,8 @@ export function nutrientsTile(s, key = dayKey()) {
   return el('div', {},
     el('div.section-label', {}, el('span.micro', {}, 'Micronutrients, today')),
     el('div.tile', {},
+      header,
+      el('div.divider'),
       coveragePct < 90
         ? el('div.note.info', { style: { marginBottom: '12px' } },
             el('div.fine', {},

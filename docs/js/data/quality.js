@@ -35,18 +35,43 @@
  */
 export const LEUCINE_THRESHOLD_G = 2.5;
 
+/*
+ * A protein is "complete" when it supplies all nine essential amino acids —
+ * histidine, isoleucine, leucine, lysine, methionine, phenylalanine,
+ * threonine, tryptophan, valine — in usable proportion. Incomplete sources
+ * are not missing one outright; they are short of one relative to need, and
+ * that one is the LIMITING amino acid, because it caps how much of the rest
+ * can be used for synthesis.
+ *
+ * This is why the classic pairings work. Cereals are limited by lysine,
+ * pulses by methionine, and each supplies what the other lacks — dal with
+ * roti, rajma with chawal. Complementation does not have to happen in the
+ * same mouthful, but the same meal is the reliable version.
+ *
+ * DIAAS is the modern digestibility-corrected quality score; the tiers here
+ * track it approximately without pretending to measure it.
+ */
+export const ESSENTIAL_AA = [
+  'histidine', 'isoleucine', 'leucine', 'lysine', 'methionine',
+  'phenylalanine', 'threonine', 'tryptophan', 'valine',
+];
+
 export const PROTEIN_CLASS = {
-  whey:   { leu: 0.105, complete: true,  label: 'Whey' },
-  dairy:  { leu: 0.095, complete: true,  label: 'Dairy' },
-  egg:    { leu: 0.086, complete: true,  label: 'Egg' },
-  meat:   { leu: 0.082, complete: true,  label: 'Meat' },
-  fish:   { leu: 0.081, complete: true,  label: 'Fish' },
-  soy:    { leu: 0.078, complete: true,  label: 'Soy' },
-  legume: { leu: 0.075, complete: false, label: 'Legume', short: 'low in methionine' },
-  grain:  { leu: 0.070, complete: false, label: 'Grain',  short: 'low in lysine' },
-  nut:    { leu: 0.068, complete: false, label: 'Nut',    short: 'low in lysine' },
-  veg:    { leu: 0.060, complete: false, label: 'Vegetable' },
-  none:   { leu: 0,     complete: false, label: '—' },
+  whey:   { leu: 0.105, complete: true,  label: 'Whey',      diaas: 'very high', limiting: null },
+  dairy:  { leu: 0.095, complete: true,  label: 'Dairy',     diaas: 'very high', limiting: null },
+  egg:    { leu: 0.086, complete: true,  label: 'Egg',       diaas: 'very high', limiting: null },
+  meat:   { leu: 0.082, complete: true,  label: 'Meat',      diaas: 'high',      limiting: null },
+  fish:   { leu: 0.081, complete: true,  label: 'Fish',      diaas: 'high',      limiting: null },
+  soy:    { leu: 0.078, complete: true,  label: 'Soy',       diaas: 'moderate',  limiting: null },
+  legume: { leu: 0.075, complete: false, label: 'Legume',    diaas: 'moderate',  limiting: 'methionine',
+            short: 'limited by methionine', pairsWith: 'cereals — rice, roti' },
+  grain:  { leu: 0.070, complete: false, label: 'Cereal',    diaas: 'low',       limiting: 'lysine',
+            short: 'limited by lysine', pairsWith: 'pulses — dal, rajma, chana' },
+  nut:    { leu: 0.068, complete: false, label: 'Nut / seed',diaas: 'low',       limiting: 'lysine',
+            short: 'limited by lysine', pairsWith: 'pulses or dairy' },
+  veg:    { leu: 0.060, complete: false, label: 'Vegetable', diaas: 'low',       limiting: 'methionine',
+            short: 'limited by methionine', pairsWith: 'cereals or dairy' },
+  none:   { leu: 0,     complete: false, label: '—',         diaas: null,        limiting: null },
 };
 
 /* ── Fat ────────────────────────────────────────────────────────────── */
@@ -137,6 +162,9 @@ export function qualityFor(entry, macros) {
       complete: P.complete,
       classLabel: P.label,
       note: P.short || null,
+      limiting: P.limiting || null,
+      pairsWith: P.pairsWith || null,
+      diaas: P.diaas || null,
     },
     fat: {
       g: fat,
@@ -191,7 +219,9 @@ export function dayQuality(entries, macrosOf) {
     acc.protein[q.protein.complete ? 'complete' : 'incomplete'] += q.protein.g;
     if (q.protein.g > 0.5) {
       acc.protein.sources.push({ name: e.name, g: q.protein.g, leucine: q.protein.leucine,
-                                 complete: q.protein.complete, cls: q.protein.classLabel });
+                                 complete: q.protein.complete, cls: q.protein.classLabel,
+                                 limiting: q.protein.limiting, pairsWith: q.protein.pairsWith,
+                                 diaas: q.protein.diaas, meal: e.meal });
     }
 
     acc.fat.g += q.fat.g;
@@ -203,7 +233,8 @@ export function dayQuality(entries, macrosOf) {
     acc.fat.covered += q.fat.g;
     if (q.fat.g > 0.5) {
       acc.fat.sources.push({ name: e.name, g: q.fat.g, sat: q.fat.sat, omega3: q.fat.omega3,
-                             cls: q.fat.classLabel });
+                             mufa: q.fat.mufa, pufa: q.fat.pufa, trans: q.fat.trans,
+                             cls: q.fat.classLabel, meal: e.meal });
     }
 
     acc.carb.g += q.carb.g;
@@ -214,7 +245,8 @@ export function dayQuality(entries, macrosOf) {
     if (q.carb.tier !== 'none') acc.carb.tiers[q.carb.tier] += q.carb.g;
     if (q.carb.g > 0.5) {
       acc.carb.sources.push({ name: e.name, g: q.carb.g, tier: q.carb.tier, gi: q.carb.gi,
-                              fibre: q.carb.fibre, cls: q.carb.classLabel });
+                              fibre: q.carb.fibre, cls: q.carb.classLabel,
+                              simple: q.carb.sugar, complex: q.carb.starch, meal: e.meal });
     }
   }
 

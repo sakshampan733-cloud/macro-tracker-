@@ -18,6 +18,8 @@ import { dayFactor } from '../whoop.js';
 import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
 import { openMacroDetail } from './macro.js';
+import { nutrientsTile } from './nutrients.js';
+import { supplementsTile } from './supplements.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
 
@@ -34,6 +36,8 @@ export function renderToday(root, ctx) {
     energyTile(t, targets, s, key, ctx),
     macroTile(t, targets, key),
     waterTile(t, targets, key, ctx),
+    supplementsTile(s, key, ctx),
+    nutrientsTile(s, key, ctx) || el('div'),
     mealsTile(key, ctx),
   );
 }
