@@ -70,6 +70,7 @@ const EMPTY = () => ({
     energyView: 'remaining',
     explain: true,          // show the teaching text, or just the numbers
     isDemo: false,          // generated data is loaded, not real logging
+    relayUrl: '',           // Cloudflare worker that fronts Whoop
     limitsOpen: false,
     microOpen: false,
     suppsOpen: false,

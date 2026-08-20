@@ -19,6 +19,9 @@ import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn,
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import { openReport } from './report.js';
+import {
+  relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
+} from '../whooprelay.js';
 
 export function renderBody(root, ctx) {
   const s = get();
@@ -240,7 +243,7 @@ function vitalsSection(s, ctx) {
         'Whoop has no public API, so bring the data in yourself: whoop.com → Settings → Download my data. '
         + 'Unzip it and load physiological_cycles.csv. Fifty days is plenty to see where you range.',
         el('div', {},
-          el('button.btn.primary', { onclick: () => openWhoopConnect(ctx) }, icon('bolt', 16), 'Connect Whoop'),
+          el('button.btn.primary', { onclick: () => openWhoopRelay(ctx) }, icon('bolt', 16), 'Connect Whoop'),
           el('button.btn.ghost', { style: { marginTop: '8px' }, onclick: () => openWhoopImport(ctx) },
             icon('upload', 16), 'Or load a CSV export')))));
   }
@@ -351,6 +354,97 @@ function openMetric(s, metric, ctx) {
  * is avoidable: authorise once in the browser and this Mac keeps itself
  * topped up. The two keys live on this machine and never reach the phone.
  */
+/*
+ * Live sync through the relay.
+ *
+ * Everything here is about getting three things lined up: the relay is
+ * deployed and has its credentials, the exact callback address is registered
+ * with Whoop, and this app knows where the relay is. Each step checks
+ * itself, because a mismatched redirect URI produces an error message from
+ * Whoop that explains nothing.
+ */
+export function openWhoopRelay(ctx) {
+  const s = get();
+  const urlInput = el('input', {
+    type: 'url', value: relayUrl(), placeholder: 'https://basal-whoop.<name>.workers.dev',
+    autocapitalize: 'none', spellcheck: 'false',
+  });
+  const body = el('div');
+  const sheetRef = { close: null };
+
+  const render = async () => {
+    const base = relayUrl();
+    const connected = isConnected();
+    let health = null;
+    if (base) health = await checkRelay(base);
+
+    body.replaceChildren(
+      el('ol', { style: { color: 'var(--text-2)', fontSize: '13.5px', lineHeight: '1.75',
+                          paddingLeft: '18px', marginTop: 0 } },
+        el('li', {}, 'Deploy the worker from ', el('b', {}, 'relay/worker.js'), ' in the repo, on a free Cloudflare account.'),
+        el('li', {}, 'Add ', el('b', {}, 'WHOOP_CLIENT_ID'), ' and ', el('b', {}, 'WHOOP_CLIENT_SECRET'), ' to it as secrets.'),
+        el('li', {}, 'Register the worker’s ', el('b', {}, '/callback'), ' address at developer.whoop.com.'),
+        el('li', {}, 'Paste the worker address below.')),
+
+      field('Relay address', urlInput),
+      el('div.btn-row', {},
+        el('button.btn', {
+          onclick: async () => {
+            const v = urlInput.value.trim().replace(/\/+$/, '');
+            const res = await checkRelay(v);
+            if (!res.ok) { toast(res.error, 'err'); return; }
+            commit(st => { st.settings.relayUrl = v; });
+            toast('Relay reachable.');
+            render();
+          },
+        }, 'Save and test')),
+
+      health ? el('div', { class: 'note ' + (health.ok ? 'good' : 'warn') },
+        el('div', {},
+          el('b', {}, health.ok ? 'Relay is up' : 'Relay not reachable'),
+          el('div.fine', { style: { marginTop: '3px' } },
+            health.ok
+              ? 'Register exactly this as the redirect URI at developer.whoop.com — character for character:'
+              : health.error))) : null,
+
+      health && health.ok ? el('div.tile', { style: { padding: '10px 12px' } },
+        el('code', { class: 'num', style: { fontSize: '12px', wordBreak: 'break-all',
+                                            color: 'var(--accent)' } }, health.redirectUri)) : null,
+
+      el('div.divider'),
+
+      connected
+        ? el('div', {},
+            el('div.note.good', {}, el('div', {},
+              el('b', {}, 'Connected to Whoop'),
+              el('div.fine', { style: { marginTop: '3px' } },
+                'Syncs on its own when the app opens. Your tokens are stored on this device, not on the relay.'))),
+            el('button.btn.primary.block', {
+              onclick: async () => {
+                toast('Syncing…');
+                try {
+                  const r = await syncWhoop({ days: 365 });
+                  toast(`${r.count} days synced.`);
+                  sheetRef.close && sheetRef.close();
+                  ctx.refresh();
+                } catch (e) { toast(String(e.message || e), 'err'); }
+              },
+            }, 'Sync now'),
+            el('button.btn.block.ghost', { style: { marginTop: '10px' },
+              onclick: () => { disconnect(); toast('Disconnected.'); render(); } }, 'Disconnect'))
+        : el('button.btn.primary.block', {
+            disabled: !(health && health.ok),
+            onclick: () => { const u = connectUrl(); if (u) location.href = u; },
+          }, 'Authorise with Whoop'),
+    );
+  };
+
+  render();
+  const sh = sheet({ title: 'Whoop live sync', body });
+  sheetRef.close = sh.close;
+  return sh;
+}
+
 export function openWhoopConnect(ctx) {
   const body = el('div');
   const s = sheet({ title: 'Whoop', body });

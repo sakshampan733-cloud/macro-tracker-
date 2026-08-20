@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.20-demo';
+export const VERSION = '2026.08.20-relay';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';
@@ -18,6 +18,7 @@ import { renderBody } from './views/body.js';
 import { renderFoods } from './views/foods.js';
 import { renderOnboarding, renderSettings } from './views/setup.js';
 import { autoSyncWhoop } from './views/body.js';
+import { captureFromUrl, isConnected, relayUrl, syncWhoop } from './whooprelay.js';
 
 const TABS = [
   { id: 'today', label: 'Today', icon: 'today', render: renderToday },
@@ -183,9 +184,22 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   });
 }
 
-/* Top up from Whoop in the background; redraw only if something arrived. */
+/*
+ * Coming back from the Whoop authorisation: the tokens arrive in the URL
+ * fragment. Grab them before anything renders, then sync straight away so
+ * the first thing seen after connecting is actual data.
+ */
+const justConnected = captureFromUrl();
+
 if (get().profile) {
-  autoSyncWhoop().then(changed => { if (changed) draw(); });
+  if (relayUrl() && isConnected()) {
+    syncWhoop({ days: justConnected ? 365 : 120 })
+      .then(() => draw())
+      .catch(() => { /* offline or expired; the Body screen explains */ });
+  } else {
+    // the Mac helper route, for when the server is running
+    autoSyncWhoop().then(changed => { if (changed) draw(); });
+  }
 }
 
 const initial = location.hash.slice(1);
