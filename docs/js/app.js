@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.20-micros';
+export const VERSION = '2026.08.20-foods';
 
 import { el, clear, icon, toast, $ } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';
@@ -166,9 +166,12 @@ subscribe(evt => {
  * the running page is not left half-old.
  */
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('sw.js').then(reg => {
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
     reg.update().catch(() => {});
-    setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+    setInterval(() => reg.update().catch(() => {}), 15 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) reg.update().catch(() => {});
+    });
   }).catch(() => {});
 
   let reloading = false;

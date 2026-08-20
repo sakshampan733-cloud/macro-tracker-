@@ -10,7 +10,7 @@ import {
   toast, sheet, confirmSheet, empty,
 } from '../ui.js';
 import {
-  get, day, totals, byMeal, MEALS, METHODS, dayKey, shiftDay,
+  get, commit, day, totals, byMeal, MEALS, METHODS, dayKey, shiftDay,
   removeEntry, addWater, undoWater, entryMacros, setWeight, saveMeal,
 } from '../store.js';
 import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
@@ -30,7 +30,7 @@ export function renderToday(root, ctx) {
 
   root.append(
     dateStrip(key, ctx),
-    energyTile(t, targets, s, key),
+    energyTile(t, targets, s, key, ctx),
     macroTile(t, targets),
     waterTile(t, targets, key, ctx),
     mealsTile(key, ctx),
@@ -79,21 +79,46 @@ function dateStrip(key, ctx) {
 
 /* ── The hero: energy on a caliper rail ─────────────────────────────── */
 
-function energyTile(t, targets, s, key) {
+/*
+ * Which number sits in the big slot: what's left, or what's gone in.
+ *
+ * Both are the same fact from opposite ends, and which one is useful
+ * depends on the moment — "how much room have I got" before a meal,
+ * "what have I actually had" when reviewing. So it toggles on tap and
+ * remembers the choice, rather than picking a side for you.
+ */
+function energyTile(t, targets, s, key, ctx) {
   const left = targets.kcal - t.kcal;
   const over = t.kcal > targets.kcal * 1.02;
+  const showEaten = s.settings.energyView === 'eaten';
+
+  const bigLabel = showEaten ? 'Eaten' : (over ? 'Over by' : 'Remaining');
+  const bigValue = showEaten ? t.kcal : Math.abs(left);
+  const bigColour = showEaten ? 'var(--text)' : (over ? 'var(--warn)' : 'var(--text)');
+  const sideLabel = showEaten ? (over ? 'Over / target' : 'Left / target') : 'Eaten / target';
+  const sideValue = showEaten
+    ? `${kcal(Math.abs(left))} / ${kcal(targets.kcal)}`
+    : `${kcal(t.kcal)} / ${kcal(targets.kcal)}`;
 
   const tile = el('div.tile', {},
+    el('button', {
+      style: { display: 'block', width: '100%', textAlign: 'left', padding: 0, background: 'none' },
+      'aria-label': `Showing ${bigLabel.toLowerCase()}. Tap to switch.`,
+      onclick: () => {
+        commit(st => { st.settings.energyView = showEaten ? 'remaining' : 'eaten'; });
+        ctx.refresh();
+      },
+    },
     el('div.readout', {},
       el('div', {},
-        el('div.micro', {}, over ? 'Over by' : 'Remaining'),
+        el('div.micro', {}, bigLabel, el('span', { style: { marginLeft: '6px', opacity: '.5' } }, '⇄')),
         el('div.readout-main', {
-          style: { color: over ? 'var(--warn)' : 'var(--text)' },
-        }, kcal(Math.abs(left)),
+          style: { color: bigColour },
+        }, kcal(bigValue),
           t.sigma > 0 ? el('span.readout-pm', {}, ` ±${Math.round(t.sigma)}`) : null)),
       el('div.readout-side', {},
-        el('div.micro', {}, 'Eaten / target'),
-        el('div.v', {}, `${kcal(t.kcal)} / ${kcal(targets.kcal)}`))),
+        el('div.micro', {}, sideLabel),
+        el('div.v', {}, sideValue)))),
 
     rail({ value: t.kcal, target: targets.kcal, sigma: t.sigma, over }),
 
@@ -199,11 +224,29 @@ function macroTile(t, targets) {
       macroRail({ name: 'Fat',     value: t.f, target: targets.f, hue: 'var(--m-f)' }),
       macroRail({ name: 'Fibre',   value: t.fib, target: targets.fib, hue: 'var(--m-fib)' })),
     el('div.divider'),
-    el('div.between', {},
-      el('span.micro', {}, 'Sugar ' + grams(t.sug) + ' g'),
-      el('span.micro', {}, 'Sat fat ' + grams(t.sat) + ' g'),
-      el('span.micro', {}, 'Sodium ' + Math.round(t.na) + ' mg')),
+    el('div.micro', { style: { marginBottom: '8px' } }, 'Keep under'),
+    el('div.macros', {},
+      ceilingRow('Sugar', t.sug, targets.sug, 'g'),
+      ceilingRow('Sat fat', t.sat, targets.sat, 'g'),
+      ceilingRow('Sodium', t.na, targets.na, 'mg')),
   );
+}
+
+/*
+ * A ceiling reads the opposite way to a target: the bar filling up is bad
+ * news, so it colours by how close to the limit you are rather than how
+ * close to done. Amber from three quarters, red past the line.
+ */
+function ceilingRow(name, value, limit, unit) {
+  const pct = limit > 0 ? (value / limit) * 100 : 0;
+  const hue = pct > 100 ? 'var(--warn)' : pct > 75 ? 'var(--caution)' : 'var(--good)';
+  return el('div.macro-row', {},
+    el('div.macro-head', {},
+      el('span.macro-name', { style: { color: hue } }, name),
+      el('span.macro-val', {},
+        el('b', {}, unit === 'mg' ? String(Math.round(value)) : grams(value)),
+        el('span.of', {}, ` / ${Math.round(limit)}${unit} max`))),
+    rail({ value, target: limit, compact: true, hue, over: pct > 100 }));
 }
 
 /* ── Water ──────────────────────────────────────────────────────────── */

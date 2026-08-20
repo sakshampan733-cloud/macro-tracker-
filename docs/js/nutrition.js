@@ -305,8 +305,19 @@ export function macroTargets(profile, tdeeKcal) {
     f: fatG,
     fib: Math.round(Math.min(45, Math.max(25, kcal / 1000 * 14))),
     water: waterTarget(profile),
+
+    /*
+     * Ceilings, not goals.
+     *
+     * Protein and fibre are things to reach; these are things to stay
+     * under, and the app draws them differently for that reason. Sodium
+     * 2,300 mg is the standard adult upper limit. Saturated fat at 10% of
+     * energy and free sugars at 10% are the WHO figures. Hitting 40% of a
+     * target is good news here and bad news everywhere else in the app.
+     */
     na: 2300,
     sug: Math.round((kcal * 0.10) / 4),
+    sat: Math.round((kcal * 0.10) / 9),
     basis: {
       tdee: Math.round(tdeeKcal), delta: Math.round(delta), rateKgPerWeek,
       proteinPerKg: lean ? null : perKg,
