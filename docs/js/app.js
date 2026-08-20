@@ -5,9 +5,9 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.20-plain';
+export const VERSION = '2026.08.20-report';
 
-import { el, clear, icon, toast, $ } from './ui.js';
+import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';
 import { solveDensities } from './dishes.js';
 import { bestTDEE } from './nutrition.js';
@@ -102,6 +102,7 @@ function refreshDensities() {
 
 function draw() {
   const s = get();
+  setExplanations(s.settings?.explain !== false);
   refreshDensities();
   clear(main);
 

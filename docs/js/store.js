@@ -55,6 +55,7 @@ const EMPTY = () => ({
   library: {},
   meals: {},
   supplementsTaken: [],     // which supplement ids the user actually takes
+  blood: {},                // blood panels, keyed by id
   recipes: {},
   cache: {},
   whoop: { rows: {}, importedAt: null },
@@ -67,6 +68,7 @@ const EMPTY = () => ({
     tdeeSource: 'auto',
     checkInDays: 14,        // fortnight by default — see the Body screen for why
     energyView: 'remaining',
+    explain: true,          // show the teaching text, or just the numbers
     limitsOpen: false,
     microOpen: false,
     suppsOpen: false,

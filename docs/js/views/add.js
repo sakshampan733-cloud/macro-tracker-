@@ -15,7 +15,7 @@ import {
 } from '../store.js';
 import { FOODS, GROUPS, atwater } from '../data/foods.js';
 import { resolveBarcode, searchProducts, validEAN, isIndian } from '../off.js';
-import { Scanner, cameraSupported, secureEnough } from '../scanner.js';
+import { Scanner, cameraSupported, secureEnough, decodeImageFile, diagnose } from '../scanner.js';
 import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
 import { openPot } from './pot.js';
@@ -327,14 +327,42 @@ export function openScanner(ctx) {
     autocomplete: 'off',
   });
 
+  /*
+   * A photo works when the live camera does not — refused permission, an
+   * old iOS, a packet you photographed in the shop. Same decoder either way.
+   */
+  const photo = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+  photo.addEventListener('change', async () => {
+    const f = photo.files[0];
+    if (!f) return;
+    status.replaceChildren(el('div.spinner'), el('span', {}, 'Reading the photo…'));
+    try {
+      const code = await decodeImageFile(f);
+      if (code) { handle(code); return; }
+      status.replaceChildren(el('span', {}, 'No barcode found in that photo. Get closer to the code and try again.'));
+    } catch (e) {
+      status.replaceChildren(el('span', {}, String(e.message || e)));
+    }
+    photo.value = '';
+  });
+
+  const failureBox = el('div');
+
   let scanner = null;
   let busy = false;
 
   const s = sheet({
     title: 'Scan a barcode',
     body: el('div', {}, wrap,
+      failureBox,
       el('div', { style: { height: '14px' } }),
-      field('Barcode number', manual, 'Useful when the print is scuffed or the light is bad.'),
+
+      el('button.btn.block', { onclick: () => photo.click() },
+        icon('scan', 16), 'Use a photo instead'),
+      photo,
+
+      el('div', { style: { height: '14px' } }),
+      field('Barcode number', manual, 'Every packet prints the digits under the bars. This always works.'),
       el('button.btn.block', {
         onclick: () => {
           const code = manual.value.replace(/\D/g, '');
@@ -383,10 +411,15 @@ export function openScanner(ctx) {
 
   scanner = new Scanner(video, {
     onResult: handle,
-    onError: msg => {
-      status.replaceChildren(el('span', {}, msg));
-      wrap.style.aspectRatio = 'auto';
-      wrap.style.minHeight = '120px';
+    onError: (msg, d) => {
+      // Collapse the dead video box and say plainly what to do instead.
+      wrap.style.display = 'none';
+      failureBox.replaceChildren(el('div.note.warn', {},
+        el('div', {},
+          el('b', {}, (d && d.title) || 'The camera did not start'),
+          el('div.fine', { style: { marginTop: '4px' } }, msg),
+          el('div.fine', { style: { marginTop: '6px' } },
+            'A photo of the barcode works just as well, and typing the digits always works.'))));
     },
   });
 

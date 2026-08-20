@@ -172,6 +172,11 @@ export function renderSettings(root, ctx) {
     { value: 'predicted', label: 'Formula' },
   ], s.settings.tdeeSource, v => { commit(st => { st.settings.tdeeSource = v; }); toast('Target source changed.'); ctx.refresh(); }, { wrap: true }));
 
+  fGlass.addEventListener('change', () => {
+    commit(st => { st.settings.glassMl = +fGlass.value || 250; });
+    ctx.refresh();
+  });
+
   function save(patch) {
     commit(st => { Object.assign(st.profile, patch); }, 'profile');
     ctx.refresh();
@@ -219,7 +224,6 @@ export function renderSettings(root, ctx) {
     el('div.section-label', {}, el('span.micro', {}, 'Preferences')),
     field('Suggestions', dietBox),
     field('Glass size (ml)', fGlass),
-    (() => { fGlass.addEventListener('change', () => { commit(st => { st.settings.glassMl = +fGlass.value || 250; }); ctx.refresh(); }); return null; })(),
 
     el('div.section-label', {}, el('span.micro', {}, 'Whoop')),
     el('div.tile', {},
@@ -231,6 +235,22 @@ export function renderSettings(root, ctx) {
               ? `${Object.keys(s.whoop.rows).length} days imported`
               : 'Not imported')),
         el('button.btn.sm', { onclick: () => openWhoopConnect(ctx) }, 'Set up'))),
+
+    el('div.section-label', {}, el('span.micro', {}, 'Reading')),
+    el('div.tile', {},
+      el('div.between', {},
+        el('div', { style: { flex: '1', paddingRight: '12px' } },
+          el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Explanations'),
+          el('div.fine', { style: { marginTop: '3px' } },
+            'The paragraphs explaining what fibre, leucine or a limiting amino acid actually are. '
+            + 'Useful the first few times, clutter once you know. Your numbers and warnings stay either way.')),
+        el('button.btn.sm', {
+          onclick: () => {
+            commit(st => { st.settings.explain = st.settings.explain === false; });
+            toast(get().settings.explain === false ? 'Explanations off.' : 'Explanations on.');
+            ctx.refresh();
+          },
+        }, s.settings.explain === false ? 'Off' : 'On'))),
 
     el('div.section-label', {}, el('span.micro', {}, 'How much to trust this')),
     el('div.tile', {},

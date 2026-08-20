@@ -17,17 +17,22 @@ import {
 } from '../whoop.js';
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict } from '../nutrition.js';
 import { calibrationTile } from './dish.js';
+import { bloodTile } from './blood.js';
+import { openReport } from './report.js';
 
 export function renderBody(root, ctx) {
   const s = get();
   clear(root);
 
   root.append(
-    el('h1', { style: { marginBottom: '14px' } }, 'Body'),
+    el('div.between', { style: { marginBottom: '14px' } },
+      el('h1', {}, 'Body'),
+      el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report')),
     checkInTile(s, ctx),
     weightTile(ctx),
     tdeeTile(s),
     calibrationTile(s) || el('div'),
+    bloodTile(s, ctx),
     vitalsSection(s, ctx),
     correlationTile(s),
   );

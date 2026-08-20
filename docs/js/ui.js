@@ -28,6 +28,30 @@ export function el(tag, props = {}, ...children) {
 
 export const clear = n => { while (n.firstChild) n.removeChild(n.firstChild); return n; };
 
+/*
+ * Explanations you can switch off.
+ *
+ * The teaching text earns its place the first few times and becomes clutter
+ * once you know what a limiting amino acid is. This gates the paragraphs
+ * that explain concepts — never the ones that report your data, which stay
+ * regardless.
+ */
+let explanationsOn = true;
+export function setExplanations(v) { explanationsOn = v !== false; }
+export function explanationsEnabled() { return explanationsOn; }
+
+export function explain(text, opts = {}) {
+  if (!explanationsOn) return null;
+  return el('div.fine', { style: opts.style || { marginTop: '10px' } }, text);
+}
+
+export function explainNote(title, text, tone = 'info') {
+  if (!explanationsOn) return null;
+  return el('div', { class: 'note ' + tone },
+    el('div', {}, title ? el('b', {}, title) : null,
+      el('div.fine', { style: { marginTop: title ? '3px' : '0' } }, text)));
+}
+
 /* Element.append() renders null as the literal text "null". Always go
    through this when the child list has conditionals in it. */
 export const append = (node, ...kids) => {

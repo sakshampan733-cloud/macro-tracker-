@@ -254,9 +254,15 @@ function ceilings(t, targets, key, ctx) {
   const s = get();
   const open = s.settings.limitsOpen === true;
 
+  /*
+   * Saturated fat is not here on purpose. It has a proper home inside the
+   * Fat sheet with the rest of the fat breakdown, and listing it in both
+   * places was the same number twice. Sugar stays because the Carbohydrate
+   * sheet shows grams, not the ceiling; sodium stays because nothing else
+   * shows it at all.
+   */
   const items = [
     ['Sugar', t.sug, targets.sug, 'g'],
-    ['Sat fat', t.sat, targets.sat, 'g'],
     ['Sodium', t.na, targets.na, 'mg'],
   ];
   const over = items.filter(([, v, lim]) => v > lim).map(([n]) => n.toLowerCase());

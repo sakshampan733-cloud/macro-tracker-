@@ -5,7 +5,7 @@
  * the question that changes what you put on the plate tomorrow.
  */
 
-import { el, sheet, kcal, g, grams, rail, icon } from '../ui.js';
+import { el, sheet, kcal, g, grams, rail, icon, explain, explainNote } from '../ui.js';
 import { get, byMeal, entryMacros, totals, dayKey } from '../store.js';
 import {
   dayQuality, leucineByMeal, qualityAdvice, LEUCINE_THRESHOLD_G, ESSENTIAL_AA,
@@ -62,9 +62,9 @@ function proteinBody(q, mealLeu, targets) {
         el('div.readout-side', {},
           el('div.micro', {}, 'Meals over threshold'),
           el('div.v', {}, `${hitCount} / ${mealCount}`))),
-      el('div.fine', { style: { marginTop: '8px' } },
-        `Leucine is the one building block that actually flips the switch on muscle building, and it works per meal, not per day. `
-        + `A sitting needs roughly ${LEUCINE_THRESHOLD_G} g to cross the line — about 25–30 g of animal protein, or one scoop of whey.`)),
+      explain(`Leucine is the one building block that actually flips the switch on muscle building, and it works per meal, not per day. `
+        + `A sitting needs roughly ${LEUCINE_THRESHOLD_G} g to cross the line — about 25–30 g of animal protein, or one scoop of whey.`,
+        { style: { marginTop: '8px' } })),
 
     el('div.section-label', {}, el('span.micro', {}, 'By meal')),
     el('div.tile.flush', {},
@@ -81,8 +81,7 @@ function proteinBody(q, mealLeu, targets) {
       el('div.macros', {},
         bar('Complete', p.complete, p.covered, 'var(--good)'),
         bar('Incomplete', p.incomplete, p.covered, 'var(--caution)')),
-      el('div.fine', { style: { marginTop: '10px' } },
-        'Complete sources — meat, fish, egg, dairy, soy — carry every essential amino acid. '
+      explain('Complete sources — meat, fish, egg, dairy, soy — carry every essential amino acid. '
         + 'Grains are short of lysine, legumes short of methionine. Eaten together they fill each other’s gaps, which is what dal with roti has always been doing.')),
 
     p.sources.length ? el('div', {},
@@ -100,12 +99,12 @@ function proteinBody(q, mealLeu, targets) {
         el('span.kcal', {}, g(s.g, 0) + ' g',
           el('div.micro', { style: { marginTop: '2px' } }, g(s.leucine, 2) + ' g leu')))),
 
-      el('div.note', {}, el('div.fine', {},
+      explainNote(null,
         `Protein is made of building blocks, and nine of them your body cannot make itself (essential amino acids): `
         + `${ESSENTIAL_AA.join(', ')}. `
         + `A food is "complete" when it has all nine in useful amounts. The others are not missing one entirely — they are short of one, `
         + `and that shortest one caps how much of the rest can be used (the limiting amino acid). `
-        + `Grains run short on lysine, pulses on methionine, and each covers the other's gap. That is what dal with roti has always been doing.`))) : null,
+        + `Grains run short on lysine, pulses on methionine, and each covers the other's gap. That is what dal with roti has always been doing.`)) : null,
   );
 }
 
@@ -121,25 +120,33 @@ function carbBody(q, targets) {
   return el('div', {},
     coverageNote(c.coverage),
 
-    el('div.section-label', {}, el('span.micro', {}, 'What kind')),
+    el('div.section-label', {}, el('span.micro', {}, '1 · Where it came from')),
     el('div.tile', {},
       el('div.macros', {},
         ...['good', 'ok', 'limit'].map(t =>
           bar(TIER_LABEL[t], c.tiers[t], tierTotal, TIER_COLOUR[t]))),
-      el('div.fine', { style: { marginTop: '10px' } },
-        'The distinction that matters is not sugar versus starch — it is whether the carbohydrate still has its fibre. '
-        + 'Rice and refined flour are both starch, but whole grains, legumes and fruit release glucose slowly and bring micronutrients with them.')),
+      explain('Whole means the fibre is still attached — oats, brown rice, dal, fruit. '
+        + 'Starchy staples are the middle ground: white rice, potato, plain pasta. '
+        + 'Refined is flour, sugar, white bread and anything with the fibre stripped out.')),
 
-    el('div.section-label', {}, el('span.micro', {}, 'Simple against complex')),
+    el('div.section-label', {}, el('span.micro', {}, '2 · How fast it reaches you')),
     el('div.tile', {},
       el('div.macros', {},
         bar('Slow / starchy (complex)', c.starch, c.covered, 'var(--m-c)'),
         bar('Fast / sugars (simple)', c.sugar, c.covered, 'var(--warn)'),
         bar('Fibre (indigestible)', c.fibre, c.covered, 'var(--m-fib)')),
-      el('div.fine', { style: { marginTop: '10px' } },
-        'Fast carbs are single sugars and pairs of them — glucose, fructose, table sugar, milk sugar (simple carbohydrate). They hit the blood quickly. '
-        + 'Slow carbs are long chains your gut has to take apart first (complex carbohydrate, or starch), so they arrive gradually. '
-        + 'Fibre is the kind your body cannot break down at all — it feeds gut bacteria instead of you, which is why it fills you up without the calories.')),
+      explain('Slow carbs are long chains your gut has to take apart first, so the energy arrives gradually. '
+        + 'Fast carbs are single sugars already broken down, so they hit the blood almost immediately. '
+        + 'Fibre your body cannot break down at all — it feeds gut bacteria instead of you, which is why it fills you up without the calories.')),
+
+    /* The question this sheet kept prompting: the two sections are not
+       independent, and saying so is more useful than either one alone. */
+    explainNote(null,
+        'These two sections are the same food seen twice — the first is where it came from, the second is what that does to you. '
+        + 'They line up most of the time: whole food is usually slow, because the fibre is physically in the way of your digestive enzymes. '
+        + 'Strip the fibre out and the same starch becomes fast. That is the whole difference between an apple and apple juice, '
+        + 'or brown rice and white bread. '
+        + 'Where they part company is fruit — high in fast sugar, but the fibre and water slow it down anyway, which is why it still counts as whole.'),
 
     c.sources.length ? el('div', {},
       el('div.section-label', {}, el('span.micro', {}, 'Which food did what')),
@@ -164,13 +171,12 @@ function fatBody(q, targets) {
     el('div.section-label', {}, el('span.micro', {}, 'The three fats')),
     el('div.tile', {},
       el('div.macros', {},
-        bar('Solid-at-room-temp (saturated)', f.sat, f.covered, 'var(--warn)'),
-        bar('Olive-oil type (monounsaturated)', f.mufa, f.covered, 'var(--good)'),
-        bar('Seed and fish type (polyunsaturated)', f.pufa, f.covered, 'var(--m-p)')),
-      el('div.fine', { style: { marginTop: '10px' } },
-        'The saturated kind is solid at room temperature — ghee, butter, fatty meat, fried food — and it is the one to keep a lid on. '
-        + 'The monounsaturated kind is olive oil, nuts and avocado, and is the easiest swap. '
-        + 'The polyunsaturated kind includes omega-3, which your body cannot make at all.')),
+        bar('Saturated', f.sat, f.covered, 'var(--warn)'),
+        bar('Monounsaturated', f.mufa, f.covered, 'var(--good)'),
+        bar('Polyunsaturated', f.pufa, f.covered, 'var(--m-p)')),
+      explain('These three make up all the fat you eat, and they always add up to the total. '
+        + 'Saturated comes from ghee, butter, fatty meat and fried food, and is the one to keep down. '
+        + 'Monounsaturated comes from olive oil, nuts and avocado. Polyunsaturated comes from seeds and fish.')),
 
     el('div.tile', {},
       el('div.between', {},
@@ -182,9 +188,10 @@ function fatBody(q, targets) {
           el('div.micro', {}, 'Trans fat'),
           el('div.num', { style: { fontSize: '22px', marginTop: '2px',
             color: f.trans > 1 ? 'var(--warn)' : 'var(--muted)' } }, g(f.trans, 2) + ' g'))),
-      el('div.fine', { style: { marginTop: '10px' } },
-        'Omega-3 cannot be made by your body at all, so every gram has to come from food — walnuts, flax and chia give the plant form (ALA), oily fish the stronger marine form (EPA and DHA). '
-        + 'Trans fat has no safe level and comes almost entirely from commercial frying and bakery fat (partially hydrogenated oil).')),
+      explain('These two are shown separately because they are not a fourth and fifth type — they sit inside the three above. '
+        + 'Omega-3 is a particular kind of polyunsaturated fat, singled out because your body cannot make it and most people get too little: '
+        + 'walnuts, flax and chia give the plant form, oily fish the stronger marine form. '
+        + 'Trans fat is a damaged version of unsaturated fat created by industrial frying, and it is the only one with no safe level at all.')),
 
     f.sources.length ? el('div', {},
       el('div.section-label', {}, el('span.micro', {}, 'Which food did what')),

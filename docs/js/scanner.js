@@ -42,6 +42,103 @@ export function cameraSupported() {
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 
+/*
+ * Why the camera isn't working, in terms that lead somewhere.
+ *
+ * "Camera failed" is useless. Denied permission, an insecure origin and an
+ * old iOS are three completely different problems with three different
+ * fixes, and iOS in particular never re-prompts once refused — the only
+ * way back is through Settings, which nobody guesses.
+ */
+export function diagnose(err) {
+  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+
+  if (!secureEnough()) {
+    return { title: 'Needs a secure connection',
+      body: 'The camera only works over https. Open the https:// address rather than http://.' };
+  }
+  if (!cameraSupported()) {
+    return { title: 'This browser will not allow camera access',
+      body: 'Type the barcode digits instead, or pick a photo of the barcode.' };
+  }
+  if (err && err.name === 'NotAllowedError') {
+    return {
+      title: 'Camera permission was refused',
+      body: iOS
+        ? (standalone
+            ? 'iOS will not ask twice. Delete this app from your Home Screen, open the site in Safari, allow the camera when asked, then add it to the Home Screen again.'
+            : 'iOS will not ask twice. Tap the ⚙ or “AA” icon in Safari’s address bar, choose Website Settings, and set Camera to Allow — then reopen this.')
+        : 'Your browser is blocking the camera for this site. Click the padlock in the address bar and allow camera access.',
+    };
+  }
+  if (err && err.name === 'NotFoundError') {
+    return { title: 'No camera found', body: 'This device has no camera the browser can reach.' };
+  }
+  if (err && err.name === 'NotReadableError') {
+    return { title: 'The camera is busy',
+      body: 'Another app is using it. Close that app and try again.' };
+  }
+  return { title: 'The camera did not start',
+    body: (err && err.message) || 'Unknown reason. Use a photo or type the digits instead.' };
+}
+
+/*
+ * Read a barcode out of a still image.
+ *
+ * The fallback that keeps working when the live camera does not — a
+ * screenshot, a photo taken earlier, or a picture of the packet someone
+ * sent you. Uses the native detector where there is one and the bundled
+ * decoder otherwise.
+ */
+export async function decodeImageFile(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error('That file could not be opened as an image.'));
+      i.src = url;
+    });
+
+    if ('BarcodeDetector' in window) {
+      const supported = await window.BarcodeDetector.getSupportedFormats().catch(() => []);
+      const formats = FORMAT_NAMES.filter(f => supported.includes(f));
+      if (formats.length) {
+        const det = new window.BarcodeDetector({ formats });
+        const found = await det.detect(img);
+        if (found.length) return found[0].rawValue;
+      }
+    }
+
+    const ZXing = await loadZXing();
+    const reader = new ZXing.BrowserMultiFormatReader(zxingHints(ZXing));
+
+    // A photo of a packet is mostly not-barcode. Downscaling huge images and
+    // retrying on a centre crop catches the common case where the code is
+    // small in frame.
+    const attempts = [1, 0.6, 0.4];
+    for (const crop of attempts) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const sw = img.naturalWidth * crop, sh = img.naturalHeight * crop;
+      const sx = (img.naturalWidth - sw) / 2, sy = (img.naturalHeight - sh) / 2;
+      const scale = Math.min(1, 1600 / Math.max(sw, sh));
+      canvas.width = Math.round(sw * scale);
+      canvas.height = Math.round(sh * scale);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      try {
+        const res = reader.decodeFromCanvas(canvas);
+        if (res) return res.getText();
+      } catch { /* try the next crop */ }
+    }
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function secureEnough() {
   return window.isSecureContext || location.hostname === 'localhost';
 }
@@ -78,12 +175,9 @@ export class Scanner {
         audio: false,
       });
     } catch (e) {
-      const msg = e.name === 'NotAllowedError'
-        ? 'Camera access was declined. Allow it in Safari settings for this site, or type the digits.'
-        : e.name === 'NotFoundError'
-          ? 'No camera found on this device.'
-          : `Camera did not start: ${e.message}`;
-      this.onError(msg);
+      const d = diagnose(e);
+      this.failure = d;
+      this.onError(d.body, d);
       return false;
     }
 
