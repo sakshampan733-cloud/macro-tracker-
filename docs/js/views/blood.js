@@ -61,8 +61,11 @@ export function bloodTile(s, ctx) {
         el('div', { style: { fontSize: '13.5px', color: 'var(--text-2)', lineHeight: '1.55' } },
           'Nothing recorded yet.'),
         explain('A blood panel is the one thing this app genuinely cannot see. Recording it here puts your markers next to what you were eating in the weeks before the draw — which is the part a lab report cannot tell you.'),
-        el('button.btn.primary.block', { style: { marginTop: '12px' },
-          onclick: () => openPanelEditor({ ctx }) }, icon('plus', 16), 'Add a panel')));
+        el('div.btn-row', { style: { marginTop: '12px' } },
+          el('button.btn.primary', { onclick: () => openPanelImport(ctx) },
+            icon('upload', 16), 'Import a file'),
+          el('button.btn', { onclick: () => openPanelEditor({ ctx }) },
+            icon('plus', 16), 'Add by hand'))));
   }
 
   const vals = Object.entries(latest.values || {});
@@ -85,7 +88,7 @@ export function bloodTile(s, ctx) {
 
       el('div.btn-row', { style: { marginTop: '12px' } },
         el('button.btn.sm', { onclick: () => openPanelList(ctx) }, 'All panels'),
-        el('button.btn.sm.primary', { onclick: () => openPanelEditor({ ctx }) }, 'Add panel'))),
+        el('button.btn.sm.primary', { onclick: () => openPanelImport(ctx) }, 'Import'))),
   );
 }
 
@@ -229,6 +232,120 @@ export function openPanelEditor({ ctx, existing = null }) {
   return s2;
 }
 
+/*
+ * Import panels from a file.
+ *
+ * Typing twenty markers off a PDF is the kind of chore that means it never
+ * gets done, so the app takes a JSON file instead — the shape a lab report
+ * can be transcribed into once, by anything, and then just loaded.
+ *
+ * Deliberately forgiving about what it accepts: a bare panel, an array of
+ * them, or an object with a panels key, because the file will usually have
+ * been produced somewhere else and a rigid parser would just be another
+ * thing to get wrong.
+ */
+export function parsePanelFile(text) {
+  let raw;
+  try { raw = JSON.parse(text); }
+  catch { throw new Error('That file is not valid JSON.'); }
+
+  const list = Array.isArray(raw) ? raw
+    : Array.isArray(raw.panels) ? raw.panels
+    : (raw.values || raw.date) ? [raw]
+    : null;
+  if (!list || !list.length) throw new Error('No panels found in that file.');
+
+  const known = new Set(Object.keys(MARKERS));
+  const out = [];
+  const unknown = new Set();
+
+  for (const p of list) {
+    const date = String(p.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error(`A panel has no usable date (got "${p.date}"). Use YYYY-MM-DD.`);
+    }
+    const values = {};
+    for (const [k, v] of Object.entries(p.values || {})) {
+      if (!known.has(k)) { unknown.add(k); continue; }
+      const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^\d.\-]/g, ''));
+      if (Number.isFinite(n)) values[k] = n;
+    }
+    if (!Object.keys(values).length) continue;
+    out.push({ id: 'bp:' + Math.random().toString(36).slice(2, 9), date,
+               lab: String(p.lab || '').slice(0, 80), values });
+  }
+
+  if (!out.length) throw new Error('No recognised markers in that file.');
+  return { panels: out, unknown: [...unknown] };
+}
+
+export function openPanelImport(ctx) {
+  const file = el('input', { type: 'file', accept: '.json,application/json' });
+  const paste = el('textarea', { rows: '7', placeholder: '{ "panels": [ ... ] }',
+    style: { fontFamily: 'var(--mono)', fontSize: '12px' } });
+  const status = el('div');
+
+  const load = (text) => {
+    try {
+      const { panels, unknown } = parsePanelFile(text);
+      commit(st => {
+        st.blood = st.blood || {};
+        for (const p of panels) st.blood[p.id] = p;
+      }, 'blood');
+      const markers = panels.reduce((a, p) => a + Object.keys(p.values).length, 0);
+      status.replaceChildren(el('div.note.good', {},
+        el('div', {},
+          el('b', {}, `${panels.length} panel${panels.length > 1 ? 's' : ''} imported`),
+          el('div.fine', { style: { marginTop: '3px' } },
+            `${markers} markers in total.`
+            + (unknown.length ? ` Ignored ${unknown.length} unrecognised: ${unknown.slice(0, 6).join(', ')}.` : '')))));
+      toast(`${panels.length} panel${panels.length > 1 ? 's' : ''} added.`);
+      setTimeout(() => { s.close(); ctx.refresh(); }, 1200);
+    } catch (e) {
+      status.replaceChildren(el('div.note.warn', {}, el('div', {}, String(e.message || e))));
+    }
+  };
+
+  file.addEventListener('change', async () => {
+    const f = file.files[0];
+    if (f) load(await f.text());
+  });
+
+  const s = sheet({
+    title: 'Import blood panels',
+    body: el('div', {},
+      el('p', { style: { color: 'var(--text-2)', marginTop: 0, lineHeight: '1.55' } },
+        'Load a JSON file of panels rather than typing them in. Existing panels are kept — this adds to them.'),
+      field('Choose a file', file),
+      el('div.divider'),
+      field('Or paste it here', paste),
+      el('button.btn.block', { onclick: () => {
+        const t = paste.value.trim();
+        if (!t) { toast('Nothing pasted.', 'err'); return; }
+        load(t);
+      } }, 'Import pasted text'),
+      status,
+      el('div.section-label', {}, el('span.micro', {}, 'Expected shape')),
+      el('div.tile', { style: { padding: '12px' } },
+        el('code', { class: 'num', style: { fontSize: '11.5px', whiteSpace: 'pre-wrap',
+                                            color: 'var(--text-2)', lineHeight: '1.6' } },
+`{
+  "panels": [
+    {
+      "date": "2026-08-20",
+      "lab": "Dr Lal PathLabs",
+      "values": { "hb": 15.1, "vitd": 22.4, "b12": 310 }
+    }
+  ]
+}`)),
+      el('div.fine', {},
+        'Marker keys must match the ones the app knows: '
+        + Object.keys(MARKERS).join(', ') + '. Anything else is ignored rather than rejected.'),
+    ),
+  });
+  return s;
+}
+
 export function openPanelList(ctx) {
   const s = get();
   const panels = Object.values(s.blood || {}).sort((a, b) => b.date.localeCompare(a.date));
@@ -257,7 +374,8 @@ export function openPanelList(ctx) {
   );
 
   const s3 = sheet({ title: 'Blood panels', body,
-    foot: el('button.btn.primary.block', {
-      onclick: () => { s3.close(); openPanelEditor({ ctx }); } }, 'Add a panel') });
+    foot: el('div.btn-row', {},
+      el('button.btn', { onclick: () => { s3.close(); openPanelImport(ctx); } }, 'Import file'),
+      el('button.btn.primary', { onclick: () => { s3.close(); openPanelEditor({ ctx }); } }, 'Add by hand')) });
   return s3;
 }

@@ -756,3 +756,121 @@ input.num-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
     transition-duration: .01ms !important;
   }
 }
+
+/* ═══ Living data ══════════════════════════════════════════════════════
+   The Whoop side was the flattest part of the app, which was backwards —
+   it is the only screen showing something measured overnight and arriving
+   on its own. Everything below exists to make that legible at a glance
+   rather than as a table of numbers.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.ring-wrap { position: relative; margin: 0 auto; }
+.ring-svg { display: block; }
+.ring-centre {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; pointer-events: none;
+}
+.ring-value {
+  font-size: 40px; font-weight: 500; letter-spacing: -0.03em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ring-sub { font-size: 11px; }
+
+/* A quiet pulse — this data arrived on its own and is still arriving. */
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--dot, var(--accent));
+  display: inline-block; flex: none;
+  box-shadow: 0 0 0 0 var(--dot, var(--accent));
+  animation: livePulse 2.4s cubic-bezier(.4,0,.6,1) infinite;
+}
+@keyframes livePulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--dot) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.chart-rich { display: block; overflow: visible; }
+.chart-pulse { animation: dotPulse 2.2s ease-in-out infinite; transform-origin: center; }
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; r: 3.5; }
+  50%      { opacity: .55; r: 5; }
+}
+
+.stage-bar {
+  display: flex; width: 100%; border-radius: 5px; overflow: hidden;
+  background: var(--bg-2); border: 1px solid var(--line);
+}
+.stage-seg {
+  height: 100%;
+  transition: width .8s cubic-bezier(.22,1,.36,1);
+}
+.stage-key { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 9px; }
+.stage-key span { display: inline-flex; align-items: center; gap: 5px; }
+.stage-key i {
+  width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex: none;
+}
+
+.bar-row { display: flex; align-items: flex-end; gap: 2px; width: 100%; }
+.bar-col { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 0; }
+.bar-fill {
+  width: 100%; border-radius: 2px 2px 1px 1px; min-height: 2px;
+  transition: height .7s cubic-bezier(.22,1,.36,1);
+}
+
+/* Cards arriving in sequence rather than all at once — the page assembles
+   itself, which reads as data landing rather than a screen being drawn. */
+.stagger > * {
+  animation: riseIn .5s cubic-bezier(.22,1,.36,1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: .02s }
+.stagger > *:nth-child(2) { animation-delay: .07s }
+.stagger > *:nth-child(3) { animation-delay: .12s }
+.stagger > *:nth-child(4) { animation-delay: .17s }
+.stagger > *:nth-child(5) { animation-delay: .22s }
+.stagger > *:nth-child(6) { animation-delay: .27s }
+.stagger > *:nth-child(n+7) { animation-delay: .3s }
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The vitals hero — recovery ring flanked by its two drivers. */
+.vitals-hero {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 10px;
+}
+.vitals-side { display: flex; flex-direction: column; gap: 16px; }
+.vitals-stat { text-align: center; }
+.vitals-stat .v {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 21px; font-weight: 500; letter-spacing: -0.02em; margin-top: 2px;
+}
+.vitals-stat .d { font-size: 10.5px; margin-top: 1px; }
+@media (max-width: 380px) {
+  .vitals-hero { grid-template-columns: 1fr; }
+  .vitals-side { flex-direction: row; justify-content: space-around; }
+}
+
+/* The one thing to do right now. Deliberately the loudest card on Today. */
+.now-card {
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.now-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--now-accent, var(--accent));
+}
+.now-card .now-head {
+  font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 5px;
+}
+.now-more {
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 10px;
+}

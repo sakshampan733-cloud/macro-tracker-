@@ -33,7 +33,13 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
   const store = get();
 
   // { key, name, brand, ref, per100, serv, grams, method, grade, dish }
-  let items = meal ? meal.items.map(i => ({ ...i, key: Math.random().toString(36).slice(2) })) : [];
+  let items = meal ? meal.items.map(i => ({
+    ...i,
+    key: Math.random().toString(36).slice(2),
+    // stored meals keep grams only, so reopen them in grams
+    unit: 'g',
+    qty: Math.round(i.grams),
+  })) : [];
   let target = meal?.meal || 'lunch';
 
   const nameInput = el('input', {
@@ -51,7 +57,16 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
     return a;
   }, { kcal: 0, p: 0, c: 0, f: 0, fib: 0 });
 
-  function render() {
+  /*
+   * Rows and summary are rendered separately, on purpose.
+   *
+   * Typing a gram amount used to call a single render() that rebuilt the
+   * whole list — including the input being typed into, which was destroyed
+   * and recreated on every keystroke, so focus jumped away after each
+   * digit. Amount changes now only recompute the summary; the rows are
+   * rebuilt solely when an item is added or removed.
+   */
+  function renderRows() {
     list.replaceChildren();
     if (!items.length) {
       list.append(el('div', { style: { padding: '16px', color: 'var(--muted)', fontSize: '13.5px' } },
@@ -59,19 +74,59 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
     }
 
     items.forEach((it, i) => {
-      const m = macrosFor(it.per100, it.grams);
+      const sub = el('div.sub', {}, describe(it));
+
+      /* Recompute grams from whatever unit is selected. Grams stay the
+         stored value, so every calculation downstream is unaffected by
+         which unit happened to be convenient at the time. */
+      const recompute = () => {
+        const item = items[i];
+        item.grams = item.unit === 'g'
+          ? item.qty
+          : +(item.qty * (item.serv[item.unit]?.g || 100)).toFixed(1);
+        sub.textContent = describe(item);
+        renderSummary();
+      };
+
+      const qty = el('input.num-in', {
+        type: 'number', inputmode: 'decimal', min: '0',
+        step: it.unit === 'g' ? '5' : '0.5',
+        value: String(it.qty),
+        style: { width: '68px', flex: 'none' },
+        'aria-label': 'Amount of ' + it.name,
+        oninput: e => {
+          items[i].qty = Math.max(0, +e.target.value || 0);
+          recompute();   // never rebuilds the row — the caret lives here
+        },
+      });
+
+      const unitSel = el('select', {
+        style: { width: 'auto', flex: 'none', maxWidth: '132px', padding: '9px 8px' },
+        'aria-label': 'Unit for ' + it.name,
+        onchange: e => {
+          const item = items[i];
+          const v = e.target.value;
+          item.unit = v === 'g' ? 'g' : +v;
+          // Carry the amount across sensibly: switching to grams should
+          // show the grams you already had, not the number 1.
+          item.qty = item.unit === 'g' ? Math.round(item.grams) : 1;
+          item.method = item.unit === 'g' ? 'weighed' : 'portion';
+          qty.value = String(item.qty);
+          qty.step = item.unit === 'g' ? '5' : '0.5';
+          recompute();
+        },
+      });
+      (it.serv || []).forEach((sv, si) => {
+        unitSel.append(el('option', { value: String(si), selected: it.unit === si }, sv.l));
+      });
+      unitSel.append(el('option', { value: 'g', selected: it.unit === 'g' }, 'grams'));
+
       list.append(el('div.row', {},
         el('span.grow', {},
           el('div.title', {}, it.name),
-          el('div.sub', {}, `${Math.round(m.kcal)} kcal · ${Math.round(m.p)}P ${Math.round(m.c)}C ${Math.round(m.f)}F`)),
-        el('input.num-in', {
-          type: 'number', inputmode: 'decimal', min: '0', step: '5',
-          value: String(it.grams),
-          style: { width: '82px', flex: 'none' },
-          'aria-label': 'Grams of ' + it.name,
-          oninput: e => { items[i].grams = Math.max(0, +e.target.value || 0); render(); },
-        }),
-        el('span.micro', { style: { flex: 'none' } }, 'g'),
+          sub),
+        qty,
+        unitSel,
         el('button.x-btn', {
           'aria-label': 'Remove ' + it.name,
           onclick: () => { items.splice(i, 1); render(); },
@@ -79,6 +134,16 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
       ));
     });
 
+    renderSummary();
+  }
+
+  const describe = it => {
+    const m = macrosFor(it.per100, it.grams);
+    const asGrams = it.unit === 'g' ? '' : ` · ${Math.round(it.grams)} g`;
+    return `${Math.round(m.kcal)} kcal${asGrams} · ${Math.round(m.p)}P ${Math.round(m.c)}C ${Math.round(m.f)}F`;
+  };
+
+  function renderSummary() {
     const t = totals();
     summary.replaceChildren(
       el('div.tile', {},
@@ -97,6 +162,9 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
     );
   }
 
+  /* Full rebuild — only when the set of items actually changes. */
+  function render() { renderRows(); }
+
   const stat = (label, v, hue) =>
     el('div', {},
       el('div.micro', { style: { color: hue } }, label),
@@ -107,13 +175,19 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
   const hits = el('div.chips', { style: { marginTop: '8px' } });
 
   const addFood = f => {
+    const serv = (f.serv || []).map(x => Array.isArray(x) ? { l: x[0], g: x[1] } : x);
+    // Default to the food's own household serving where it has one — "1
+    // medium onion" is how the thing is actually eaten, and 199 of the 225
+    // reference foods define one. Grams remain what gets stored.
+    const first = serv[0];
     items.push({
       key: Math.random().toString(36).slice(2),
       name: f.n, brand: f.brand || '', ref: f.id,
-      per100: f.per100,
-      serv: (f.serv || []).map(x => Array.isArray(x) ? { l: x[0], g: x[1] } : x),
-      grams: (f.serv && f.serv[0]) ? (Array.isArray(f.serv[0]) ? f.serv[0][1] : f.serv[0].g) : 100,
-      method: 'weighed',      // you assembled it, so you can weigh it
+      per100: f.per100, serv,
+      unit: first ? 0 : 'g',        // index into serv, or 'g' for raw grams
+      qty: 1,
+      grams: first ? first.g : 100,
+      method: first ? 'portion' : 'weighed',
       grade: f.grade || 'B',
     });
     search.value = ''; showHits(''); render();
@@ -124,7 +198,7 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
     items.push({
       key: Math.random().toString(36).slice(2),
       name: STYLES[style].label, brand: '', ref: 'dish:' + style,
-      per100: per100For(style, d), serv: [], grams: 200,
+      per100: per100For(style, d), serv: [], unit: 'g', qty: 200, grams: 200,
       method: 'dish', grade: 'C', dish: style,
     });
     search.value = ''; showHits(''); render();
@@ -163,7 +237,7 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
     if (!n) { toast('Give the meal a name.', 'err'); return null; }
     if (!items.length) { toast('Add what goes in it.', 'err'); return null; }
     if (items.some(i => !(i.grams > 0))) { toast('Every item needs an amount.', 'err'); return null; }
-    return { name: n, items: items.map(({ key, ...rest }) => rest), meal: target };
+    return { name: n, items: items.map(({ key, qty, unit, ...rest }) => rest), meal: target };
   };
 
   const s = sheet({

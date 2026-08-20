@@ -40,11 +40,20 @@ export function openPot({ onSaved = () => {} } = {}) {
   const cookedInput = el('input.num-in', {
     type: 'number', inputmode: 'decimal', min: '0', step: '10',
     placeholder: 'weight of the finished dish',
-    oninput: e => { cookedG = +e.target.value || 0; render(); },
+    oninput: e => { cookedG = +e.target.value || 0; renderSummary(); },
   });
 
   const list = el('div.tile.flush');
   const summary = el('div');
+
+  /* Grams from whichever unit is selected. Grams remain what the yield
+     calculation actually uses, so the maths is untouched by the choice. */
+  const gramsOf = it => {
+    const f = BY_ID[it.id];
+    if (it.unit === 'g') return it.qty;
+    const sv = f?.serv?.[it.unit];
+    return +(it.qty * (sv ? sv[1] : 100)).toFixed(1);
+  };
 
   const raw = () => items.reduce((a, it) => {
     const f = BY_ID[it.id];
@@ -57,8 +66,15 @@ export function openPot({ onSaved = () => {} } = {}) {
     return a;
   }, { grams: 0 });
 
-  function render() {
-    // rows
+  /*
+   * Same split as the meal builder: typing an amount must not rebuild the
+   * row containing the caret, or focus is lost after every digit.
+   */
+  function renderRows() {
+    // pots saved before units existed stored grams only
+    items.forEach(it => {
+      if (it.unit === undefined) { it.unit = 'g'; it.qty = Math.round(it.grams); }
+    });
     list.replaceChildren();
     if (!items.length) {
       list.append(el('div', { style: { padding: '16px', color: 'var(--muted)', fontSize: '13.5px' } },
@@ -66,20 +82,60 @@ export function openPot({ onSaved = () => {} } = {}) {
     }
     items.forEach((it, i) => {
       const f = BY_ID[it.id];
-      const m = (f.per100.kcal || 0) * it.grams / 100;
+      const describe = () => {
+        const m = (f.per100.kcal || 0) * it.grams / 100;
+        return `${grams(it.grams)} g · ${Math.round(m)} kcal`;
+      };
+      const sub = el('div.sub', {}, describe());
+      const qty = el('input.num-in', {
+        type: 'number', inputmode: 'decimal', min: '0',
+        step: it.unit === 'g' ? '5' : '0.5',
+        value: String(it.qty ?? it.grams),
+        style: { width: '66px', flex: 'none' },
+        'aria-label': 'Amount of ' + f.n,
+        oninput: e => {
+          items[i].qty = Math.max(0, +e.target.value || 0);
+          items[i].grams = gramsOf(items[i]);
+          sub.textContent = describe();
+          renderSummary();      // never renderRows() — the caret is in here
+        },
+      });
+
+      /* Ingredients get measured the way a kitchen actually measures them —
+         a spoon of oil, one onion — rather than forced onto a scale. */
+      const unitSel = el('select', {
+        style: { width: 'auto', flex: 'none', maxWidth: '124px', padding: '9px 8px' },
+        'aria-label': 'Unit for ' + f.n,
+        onchange: e => {
+          const v = e.target.value;
+          items[i].unit = v === 'g' ? 'g' : +v;
+          items[i].qty = items[i].unit === 'g' ? Math.round(items[i].grams) : 1;
+          items[i].grams = gramsOf(items[i]);
+          qty.value = String(items[i].qty);
+          qty.step = items[i].unit === 'g' ? '5' : '0.5';
+          sub.textContent = describe();
+          renderSummary();
+        },
+      });
+      (f.serv || []).forEach((sv, si) => {
+        unitSel.append(el('option', { value: String(si), selected: it.unit === si }, sv[0]));
+      });
+      unitSel.append(el('option', { value: 'g', selected: it.unit === 'g' }, 'grams'));
+
       list.append(el('div.row', {},
         el('span.grow', {},
           el('div.title', {}, f.n),
-          el('div.sub', {}, `${grams(it.grams)} g · ${Math.round(m)} kcal`)),
-        el('input.num-in', {
-          type: 'number', inputmode: 'decimal', min: '0', step: '5', value: String(it.grams),
-          style: { width: '84px', flex: 'none' },
-          oninput: e => { items[i].grams = Math.max(0, +e.target.value || 0); render(); },
-        }),
+          sub),
+        qty,
+        unitSel,
         el('button.x-btn', { 'aria-label': 'Remove ' + f.n,
           onclick: () => { items.splice(i, 1); render(); } }, icon('trash', 15))));
     });
 
+    renderSummary();
+  }
+
+  function renderSummary() {
     const r = raw();
     const yielded = cookedG > 0 ? cookedG : r.grams;
     const density = yielded > 0 ? r.kcal / yielded : 0;
@@ -107,6 +163,8 @@ export function openPot({ onSaved = () => {} } = {}) {
     );
   }
 
+  function render() { renderRows(); }
+
   const stat = (label, per100, hue) =>
     el('div', {},
       el('div.micro', { style: { color: hue } }, label),
@@ -127,8 +185,16 @@ export function openPot({ onSaved = () => {} } = {}) {
         type: 'button',
         onclick: () => {
           const exists = items.find(i => i.id === f.id);
-          if (exists) exists.grams += 50;
-          else items.push({ id: f.id, grams: f.serv?.[0]?.[1] || 100 });
+          if (exists) { exists.qty += 1; exists.grams = gramsOf(exists); }
+          else {
+            const hasServ = !!(f.serv && f.serv[0]);
+            items.push({
+              id: f.id,
+              unit: hasServ ? 0 : 'g',
+              qty: hasServ ? 1 : 100,
+              grams: hasServ ? f.serv[0][1] : 100,
+            });
+          }
           search.value = ''; showHits(''); render();
         },
       }, f.n));
