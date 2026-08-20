@@ -13,11 +13,14 @@ import {
 import { get, commit, dayKey, setWeight, peekDay, weightSeries, totals } from '../store.js';
 import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
-  nutritionVsRecovery,
+  nutritionVsRecovery, stats,
 } from '../whoop.js';
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict } from '../nutrition.js';
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
+import {
+  ring, areaChart, stageBar, liveDot, barRow, recoveryColour, countUp,
+} from '../charts.js';
 import { openReport } from './report.js';
 import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
@@ -28,9 +31,9 @@ export function renderBody(root, ctx) {
   clear(root);
 
   root.append(
-    el('div.between', { style: { marginBottom: '14px' } },
+    (root.classList.add('stagger'), el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Body'),
-      el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report')),
+      el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report'))),
     checkInTile(s, ctx),
     weightTile(ctx),
     tdeeTile(s),
@@ -232,6 +235,21 @@ const notReadyNote = r =>
 
 /* ── Vitals ─────────────────────────────────────────────────────────── */
 
+/*
+ * Vitals.
+ *
+ * This was the flattest screen in the app, which was exactly backwards: it
+ * is the only part showing something measured overnight, arriving on its
+ * own, without you doing anything. A grid of small grey numbers made live
+ * physiology look like a spreadsheet.
+ *
+ * So recovery gets the shape it deserves — a ring, coloured by the same
+ * three bands Whoop uses because those bands ARE the reading — flanked by
+ * the two things that actually drive it. Sleep is shown as the stages it
+ * was made of, because six hours that was mostly light sleep is not the
+ * same night as six with normal deep and REM, and a single number hides
+ * that completely.
+ */
 function vitalsSection(s, ctx) {
   const sum = summary(s.whoop);
 
@@ -240,61 +258,164 @@ function vitalsSection(s, ctx) {
       el('div.section-label', {}, el('span.micro', {}, 'Vitals')),
       el('div.tile', {}, empty(
         'No Whoop data yet',
-        'Whoop has no public API, so bring the data in yourself: whoop.com → Settings → Download my data. '
-        + 'Unzip it and load physiological_cycles.csv. Fifty days is plenty to see where you range.',
+        'Connect Whoop for live sync, or load a CSV export if you would rather not set up the relay.',
         el('div', {},
           el('button.btn.primary', { onclick: () => openWhoopRelay(ctx) }, icon('bolt', 16), 'Connect Whoop'),
           el('button.btn.ghost', { style: { marginTop: '8px' }, onclick: () => openWhoopImport(ctx) },
             icon('upload', 16), 'Or load a CSV export')))));
   }
 
+  const rec = sum.metrics.recovery;
+  const hrv = sum.metrics.hrv;
+  const rhr = sum.metrics.rhr;
+  const sleep = sum.metrics.sleepH;
+  const strain = sum.metrics.strain;
+
+  const latestKey = Object.keys(s.whoop.rows || {}).sort().pop();
+  const today = s.whoop.rows?.[latestKey] || {};
+  const recV = rec?.latest?.v ?? null;
+  const colour = recoveryColour(recV);
+
+  const syncedVia = s.whoop.source === 'relay' ? 'live from Whoop'
+    : s.whoop.source === 'demo' ? 'demo data' : 'imported';
+
   const wrap = el('div', {},
     el('div.section-label', {}, el('span.micro', {}, 'Vitals')),
     el('div.between', { style: { marginBottom: '10px' } },
-      el('span.micro', {}, `${sum.days} days · ${sum.from} to ${sum.to}`),
-      el('button.btn.sm.ghost', { onclick: () => openWhoopImport(ctx) }, 'Re-import')),
+      el('span.flex', {},
+        liveDot(colour),
+        el('span.micro', { style: { marginLeft: '7px' } },
+          `${latestKey} · ${syncedVia}`)),
+      el('button.btn.sm.ghost', { onclick: () => openWhoopRelay(ctx) }, 'Sync')),
   );
 
-  const order = ['recovery', 'hrv', 'rhr', 'sleepH', 'sleepPerf', 'strain'];
-  const grid = el('div.metric-grid');
+  /* ── the hero: recovery, flanked by what drives it ── */
+  const hero = el('div.tile', {},
+    el('div.vitals-hero', {},
+      el('div.vitals-side', {},
+        sideStat('HRV', hrv?.latest?.v, 'ms', 0, s, 'hrv', ctx),
+        sideStat('Resting HR', rhr?.latest?.v, 'bpm', 0, s, 'rhr', ctx)),
 
-  for (const m of order) {
-    const info = sum.metrics[m];
-    if (!info || !info.latest) continue;
-    const place = placeInRange(s.whoop, m, info.latest.v);
-    const tone = place && info.good !== 'none'
-      ? (place.verdict === 'strong' || place.verdict === 'above your normal' ? 'good'
-        : place.verdict.includes('below') ? 'warn' : '')
-      : '';
-
-    const open = () => openMetric(s, m, ctx);
-    grid.append(el('div', {
-      class: 'metric ' + tone,
-      role: 'button',
-      tabindex: '0',
-      'aria-label': `${info.label}, ${info.latest.v.toFixed(info.dp)} ${info.unit}`,
-      onclick: open,
-      // A focusable role="button" that ignores the keyboard is a trap.
-      onkeydown: e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      el('div', { style: { cursor: 'pointer' },
+        role: 'button', tabindex: '0',
+        'aria-label': `Recovery ${recV ?? 'unknown'} percent`,
+        onclick: () => openMetric(s, 'recovery', ctx),
+        onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, 'recovery', ctx); } },
       },
-    },
-      el('div.micro', {}, info.label),
-      el('div.v', {}, info.latest.v.toFixed(info.dp), el('span.u', {}, info.unit)),
-      el('div.verdict', {}, place ? `${place.pct}th percentile · ${place.verdict}` : '')));
+        ring({ value: recV, max: 100, size: 152, stroke: 12,
+               colour, label: 'RECOVERY', unit: '%',
+               sub: recV == null ? '' : recV >= 67 ? 'ready' : recV >= 34 ? 'moderate' : 'rest' })),
+
+      el('div.vitals-side', {},
+        sideStat('Sleep', sleep?.latest?.v, 'h', 1, s, 'sleepH', ctx),
+        sideStat('Strain', strain?.latest?.v, '', 1, s, 'strain', ctx)),
+    ),
+  );
+  wrap.append(hero);
+
+  /* ── sleep, as the stages it was actually made of ── */
+  if (today.sleepH) {
+    const light = Math.max(0, (today.sleepH || 0) - (today.remH || 0) - (today.swsH || 0));
+    const stages = [
+      { label: 'Deep', value: today.swsH || 0, colour: 'var(--m-p)' },
+      { label: 'REM',  value: today.remH || 0, colour: 'var(--m-f)' },
+      { label: 'Light', value: light, colour: 'var(--line-2)' },
+    ];
+    wrap.append(el('div.tile', {},
+      el('div.between', { style: { marginBottom: '10px' } },
+        el('h3', {}, 'Last night'),
+        el('span.num', { style: { fontSize: '15px' } },
+          `${today.sleepH.toFixed(1)} h`)),
+      stageBar(stages),
+      el('div.stage-key', {},
+        ...stages.map(st => el('span.micro', {},
+          el('i', { style: { background: st.colour } }),
+          `${st.label} ${st.value.toFixed(1)}h`))),
+      today.sleepPerf != null
+        ? el('div.fine', { style: { marginTop: '10px' } },
+            `Sleep performance ${Math.round(today.sleepPerf)}%`
+            + (today.debtH ? ` · ${today.debtH.toFixed(1)} h of debt` : ''))
+        : null,
+    ));
   }
 
-  wrap.append(grid);
+  /* ── trends, as shapes rather than rows of numbers ── */
+  const trendFor = (key, colour) => {
+    const pts = seriesFor(s.whoop, key, 30);
+    if (pts.length < 4) return null;
+    const info = sum.metrics[key];
+    /*
+     * Statistics from the same window that is drawn.
+     *
+     * This previously labelled a 14-day baseline as the "30-day range"
+     * beside a 30-day chart, so the stated range excluded points visibly
+     * on the line — a caption contradicting the picture directly above it.
+     */
+    const base = stats(pts.map(p => p.v));
+    if (!base) return null;
+    return el('div.tile', {},
+      el('div.between', { style: { marginBottom: '8px' } },
+        el('div', {},
+          el('div.micro', {}, info.label),
+          el('div.num', { style: { fontSize: '19px', marginTop: '2px', color: colour } },
+            info.latest.v.toFixed(info.dp) + (info.unit ? ' ' + info.unit : ''))),
+        el('div', { style: { textAlign: 'right' } },
+          el('div.micro', {}, '30-day range'),
+          el('div.num', { style: { fontSize: '12px', marginTop: '3px', color: 'var(--muted)' } },
+            `${base.min.toFixed(info.dp)}–${base.max.toFixed(info.dp)}`))),
+      areaChart(pts.map(p => ({ v: p.v })), {
+        colour, h: 96, showDots: true,
+        band: { lo: base.p25, hi: base.p75 },
+      }),
+      el('div.fine', { style: { marginTop: '6px' } },
+        'Shaded band is where this normally sits for you.'),
+    );
+  };
 
-  const rec = sum.metrics.recovery;
+  const hrvTrend = trendFor('hrv', 'var(--m-p)');
+  const rhrTrend = trendFor('rhr', 'var(--accent)');
+  if (hrvTrend) wrap.append(hrvTrend);
+  if (rhrTrend) wrap.append(rhrTrend);
+
+  /* ── the fortnight, at a glance ── */
+  const recentRec = seriesFor(s.whoop, 'recovery', 14);
+  if (recentRec.length > 3) {
+    wrap.append(el('div.tile', {},
+      el('div.between', { style: { marginBottom: '10px' } },
+        el('h3', {}, 'Last fortnight'),
+        el('span.micro', {}, `avg ${Math.round(rec.recent.mean)}%`)),
+      barRow(recentRec.map(p => ({ v: p.v, label: `${p.date}: ${Math.round(p.v)}%` })),
+             { h: 62, colourFor: recoveryColour }),
+      el('div.between', { style: { marginTop: '6px' } },
+        el('span.micro', {}, recentRec[0].date.slice(5)),
+        el('span.micro', {}, 'green ≥67 · amber ≥34 · red below'),
+        el('span.micro', {}, recentRec[recentRec.length - 1].date.slice(5))),
+    ));
+  }
+
   if (rec && rec.drift != null && Math.abs(rec.drift) > 0.4) {
-    wrap.append(el('div', { class: 'note ' + (rec.drift > 0 ? 'good' : 'warn'), style: { marginTop: '10px' } },
+    wrap.append(el('div', { class: 'note ' + (rec.drift > 0 ? 'good' : 'warn') },
       el('div', {}, `Your last fortnight of recovery is running `
         + `${Math.abs(rec.drift).toFixed(1)} standard deviations ${rec.drift > 0 ? 'above' : 'below'} your full-period average `
         + `(${rec.recent.mean.toFixed(0)}% against ${rec.all.mean.toFixed(0)}%).`)));
   }
 
   return wrap;
+}
+
+/* A driver of recovery, small, tappable, with its own percentile. */
+function sideStat(label, value, unit, dp, store, key, ctx) {
+  if (value == null) return el('div.vitals-stat', {}, el('div.micro', {}, label), el('div.v', {}, '—'));
+  const place = placeInRange(store.whoop, key, value);
+  return el('div.vitals-stat', {
+    role: 'button', tabindex: '0', style: { cursor: 'pointer' },
+    'aria-label': `${label} ${value}`,
+    onclick: () => openMetric(store, key, ctx),
+    onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(store, key, ctx); } },
+  },
+    el('div.micro', {}, label),
+    el('div.v', {}, value.toFixed(dp) + (unit ? ' ' + unit : '')),
+    el('div.d.micro', {}, place ? `${place.pct}th` : ''));
 }
 
 function openMetric(s, metric, ctx) {

@@ -7,7 +7,7 @@
 
 import {
   el, clear, rail, macroRail, kcal, grams, g, clock, dateLabel, icon,
-  toast, sheet, confirmSheet, empty,
+  toast, sheet, confirmSheet, empty, append,
 } from '../ui.js';
 import {
   get, commit, day, totals, byMeal, MEALS, METHODS, dayKey, shiftDay,
@@ -20,6 +20,7 @@ import { openDish } from './dish.js';
 import { openMacroDetail } from './macro.js';
 import { nutrientsTile } from './nutrients.js';
 import { supplementsTile } from './supplements.js';
+import { nowAdvice } from '../coachnow.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
 
@@ -31,8 +32,10 @@ export function renderToday(root, ctx) {
 
   clear(root);
 
+  root.classList.add('stagger');
   root.append(
     dateStrip(key, ctx),
+    nowCard(s, targets, key, ctx),
     energyTile(t, targets, s, key, ctx),
     macroTile(t, targets, key, ctx),
     waterTile(t, targets, key, ctx),
@@ -80,6 +83,56 @@ function dateStrip(key, ctx) {
       onclick: () => ctx.go('today', { date: shiftDay(key, 1) }),
     }, icon('chevron', 16)),
   );
+}
+
+/*
+ * The one thing to do right now.
+ *
+ * Everything else in this app looks backwards — the check-in, the report,
+ * the correlations all describe a period once it is over. This is the only
+ * part that speaks while there is still time to act on it, which is the
+ * whole difference between a log and a coach.
+ *
+ * Deliberately one thing at a time. A stack of six warnings gets ignored
+ * wholesale; a single specific sentence gets read.
+ */
+function nowCard(s, targets, key, ctx) {
+  // only for today — reading advice about last Tuesday is nonsense
+  if (key !== dayKey()) return null;
+
+  let advice;
+  try { advice = nowAdvice(s, targets, key); }
+  catch (e) { console.warn('coach failed', e); return null; }
+  if (!advice || !advice.primary) return null;
+
+  const p = advice.primary;
+  const accent = { warn: 'var(--warn)', good: 'var(--good)', info: 'var(--m-p)' }[p.tone] || 'var(--accent)';
+
+  const card = el('div.now-card', {});
+  card.style.setProperty('--now-accent', accent);
+
+  const more = el('div.now-more.hide', {},
+    ...advice.rest.map(r => el('div', {},
+      el('div', { style: { fontSize: '13.5px', fontWeight: '500' } }, r.headline),
+      el('div.fine', { style: { marginTop: '2px' } }, r.body))));
+
+  // Element.append() renders null as the literal word — use the helper that
+  // filters, the same trap that produced a stray "null" in the rails before.
+  append(card,
+    el('div.now-head', { style: { color: accent } }, p.headline),
+    el('div.fine', {}, p.body),
+    advice.rest.length
+      ? el('button.btn.sm.ghost', {
+          style: { marginTop: '11px' },
+          onclick: e => {
+            const open = more.classList.toggle('hide');
+            e.target.textContent = open ? `${advice.rest.length} more` : 'Show less';
+          },
+        }, `${advice.rest.length} more`)
+      : null,
+    advice.rest.length ? more : null,
+  );
+  return card;
 }
 
 /* ── The hero: energy on a caliper rail ─────────────────────────────── */

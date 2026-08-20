@@ -86,11 +86,16 @@ export function ring({
   centre.append(lab, big, subEl);
   wrap.append(centre);
 
-  // fill and count up together, once the element is actually on screen
-  requestAnimationFrame(() => {
-    arc.setAttribute('stroke-dashoffset', String(c * (1 - pct)));
-    if (value != null) countUp(big, value, dp, unit);
-  });
+  // Fill and count up together. Both are guaranteed to land even if the
+  // frame callback never runs — see countUp.
+  const settleArc = () => arc.setAttribute('stroke-dashoffset', String(c * (1 - pct)));
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(settleArc);
+    setTimeout(settleArc, 400);
+  } else {
+    settleArc();
+  }
+  if (value != null) countUp(big, value, dp, unit);
 
   return wrap;
 }
@@ -102,16 +107,30 @@ export function ring({
  * reads like a loading spinner rather than a measurement settling.
  */
 export function countUp(node, target, dp = 0, unit = '', ms = 900) {
-  if (reduced()) { node.textContent = fmt(target, dp) + unit; return; }
+  const settle = () => { node.textContent = fmt(target, dp) + unit; };
+
+  if (reduced() || typeof requestAnimationFrame !== 'function') { settle(); return; }
+
+  let done = false;
   const t0 = performance.now();
   const step = now => {
     const p = Math.min(1, (now - t0) / ms);
     const eased = 1 - Math.pow(1 - p, 3);
     node.textContent = fmt(target * eased, dp) + unit;
     if (p < 1) requestAnimationFrame(step);
-    else node.textContent = fmt(target, dp) + unit;
+    else { done = true; settle(); }
   };
   requestAnimationFrame(step);
+
+  /*
+   * The animation is decoration; the number is not.
+   *
+   * requestAnimationFrame is throttled to nothing in a background tab and
+   * on some low-power devices, which would leave the figure frozen at zero
+   * — a wrong number presented as a real one, which is far worse than no
+   * animation. This guarantees the true value lands regardless.
+   */
+  setTimeout(() => { if (!done) settle(); }, ms + 300);
 }
 
 const fmt = (v, dp) => dp ? v.toFixed(dp) : String(Math.round(v));
@@ -178,7 +197,9 @@ export function areaChart(points, {
     stroke.style.strokeDasharray = len;
     stroke.style.strokeDashoffset = len;
     stroke.style.transition = 'stroke-dashoffset 1.2s ease-out';
-    requestAnimationFrame(() => { stroke.style.strokeDashoffset = '0'; });
+    const settle = () => { stroke.style.strokeDashoffset = '0'; };
+    requestAnimationFrame(settle);
+    setTimeout(settle, 500);
   }
 
   if (showDots) {
@@ -216,7 +237,9 @@ export function stageBar(stages, { h = 26 } = {}) {
     seg.style.transitionDelay = (i * 90) + 'ms';
     wrap.append(seg);
     if (!reduced()) {
-      requestAnimationFrame(() => { seg.style.width = (s.value / total * 100) + '%'; });
+      const settle = () => { seg.style.width = (s.value / total * 100) + '%'; };
+      requestAnimationFrame(settle);
+      setTimeout(settle, 500);   // never leave a bar at zero width
     }
   });
   return wrap;
@@ -248,7 +271,11 @@ export function barRow(points, { h = 56, colourFor = () => 'var(--accent)' } = {
     if (p.label) b.title = p.label;
     b.append(fill);
     wrap.append(b);
-    if (!reduced()) requestAnimationFrame(() => { fill.style.height = pct + '%'; });
+    if (!reduced()) {
+      const settle = () => { fill.style.height = pct + '%'; };
+      requestAnimationFrame(settle);
+      setTimeout(settle, 500);
+    }
   });
   return wrap;
 }

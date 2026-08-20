@@ -475,8 +475,15 @@ export function checkInVerdict(ci, profile, targetRateKgPerWeek) {
         parts.push(`Lost ${gotKg.toFixed(1)} kg, right where the ${wantedKg.toFixed(1)} kg target aimed. This is working.`);
       } else if (diff > 0) {
         parts.push(`Lost ${gotKg.toFixed(1)} kg against a ${wantedKg.toFixed(1)} kg target — faster than planned. Worth checking the pace isn't costing more than fat.`);
-      } else if (gotKg > 0) {
+      } else if (gotKg > 0.05) {
         parts.push(`Lost ${gotKg.toFixed(1)} kg against a ${wantedKg.toFixed(1)} kg target — real progress, just slower than aimed. That is usually intake creeping up, not a broken metabolism.`);
+      } else if (Math.abs(gotKg) <= 0.05) {
+        /* Flat is its own outcome, not a loss of zero. Saying weight moved
+           "the wrong way" when it did not move at all is simply wrong. */
+        parts.push(`Weight held flat against a ${wantedKg.toFixed(1)} kg target. `
+          + (ci.coverage >= 0.7
+              ? `At an average of ${kcal_(ci.meanIntake)} kcal a day that points at the target being set too high rather than at anything you did.`
+              : `With ${Math.round(ci.coverage * 100)}% of days logged there is not enough here to say why.`));
       } else {
         /*
          * Weight moved the wrong way. Whether that means "too many
@@ -500,20 +507,43 @@ export function checkInVerdict(ci, profile, targetRateKgPerWeek) {
     }
   }
 
-  const severity = ci.weightChange != null && targetRateKgPerWeek < 0
-    && (-ci.weightChange) < 0 ? 'warn'
-    : ci.coverage < 0.5 ? 'warn' : 'good';
-
-  return { tone: severity, headline: checkInHeadline(ci, targetRateKgPerWeek), body: parts.join(' ') };
+  /*
+   * Tone and headline must come from the same judgement.
+   *
+   * They were computed separately, which produced a green dot next to
+   * "Off from the plan" — the colour and the words contradicting each
+   * other on the same line.
+   */
+  const status = checkInStatus(ci, targetRateKgPerWeek);
+  return { tone: status.tone, headline: status.headline, body: parts.join(' ') };
 }
 
 function kcal_(n) { return Math.round(n).toLocaleString('en-IN'); }
 
-function checkInHeadline(ci, targetRateKgPerWeek) {
-  if (!ci.ready) return 'Keep logging';
-  if (ci.weightChange == null) return 'Intake tracked, no weight trend yet';
-  const onTrack = targetRateKgPerWeek < 0
-    ? (-ci.weightChange) > 0
-    : targetRateKgPerWeek > 0 ? ci.weightChange > 0 : Math.abs(ci.weightChange) < 0.3;
-  return onTrack ? 'On track' : 'Off from the plan';
+/* One judgement, used for both the words and the colour. */
+function checkInStatus(ci, targetRateKgPerWeek) {
+  if (!ci.ready) return { headline: 'Keep logging', tone: 'info' };
+  if (ci.weightChange == null) {
+    return { headline: 'Intake tracked, no weight trend yet', tone: 'info' };
+  }
+
+  const poorCoverage = ci.coverage < 0.5;
+  const flat = Math.abs(ci.weightChange) <= 0.05;
+  const moving = targetRateKgPerWeek < 0 ? -ci.weightChange
+               : targetRateKgPerWeek > 0 ? ci.weightChange
+               : -Math.abs(ci.weightChange);
+
+  if (targetRateKgPerWeek === 0) {
+    return flat || Math.abs(ci.weightChange) < 0.3
+      ? { headline: 'Holding steady', tone: 'good' }
+      : { headline: 'Drifting from maintenance', tone: 'info' };
+  }
+
+  if (flat) return { headline: 'Not moving', tone: 'info' };
+  if (moving > 0) {
+    return poorCoverage
+      ? { headline: 'Moving, but barely logged', tone: 'info' }
+      : { headline: 'On track', tone: 'good' };
+  }
+  return { headline: 'Going the wrong way', tone: 'warn' };
 }
