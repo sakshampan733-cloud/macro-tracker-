@@ -34,7 +34,7 @@ export function renderToday(root, ctx) {
   root.append(
     dateStrip(key, ctx),
     energyTile(t, targets, s, key, ctx),
-    macroTile(t, targets, key),
+    macroTile(t, targets, key, ctx),
     waterTile(t, targets, key, ctx),
     supplementsTile(s, key, ctx),
     nutrientsTile(s, key, ctx) || el('div'),
@@ -221,7 +221,7 @@ function targetBasis(targets, s, key) {
 
 /* ── Macros ─────────────────────────────────────────────────────────── */
 
-function macroTile(t, targets, key) {
+function macroTile(t, targets, key, ctx) {
   /* Protein, carbs and fat open a breakdown; fibre has nothing further to
      say, so it stays a plain row rather than a button that disappoints. */
   const tappable = (which, node) => el('button', {
@@ -237,12 +237,50 @@ function macroTile(t, targets, key) {
       tappable('Fat',     macroRail({ name: 'Fat ›',     value: t.f, target: targets.f, hue: 'var(--m-f)' })),
       macroRail({ name: 'Fibre',   value: t.fib, target: targets.fib, hue: 'var(--m-fib)' })),
     el('div.divider'),
-    el('div.micro', { style: { marginBottom: '8px' } }, 'Keep under'),
-    el('div.macros', {},
-      ceilingRow('Sugar', t.sug, targets.sug, 'g'),
-      ceilingRow('Sat fat', t.sat, targets.sat, 'g'),
-      ceilingRow('Sodium', t.na, targets.na, 'mg')),
+    ceilings(t, targets, key, ctx),
   );
+}
+
+/*
+ * Limits, folded away.
+ *
+ * Saturated fat and sugar already have a home inside the Fat and
+ * Carbohydrate sheets, so repeating all three in full on Today was the same
+ * information twice and a screen's worth of scrolling for it. Collapsed,
+ * this is one line that only demands attention when something is actually
+ * over.
+ */
+function ceilings(t, targets, key, ctx) {
+  const s = get();
+  const open = s.settings.limitsOpen === true;
+
+  const items = [
+    ['Sugar', t.sug, targets.sug, 'g'],
+    ['Sat fat', t.sat, targets.sat, 'g'],
+    ['Sodium', t.na, targets.na, 'mg'],
+  ];
+  const over = items.filter(([, v, lim]) => v > lim).map(([n]) => n.toLowerCase());
+  const near = items.filter(([, v, lim]) => v <= lim && v > lim * 0.75).map(([n]) => n.toLowerCase());
+
+  const summary = over.length ? `over on ${over.join(' and ')}`
+    : near.length ? `close on ${near.join(' and ')}`
+    : 'all under';
+
+  const header = el('button', {
+    style: { display: 'block', width: '100%', textAlign: 'left', padding: 0, background: 'none' },
+    'aria-expanded': String(open),
+    onclick: () => { commit(st => { st.settings.limitsOpen = !open; }); ctx.refresh(); },
+  },
+    el('div.between', {},
+      el('span.micro', {}, 'Keep under ', open ? '▾' : '▸'),
+      el('span.micro', { style: { color: over.length ? 'var(--warn)' : near.length ? 'var(--caution)' : 'var(--good)' } },
+        summary)));
+
+  if (!open) return header;
+
+  return el('div', {}, header,
+    el('div', { style: { height: '10px' } }),
+    el('div.macros', {}, ...items.map(([n, v, lim, u]) => ceilingRow(n, v, lim, u))));
 }
 
 /*

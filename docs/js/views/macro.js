@@ -63,7 +63,7 @@ function proteinBody(q, mealLeu, targets) {
           el('div.micro', {}, 'Meals over threshold'),
           el('div.v', {}, `${hitCount} / ${mealCount}`))),
       el('div.fine', { style: { marginTop: '8px' } },
-        `Leucine is the amino acid that actually switches on muscle building, and it works per meal, not per day. `
+        `Leucine is the one building block that actually flips the switch on muscle building, and it works per meal, not per day. `
         + `A sitting needs roughly ${LEUCINE_THRESHOLD_G} g to cross the line — about 25–30 g of animal protein, or one scoop of whey.`)),
 
     el('div.section-label', {}, el('span.micro', {}, 'By meal')),
@@ -92,8 +92,8 @@ function proteinBody(q, mealLeu, targets) {
           el('div.title', {}, s.name),
           el('div.sub', { style: { color: s.complete ? 'var(--good)' : 'var(--caution)' } },
             s.complete
-              ? `complete · all 9 EAAs · DIAAS ${s.diaas}`
-              : `incomplete · limiting AA: ${s.limiting} · DIAAS ${s.diaas}`),
+              ? `has all nine building blocks (complete protein) · quality ${s.diaas}`
+              : `short on ${s.limiting} (its limiting amino acid) · quality ${s.diaas}`),
           !s.complete && s.pairsWith
             ? el('div.fine', { style: { marginTop: '2px' } }, `pair with ${s.pairsWith}`)
             : null),
@@ -101,11 +101,11 @@ function proteinBody(q, mealLeu, targets) {
           el('div.micro', { style: { marginTop: '2px' } }, g(s.leucine, 2) + ' g leu')))),
 
       el('div.note', {}, el('div.fine', {},
-        `A protein is complete when it supplies all nine essential amino acids — `
-        + `${ESSENTIAL_AA.join(', ')} — in usable proportion. `
-        + `Incomplete sources are not missing one outright; they are short of one relative to need, and that one is the limiting amino acid, `
-        + `because it caps how much of the rest can be used. Cereals are limited by lysine, pulses by methionine, `
-        + `which is exactly why dal with roti works as a pair.`))) : null,
+        `Protein is made of building blocks, and nine of them your body cannot make itself (essential amino acids): `
+        + `${ESSENTIAL_AA.join(', ')}. `
+        + `A food is "complete" when it has all nine in useful amounts. The others are not missing one entirely — they are short of one, `
+        + `and that shortest one caps how much of the rest can be used (the limiting amino acid). `
+        + `Grains run short on lysine, pulses on methionine, and each covers the other's gap. That is what dal with roti has always been doing.`))) : null,
   );
 }
 
@@ -133,13 +133,13 @@ function carbBody(q, targets) {
     el('div.section-label', {}, el('span.micro', {}, 'Simple against complex')),
     el('div.tile', {},
       el('div.macros', {},
-        bar('Complex (polysaccharide)', c.starch, c.covered, 'var(--m-c)'),
-        bar('Simple (mono/disaccharide)', c.sugar, c.covered, 'var(--warn)'),
-        bar('Fibre (non-digestible)', c.fibre, c.covered, 'var(--m-fib)')),
+        bar('Slow / starchy (complex)', c.starch, c.covered, 'var(--m-c)'),
+        bar('Fast / sugars (simple)', c.sugar, c.covered, 'var(--warn)'),
+        bar('Fibre (indigestible)', c.fibre, c.covered, 'var(--m-fib)')),
       el('div.fine', { style: { marginTop: '10px' } },
-        'Simple carbohydrates are single sugars (glucose, fructose) and pairs of them (sucrose, lactose) — absorbed fast. '
-        + 'Complex carbohydrates are long starch chains that have to be broken down first. '
-        + 'Fibre is carbohydrate your enzymes cannot cleave at all, which is why it feeds gut bacteria instead of you.')),
+        'Fast carbs are single sugars and pairs of them — glucose, fructose, table sugar, milk sugar (simple carbohydrate). They hit the blood quickly. '
+        + 'Slow carbs are long chains your gut has to take apart first (complex carbohydrate, or starch), so they arrive gradually. '
+        + 'Fibre is the kind your body cannot break down at all — it feeds gut bacteria instead of you, which is why it fills you up without the calories.')),
 
     c.sources.length ? el('div', {},
       el('div.section-label', {}, el('span.micro', {}, 'Which food did what')),
@@ -147,9 +147,9 @@ function carbBody(q, targets) {
         el('span.grow', {},
           el('div.title', {}, s.name),
           el('div.sub', { style: { color: TIER_COLOUR[s.tier] || 'var(--muted)' } },
-            `${s.cls}${s.gi ? ' · ' + s.gi + ' glycaemic' : ''}`),
+            `${s.cls}${s.gi ? ' · ' + s.gi + ' blood-sugar impact' : ''}`),
           el('div.fine', { style: { marginTop: '2px' } },
-            `${g(s.complex, 0)} g complex · ${g(s.simple, 0)} g simple · ${g(s.fibre, 1)} g fibre`)),
+            `${g(s.complex, 0)} g slow · ${g(s.simple, 0)} g fast · ${g(s.fibre, 1)} g fibre`)),
         el('span.kcal', { style: { color: TIER_COLOUR[s.tier] || 'var(--text)' } }, g(s.g, 0) + ' g')))) : null,
   );
 }
@@ -164,12 +164,13 @@ function fatBody(q, targets) {
     el('div.section-label', {}, el('span.micro', {}, 'The three fats')),
     el('div.tile', {},
       el('div.macros', {},
-        bar('Saturated (SFA)', f.sat, f.covered, 'var(--warn)'),
-        bar('Monounsaturated (MUFA)', f.mufa, f.covered, 'var(--good)'),
-        bar('Polyunsaturated (PUFA)', f.pufa, f.covered, 'var(--m-p)')),
+        bar('Solid-at-room-temp (saturated)', f.sat, f.covered, 'var(--warn)'),
+        bar('Olive-oil type (monounsaturated)', f.mufa, f.covered, 'var(--good)'),
+        bar('Seed and fish type (polyunsaturated)', f.pufa, f.covered, 'var(--m-p)')),
       el('div.fine', { style: { marginTop: '10px' } },
-        'Saturated is the one to keep a lid on — ghee, butter, fatty meat, fried food. '
-        + 'Monounsaturated is olive oil, nuts, avocado. Polyunsaturated includes the omega-3s your body cannot make at all.')),
+        'The saturated kind is solid at room temperature — ghee, butter, fatty meat, fried food — and it is the one to keep a lid on. '
+        + 'The monounsaturated kind is olive oil, nuts and avocado, and is the easiest swap. '
+        + 'The polyunsaturated kind includes omega-3, which your body cannot make at all.')),
 
     el('div.tile', {},
       el('div.between', {},
@@ -182,8 +183,8 @@ function fatBody(q, targets) {
           el('div.num', { style: { fontSize: '22px', marginTop: '2px',
             color: f.trans > 1 ? 'var(--warn)' : 'var(--muted)' } }, g(f.trans, 2) + ' g'))),
       el('div.fine', { style: { marginTop: '10px' } },
-        'Omega-3 (ALA from plants, EPA and DHA from marine sources) cannot be synthesised — it has to come from food. '
-        + 'Trans-unsaturated fat has no safe intake and comes almost entirely from partially hydrogenated frying and bakery fat.')),
+        'Omega-3 cannot be made by your body at all, so every gram has to come from food — walnuts, flax and chia give the plant form (ALA), oily fish the stronger marine form (EPA and DHA). '
+        + 'Trans fat has no safe level and comes almost entirely from commercial frying and bakery fat (partially hydrogenated oil).')),
 
     f.sources.length ? el('div', {},
       el('div.section-label', {}, el('span.micro', {}, 'Which food did what')),
@@ -191,10 +192,10 @@ function fatBody(q, targets) {
         el('span.grow', {},
           el('div.title', {}, s.name),
           el('div.sub', { style: { color: s.sat / Math.max(0.1, s.g) > 0.5 ? 'var(--warn)' : 'var(--muted)' } },
-            `${s.cls} · ${Math.round((s.sat / Math.max(0.1, s.g)) * 100)}% SFA`),
+            `${s.cls} · ${Math.round((s.sat / Math.max(0.1, s.g)) * 100)}% saturated`),
           el('div.fine', { style: { marginTop: '2px' } },
-            `${g(s.sat, 1)} SFA · ${g(s.mufa, 1)} MUFA · ${g(s.pufa, 1)} PUFA`
-            + (s.omega3 > 0.05 ? ` · ${g(s.omega3, 2)} g ω-3` : ''))),
+            `${g(s.sat, 1)} saturated · ${g(s.mufa, 1)} mono · ${g(s.pufa, 1)} poly`
+            + (s.omega3 > 0.05 ? ` · ${g(s.omega3, 2)} g omega-3` : ''))),
         el('span.kcal', {}, g(s.g, 0) + ' g')))) : null,
   );
 }

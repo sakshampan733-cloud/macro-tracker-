@@ -297,15 +297,15 @@ export function qualityAdvice(q, mealLeucine, targets) {
     const incompleteShare = pc.incomplete / Math.max(1, pc.covered);
     if (incompleteShare > 0.6) {
       out.push({ macro: 'protein', tone: 'warn',
-        text: `${Math.round(incompleteShare * 100)}% of today's protein came from grains, legumes or nuts, which are each short of one essential amino acid. `
-            + `They cover each other — dal with roti, rajma with rice — but a dairy, egg or meat source in the same meal does it more reliably.` });
+        text: `${Math.round(incompleteShare * 100)}% of today's protein came from grains, pulses or nuts, and each of those is short of one building block your body cannot make (an essential amino acid). `
+            + `They cover each other — dal with roti, rajma with rice — but adding dairy, egg or meat to the same meal does it more reliably.` });
     }
     const missed = Object.entries(mealLeucine).filter(([, v]) => v.classified && v.protein > 5 && !v.hit);
     if (missed.length) {
       out.push({ macro: 'protein', tone: 'info',
-        text: `${missed.map(([m]) => m).join(' and ')} came in under the leucine threshold. `
-            + `A meal needs about ${LEUCINE_THRESHOLD_G} g of leucine to actually switch on muscle building — roughly 25–30 g of animal protein, or a scoop of whey. `
-            + `Under it, the protein is still used, but that meal does much less for holding muscle.` });
+        text: `${missed.map(([m]) => m).join(' and ')} came in under the leucine mark. `
+            + `Leucine is the building block that flips the switch on muscle building, and a meal needs about ${LEUCINE_THRESHOLD_G} g of it — roughly 25–30 g of animal protein, or a scoop of whey. `
+            + `Below that the protein is still used, but the meal does much less for holding onto muscle.` });
     }
   }
 
@@ -315,15 +315,15 @@ export function qualityAdvice(q, mealLeucine, targets) {
     const satShare = fc.sat / Math.max(1, fc.covered);
     if (satShare > 0.42) {
       out.push({ macro: 'fat', tone: 'warn',
-        text: `${Math.round(satShare * 100)}% of today's fat was saturated. Swapping some ghee or fried food for olive oil, nuts or fish moves it without changing the calories.` });
+        text: `${Math.round(satShare * 100)}% of today's fat was the saturated kind — the sort that is solid at room temperature. Swapping some ghee or fried food for olive oil, nuts or fish moves it without changing the calories.` });
     }
     if (fc.omega3 < 1.0 && fc.covered > 20) {
       out.push({ macro: 'fat', tone: 'info',
-        text: `Only ${fc.omega3.toFixed(1)} g of omega-3 today. It has to come from food — oily fish, walnuts, flax or chia are the realistic sources.` });
+        text: `Only ${fc.omega3.toFixed(1)} g of omega-3 today. Your body cannot make it, so every gram has to come from food — oily fish, walnuts, flax or chia.` });
     }
     if (fc.trans > 2) {
       out.push({ macro: 'fat', tone: 'warn',
-        text: `About ${fc.trans.toFixed(1)} g of trans fat, mostly from fried or bakery items. This is the one fat with no safe intake.` });
+        text: `About ${fc.trans.toFixed(1)} g of trans fat, mostly from fried or bakery items. This is the one fat with no safe level at all.` });
     }
   }
 
@@ -334,7 +334,7 @@ export function qualityAdvice(q, mealLeucine, targets) {
     const limitShare = cc.tiers.limit / tierTotal;
     if (limitShare > 0.45) {
       out.push({ macro: 'carb', tone: 'warn',
-        text: `${Math.round(limitShare * 100)}% of today's carbohydrate was refined or added sugar. Same energy as whole grains and fruit, without the fibre or the micronutrients — and it is the part that leaves you hungry sooner.` });
+        text: `${Math.round(limitShare * 100)}% of today's carbs were refined or added sugar. Same energy as whole grains and fruit but stripped of the fibre and vitamins — and it is the part that leaves you hungry sooner.` });
     } else if (limitShare < 0.2 && cc.tiers.good > 20) {
       out.push({ macro: 'carb', tone: 'good',
         text: `Most of today's carbohydrate came from whole sources. That is the version that holds you between meals.` });

@@ -67,6 +67,9 @@ const EMPTY = () => ({
     tdeeSource: 'auto',
     checkInDays: 14,        // fortnight by default — see the Body screen for why
     energyView: 'remaining',
+    limitsOpen: false,
+    microOpen: false,
+    suppsOpen: false,
     lastCheckInSeen: null,
   },
 });

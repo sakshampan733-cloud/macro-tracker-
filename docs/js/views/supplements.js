@@ -30,29 +30,64 @@ export function supplementsTile(s, key, ctx) {
 
   const taken = suppsTaken(key);
   const done = chosen.filter(id => taken.includes(id)).length;
+  const all = done === chosen.length;
+  const open = s.settings.suppsOpen === true;
+
+  /*
+   * Chips wrapped badly at five or six items and turned into a block of
+   * text. A checklist is what this actually is, so it looks like one — and
+   * it stays folded behind a count, because on most days the only question
+   * is whether they are done.
+   */
+  const header = el('button', {
+    style: { display: 'block', width: '100%', textAlign: 'left', padding: 0, background: 'none' },
+    'aria-expanded': String(open),
+    onclick: () => { commit(st => { st.settings.suppsOpen = !open; }); ctx.refresh(); },
+  },
+    el('div.between', {},
+      el('div.flex', {},
+        el('h3', {}, 'Supplements'),
+        el('span.micro', { style: { marginLeft: '8px' } }, open ? '▾' : '▸')),
+      el('span.num', {
+        style: { fontSize: '13px', color: all ? 'var(--good)' : 'var(--muted)' },
+      }, all ? `all ${chosen.length} taken` : `${done}/${chosen.length}`)));
+
+  if (!open) return el('div.tile', {}, header);
 
   return el('div.tile', {},
-    el('div.tile-head', {},
-      el('div.flex', {}, icon('plus', 15), el('h3', {}, 'Supplements')),
-      el('div.flex', {},
-        el('span.num', { style: { fontSize: '13px', color: done === chosen.length ? 'var(--good)' : 'var(--muted)' } },
-          `${done}/${chosen.length}`),
-        el('button.btn.sm.ghost', { style: { marginLeft: '8px' },
-          onclick: () => openSupplementPicker(ctx) }, 'Edit'))),
-
-    el('div.chips', {},
+    header,
+    el('div', { style: { height: '10px' } }),
+    el('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px' } },
       ...chosen.map(id => {
         const sup = SUPPLEMENTS[id];
         if (!sup) return null;
         const on = taken.includes(id);
-        return el('button.chip', {
+        return el('button', {
           type: 'button',
           'aria-pressed': String(on),
-          style: on ? { borderColor: 'var(--good)', color: 'var(--good)',
-                        background: 'rgba(95,208,138,.08)' } : {},
+          style: {
+            display: 'flex', alignItems: 'center', gap: '11px', width: '100%',
+            padding: '9px 2px', background: 'none', textAlign: 'left',
+          },
           onclick: () => { toggleSupplement(key, id); ctx.refresh(); },
-        }, (on ? '✓ ' : '') + sup.label);
+        },
+          el('span', {
+            style: {
+              width: '20px', height: '20px', flex: 'none', borderRadius: '50%',
+              border: '1.5px solid ' + (on ? 'var(--good)' : 'var(--line-2)'),
+              background: on ? 'var(--good)' : 'transparent',
+              color: on ? 'var(--bg)' : 'transparent',
+              display: 'grid', placeItems: 'center',
+              fontSize: '12px', fontWeight: '700', lineHeight: '1',
+            },
+          }, '✓'),
+          el('span', { style: { flex: '1', minWidth: '0' } },
+            el('div', { style: { fontSize: '14.5px', color: on ? 'var(--text)' : 'var(--text-2)' } }, sup.label),
+            el('div.micro', { style: { marginTop: '2px' } }, sup.dose || '')),
+        );
       }).filter(Boolean)),
+    el('button.btn.sm.ghost.block', { style: { marginTop: '10px' },
+      onclick: () => openSupplementPicker(ctx) }, 'Change which ones'),
   );
 }
 
