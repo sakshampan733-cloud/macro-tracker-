@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Basal — Privacy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1216">
+<meta name="color-scheme" content="dark">
+<style>
+  :root{
+    --bg:#0E1216; --surface:#161B21; --line:#262F38;
+    --text:#E9EEF3; --text-2:#A6B2BE; --muted:#78868F; --accent:#3DDBC4;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  main{max-width:44em; margin:0 auto; padding:48px 22px 96px}
+  .brand{
+    font-weight:700; letter-spacing:.22em; text-transform:uppercase;
+    font-size:14px; margin-bottom:28px;
+  }
+  .brand span{color:var(--accent)}
+  h1{font-size:28px; letter-spacing:-.02em; margin:0 0 6px}
+  .sub{color:var(--muted); font-size:13px; margin-bottom:34px}
+  h2{font-size:17px; margin:34px 0 10px; letter-spacing:-.01em}
+  p,li{color:var(--text-2)}
+  ul{padding-left:20px}
+  li{margin-bottom:7px}
+  strong{color:var(--text); font-weight:600}
+  .card{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:8px; padding:16px 18px; margin:22px 0;
+  }
+  .card p{margin:0}
+  code{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:13px;
+    color:var(--accent); word-break:break-all;
+  }
+  footer{margin-top:44px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:13px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">BAS<span>AL</span></div>
+
+  <h1>Privacy</h1>
+  <div class="sub">Last updated 20 August 2026</div>
+
+  <div class="card">
+    <p><strong>Basal is a personal project with one user.</strong> It has no accounts, no
+    analytics, no advertising, and no company behind it. Nothing you log is
+    collected, sold, or seen by anyone else — because there is nowhere for it
+    to go.</p>
+  </div>
+
+  <h2>Where your data lives</h2>
+  <p>Everything you enter — meals, weight, water, supplements, blood markers,
+  settings — is stored in your own browser, on your own device, using local
+  storage. It is never uploaded to any server operated by this project, because
+  no such server exists.</p>
+  <p>If you clear your browser data, it is gone. That is the trade-off of
+  keeping it entirely local, which is why the app has an export button.</p>
+
+  <h2>Whoop</h2>
+  <p>If you connect Whoop, the app reads your recovery, heart rate variability,
+  resting heart rate, sleep and strain in order to show them alongside your
+  food log and adjust your daily calorie target.</p>
+  <p>Whoop's API cannot be called directly by a web page, so requests pass
+  through a small relay that you deploy and control. The relay:</p>
+  <ul>
+    <li>holds only the Whoop application credentials, which cannot be published in a web page;</li>
+    <li>forwards requests to Whoop and returns the response;</li>
+    <li><strong>stores nothing</strong> — no health data, no tokens, no logs of your activity.</li>
+  </ul>
+  <p>Your Whoop access tokens are returned to your device and stored there, with
+  the rest of your data. You can disconnect at any time, which deletes them, and
+  revoke access from your Whoop account settings.</p>
+
+  <h2>Food lookups</h2>
+  <p>When you scan or type a barcode, the digits are sent to
+  <a href="https://openfoodfacts.org">Open Food Facts</a>, a public non-profit
+  food database, to fetch that product's nutrition information. Only the barcode
+  number is sent. Nothing about you, your log, or your device is included.</p>
+
+  <h2>What is never collected</h2>
+  <ul>
+    <li>No analytics or usage tracking of any kind</li>
+    <li>No cookies for tracking or advertising</li>
+    <li>No third-party scripts — the app has no external dependencies at runtime</li>
+    <li>No location, contacts, or device identifiers</li>
+    <li>No account, email address, or password, because there is no sign-in</li>
+  </ul>
+
+  <h2>Camera</h2>
+  <p>Barcode scanning uses your camera to read the code. Frames are processed on
+  your device and discarded immediately. No image is stored, uploaded or
+  transmitted anywhere.</p>
+
+  <h2>Your control</h2>
+  <ul>
+    <li><strong>Export</strong> — take a full copy of everything as a JSON file at any time</li>
+    <li><strong>Erase</strong> — delete everything from the device in one action</li>
+    <li><strong>Disconnect Whoop</strong> — removes stored tokens immediately</li>
+  </ul>
+
+  <h2>Not medical advice</h2>
+  <p>Basal estimates and displays nutrition information. It is not a medical
+  device, it has not been reviewed by any clinician, and nothing it shows is a
+  diagnosis or a treatment recommendation. Decisions about your health belong
+  with a qualified professional.</p>
+
+  <h2>Contact</h2>
+  <p>The source code is public at
+  <a href="https://github.com/sakshampan733-cloud/macro-tracker-">github.com/sakshampan733-cloud/macro-tracker-</a>,
+  where every claim on this page can be checked against what the app actually does.</p>
+
+  <footer>
+    Basal · a personal nutrition tracker · no accounts, no servers, no tracking
+  </footer>
+</main>
+</body>
+</html>
