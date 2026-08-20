@@ -105,7 +105,10 @@ export function sheet({ title, body, foot, onClose, wide }) {
   };
   const onKey = e => { if (e.key === 'Escape') close(); };
 
-  panel.append(
+  // append(), not panel.append() — a sheet with no footer was rendering the
+  // literal string "null" at the bottom, because Element.append stringifies
+  // it. Same trap as the rail had.
+  append(panel,
     el('div.sheet-grip'),
     el('div.sheet-head', {},
       el('h2', {}, title || ''),

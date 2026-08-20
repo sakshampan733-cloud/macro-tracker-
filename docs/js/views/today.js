@@ -17,6 +17,7 @@ import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
 import { dayFactor } from '../whoop.js';
 import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
+import { openMacroDetail } from './macro.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
 
@@ -31,7 +32,7 @@ export function renderToday(root, ctx) {
   root.append(
     dateStrip(key, ctx),
     energyTile(t, targets, s, key, ctx),
-    macroTile(t, targets),
+    macroTile(t, targets, key),
     waterTile(t, targets, key, ctx),
     mealsTile(key, ctx),
   );
@@ -216,12 +217,20 @@ function targetBasis(targets, s, key) {
 
 /* ── Macros ─────────────────────────────────────────────────────────── */
 
-function macroTile(t, targets) {
+function macroTile(t, targets, key) {
+  /* Protein, carbs and fat open a breakdown; fibre has nothing further to
+     say, so it stays a plain row rather than a button that disappoints. */
+  const tappable = (which, node) => el('button', {
+    style: { display: 'block', width: '100%', textAlign: 'left', padding: 0, background: 'none' },
+    'aria-label': `${which} breakdown`,
+    onclick: () => openMacroDetail(which === 'Carbs' ? 'carb' : which.toLowerCase(), key),
+  }, node);
+
   return el('div.tile', {},
     el('div.macros', {},
-      macroRail({ name: 'Protein', value: t.p, target: targets.p, hue: 'var(--m-p)' }),
-      macroRail({ name: 'Carbs',   value: t.c, target: targets.c, hue: 'var(--m-c)' }),
-      macroRail({ name: 'Fat',     value: t.f, target: targets.f, hue: 'var(--m-f)' }),
+      tappable('Protein', macroRail({ name: 'Protein ›', value: t.p, target: targets.p, hue: 'var(--m-p)' })),
+      tappable('Carbs',   macroRail({ name: 'Carbs ›',   value: t.c, target: targets.c, hue: 'var(--m-c)' })),
+      tappable('Fat',     macroRail({ name: 'Fat ›',     value: t.f, target: targets.f, hue: 'var(--m-f)' })),
       macroRail({ name: 'Fibre',   value: t.fib, target: targets.fib, hue: 'var(--m-fib)' })),
     el('div.divider'),
     el('div.micro', { style: { marginBottom: '8px' } }, 'Keep under'),
