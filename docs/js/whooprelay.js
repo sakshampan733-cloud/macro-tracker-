@@ -111,11 +111,17 @@ export async function syncWhoop({ days = 180 } = {}) {
   const token = await freshToken();
   if (!token) throw new Error('Not connected.');
 
+  /*
+   * Whoop retired v1 in favour of v2. Confirmed against their own migration
+   * guide after the relay started 404ing: the paths rename one-for-one, but
+   * recovery stops being nested under a cycle and becomes its own top-level
+   * paginated collection, referencing cycle_id and sleep_id directly.
+   */
   const start = new Date(Date.now() - days * 86400000).toISOString();
   const [cycles, recoveries, sleeps] = await Promise.all([
-    collect('/v1/cycle', token, start),
-    collect('/v1/recovery', token, start),
-    collect('/v1/activity/sleep', token, start),
+    collect('/v2/cycle', token, start),
+    collect('/v2/recovery', token, start),
+    collect('/v2/activity/sleep', token, start),
   ]);
 
   const byCycle = {};

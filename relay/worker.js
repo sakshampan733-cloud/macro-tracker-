@@ -29,7 +29,14 @@
 
 const WHOOP_AUTH  = 'https://api.prod.whoop.com/oauth/oauth2/auth';
 const WHOOP_TOKEN = 'https://api.prod.whoop.com/oauth/oauth2/token';
-const WHOOP_API   = 'https://api.prod.whoop.com/developer';
+/*
+ * Whoop retired v1 of this API. /developer/v1/cycle and friends now 404 —
+ * confirmed against their own migration guide, not assumed. v2 renames
+ * cycle and activity/sleep one-for-one, and — the part that actually
+ * changes the shape of a request — recovery is no longer nested under a
+ * cycle ID. It is its own top-level, paginated collection.
+ */
+const WHOOP_API   = 'https://api.prod.whoop.com/developer/v2';
 
 const SCOPES = 'read:recovery read:cycles read:sleep read:profile read:body_measurement offline';
 
@@ -202,11 +209,14 @@ export default {
      * own bearer token, and comes back with the CORS headers Whoop leaves
      * off. The relay never reads or keeps the response.
      */
-    if (path.startsWith('/v1/')) {
+    if (path.startsWith('/v1/') || path.startsWith('/v2/')) {
       const auth = request.headers.get('Authorization');
       if (!auth) return json({ error: 'no Authorization header' }, request, env, 401);
 
-      const target = `${WHOOP_API}${path}${url.search}`;
+      // Forward whatever the app asked for onto the v2 base, regardless of
+      // which prefix it used to build the path — old app builds still work.
+      const forward = path.replace(/^\/v[12]/, '');
+      const target = `${WHOOP_API}${forward}${url.search}`;
       const r = await fetch(target, { headers: { Authorization: auth } });
       const text = await r.text();
       return new Response(text, {
