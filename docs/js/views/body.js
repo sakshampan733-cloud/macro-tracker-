@@ -17,6 +17,7 @@ import {
 } from '../whoop.js';
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict } from '../nutrition.js';
 import { calibrationTile } from './dish.js';
+import { nutrientsTile } from './nutrients.js';
 
 export function renderBody(root, ctx) {
   const s = get();
@@ -25,6 +26,7 @@ export function renderBody(root, ctx) {
   root.append(
     el('h1', { style: { marginBottom: '14px' } }, 'Body'),
     checkInTile(s, ctx),
+    nutrientsTile(s) || el('div'),
     weightTile(ctx),
     tdeeTile(s),
     calibrationTile(s) || el('div'),

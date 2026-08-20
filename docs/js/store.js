@@ -7,6 +7,7 @@
  */
 
 import { per100For, STYLES } from './dishes.js';
+import { MICROS, NUTRIENTS } from './data/nutrients.js';
 
 const KEY = 'basal.v1';
 const LEGACY_KEYS = ['assay.v1'];   // the app was called Assay before this
@@ -186,6 +187,26 @@ export function macrosFor(per100, grams) {
 }
 
 /*
+ * Micronutrients for one entry, or null if there is nothing to report.
+ *
+ * Only reference-database foods carry micronutrient data (looked up by
+ * `ref`, e.g. 'chicken-breast-ckd'). A custom food, a Pot recipe or a home
+ * dish has none — and the honest response to that is null, not zero. Zero
+ * would read as "this food has no iron," when the truth is "the app was
+ * never told." Totals below track how much of the day actually had data,
+ * for exactly this reason.
+ */
+export function microsFor(entry) {
+  const id = (entry.ref || '').replace(/^off:|^my:|^dish:/, '');
+  const row = MICROS[id];
+  if (!row) return null;
+  const k = entry.grams / 100;
+  const out = {};
+  for (const key in row) out[key] = row[key] * k;
+  return out;
+}
+
+/*
  * An entry's macros.
  *
  * For a home dish this is recomputed from the live density estimate, so
@@ -262,11 +283,20 @@ export function totals(key = dayKey()) {
   const sum = { kcal: 0, p: 0, c: 0, f: 0, fib: 0, sug: 0, sat: 0, na: 0, alc: 0 };
   let varSum = 0;
 
+  const micro = Object.fromEntries(Object.keys(NUTRIENTS).map(k => [k, 0]));
+  let microKcal = 0;   // calories from entries that DID carry micro data
+
   for (const e of d.entries) {
     const m = entryMacros(e);
     for (const k in sum) sum[k] += m[k] || 0;
     const s = entrySigma(e);
     varSum += s * s;
+
+    const mic = microsFor(e);
+    if (mic) {
+      for (const k in micro) micro[k] += mic[k] || 0;
+      microKcal += m.kcal || 0;
+    }
   }
 
   const sigma = Math.sqrt(varSum);
@@ -277,6 +307,10 @@ export function totals(key = dayKey()) {
     confidence: sum.kcal > 0 ? 1 - Math.min(0.5, sigma / sum.kcal) : 1,
     water: (d.water || []).reduce((a, w) => a + w.ml, 0),
     count: d.entries.length,
+    micro,
+    // What share of today's calories actually carried micronutrient data —
+    // the figure the UI uses to say "this is a partial picture" honestly.
+    microCoverage: sum.kcal > 0 ? microKcal / sum.kcal : 0,
   };
 }
 
