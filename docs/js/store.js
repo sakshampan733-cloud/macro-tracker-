@@ -69,6 +69,7 @@ const EMPTY = () => ({
     checkInDays: 14,        // fortnight by default — see the Body screen for why
     energyView: 'remaining',
     explain: true,          // show the teaching text, or just the numbers
+    isDemo: false,          // generated data is loaded, not real logging
     limitsOpen: false,
     microOpen: false,
     suppsOpen: false,

@@ -12,6 +12,7 @@ import {
 } from '../nutrition.js';
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
+import { generateDemo } from '../demo.js';
 import { VERSION } from '../app.js';
 
 /* ── Onboarding ─────────────────────────────────────────────────────── */
@@ -260,6 +261,56 @@ export function renderSettings(root, ctx) {
           el('div.fine', { style: { marginTop: '3px' } },
             'Which parts of this app are solid, which are guesses, and what it cannot see at all.')),
         el('button.btn.sm', { onclick: () => openTrust() }, 'Read'))),
+
+    el('div.section-label', {}, el('span.micro', {}, 'Demo data')),
+    el('div.tile', {},
+      el('div', { style: { fontSize: '14px', fontWeight: '500' } },
+        get().settings.isDemo ? 'Demo data is loaded' : 'Try two years of data'),
+      el('div.fine', { style: { marginTop: '4px' } },
+        get().settings.isDemo
+          ? 'Everything you are looking at is generated. Clear it before you start logging for real — otherwise your first weeks get averaged in with someone who does not exist.'
+          : 'Fills the app with two years of plausible logs, weigh-ins, Whoop days and blood panels so every report has something to show. '
+            + 'Deliberately imperfect — a holiday where logging stopped, an eleven-week plateau, a festive regain.'),
+      el('div.btn-row', { style: { marginTop: '12px' } },
+        el('button.btn', {
+          onclick: async () => {
+            if (!(await confirmSheet({
+              title: 'Load two years of demo data?',
+              message: 'This replaces everything currently in the app — your log, weigh-ins, Whoop data and settings. Export a backup first if any of it is real.',
+              confirmLabel: 'Load demo data', danger: true,
+            }))) return;
+            toast('Generating two years…');
+            setTimeout(() => {
+              const demo = generateDemo({ years: 2 });
+              commit(st => {
+                st.days = demo.days;
+                st.whoop = demo.whoop;
+                st.blood = demo.blood;
+                st.meals = demo.meals;
+                st.library = demo.library;
+                st.supplementsTaken = demo.supplementsTaken;
+                st.settings.isDemo = true;
+              }, 'import');
+              toast(`${demo.stats.days} days loaded.`);
+              location.reload();
+            }, 60);
+          },
+        }, get().settings.isDemo ? 'Regenerate' : 'Load demo data'),
+        get().settings.isDemo ? el('button.btn.danger', {
+          onclick: async () => {
+            if (!(await confirmSheet({
+              title: 'Clear the demo data?',
+              message: 'Everything generated will be removed and you will start from an empty app.',
+              confirmLabel: 'Clear it', danger: true,
+            }))) return;
+            commit(st => {
+              st.days = {}; st.whoop = { rows: {}, importedAt: null };
+              st.blood = {}; st.meals = {}; st.library = {};
+              st.supplementsTaken = []; st.settings.isDemo = false;
+            }, 'import');
+            location.reload();
+          },
+        }, 'Clear demo') : null)),
 
     el('div.section-label', {}, el('span.micro', {}, 'Your data')),
     el('div.tile', {},
