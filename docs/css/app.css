@@ -1174,35 +1174,36 @@ body::after { opacity: var(--grain); }
 :root[data-theme="light"] {
   /* Warm off-white, not clinical white — the reference light direction is
      bone and sand, with colour bleeding through, never a flat sheet. */
-  /* The ground has to be a ground.
-     Panes were 52% white over an 88%-white page, landing six percent
-     apart — no separation for a glass edge to register against, which is
-     the whole reason light mode read flat while dark read as glass. The
-     ground drops to sand so the frosted panes have something to sit on. */
-  --bg:        #D8CBB8;
-  --bg-2:      rgba(255, 255, 255, .50);
-  --surface:   rgba(255, 255, 255, .62);
-  --surface-2: rgba(255, 255, 255, .44);
-  --raised:    rgba(255, 255, 255, .86);
-  --line:      rgba(74, 54, 30, .16);
-  --line-2:    rgba(74, 54, 30, .26);
+  /* Bright, with separation.
+     Dropping the ground to sand did give the panes something to sit on,
+     but it made the whole screen dull — light mode should read as light.
+     The ground is bright and very slightly cool now, and the separation
+     comes from the panes being near-white with a real edge rather than
+     from darkening everything behind them. */
+  --bg:        #EFEFF1;
+  --bg-2:      rgba(255, 255, 255, .72);
+  --surface:   rgba(255, 255, 255, .80);
+  --surface-2: rgba(255, 255, 255, .62);
+  --raised:    rgba(255, 255, 255, .95);
+  --line:      rgba(28, 30, 38, .10);
+  --line-2:    rgba(28, 30, 38, .18);
 
   /* Contrast against the pane, not against the page: a .40-alpha white
      card over a warm orb sits nearer #E8DDD2 than #FFF, so the greys have
      to come down to keep secondary text readable rather than decorative. */
-  --text:      #14100D;
-  --text-2:    #453D36;
-  --muted:     #665C54;
-  --dim:       #8A7F76;
+  --text:      #14161A;
+  --text-2:    #3D424A;
+  --muted:     #626873;
+  --dim:       #8A909B;
 
   --accent:    #0A7A6E;
   --accent-2:  #06584F;
   --accent-ink:#FFFFFF;
 
-  --glass-bg:     rgba(255, 255, 255, .46);
-  --glass-strong: rgba(255, 255, 255, .64);
-  --glass-brd:    rgba(255, 255, 255, .78);
-  --glass-hi:     rgba(255, 255, 255, .92);
+  --glass-bg:     rgba(255, 255, 255, .70);
+  --glass-strong: rgba(255, 255, 255, .84);
+  --glass-brd:    rgba(255, 255, 255, .92);
+  --glass-hi:     rgba(255, 255, 255, 1);
   --blur:         saturate(180%) blur(26px);
 
   --sheen:      linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,0) 46%);
@@ -1214,13 +1215,15 @@ body::after { opacity: var(--grain); }
      because the orb was faint AND the panes were near-white AND the ground
      was near-white — three pale layers stacked. The orb carries more
      weight and the ground drops a step so the glass has an edge. */
+  /* A tint, not a wash. At light-mode brightness a strong orb turns the
+     whole page muddy, which is most of why this looked dull. */
   --orb: 208, 88, 76;
   --ambient:
-    radial-gradient(circle 62vmax at 50% 46%,
-                    rgba(var(--orb), .52) 0%,
-                    rgba(var(--orb), .26) 34%,
-                    rgba(var(--orb), .09) 58%,
-                    transparent 76%);
+    radial-gradient(circle 58vmax at 50% 44%,
+                    rgba(var(--orb), .22) 0%,
+                    rgba(var(--orb), .11) 36%,
+                    rgba(var(--orb), .04) 60%,
+                    transparent 78%);
 }
 
 /* The wash sits behind everything and does not scroll — the app has a sky. */
@@ -1964,3 +1967,40 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
   cursor: pointer; transition: background .2s ease, transform .2s ease;
 }
 .guide-dots i.is-on { background: var(--accent); transform: scale(1.25); }
+
+/* ── Light mode corrections ───────────────────────────────────────────── */
+
+/* The grain is there to stop OLED banding on black. On a bright ground it
+   does nothing but add dirt, which is exactly what "grainy" meant. */
+:root[data-theme="light"] body::after { opacity: .012; }
+
+/* The wordmark bar was dissolving into the first card beneath it: two
+   near-white translucent surfaces with no edge between them. */
+:root[data-theme="light"] .topbar {
+  background: rgba(255, 255, 255, .74);
+  border-bottom: 1px solid rgba(28, 30, 38, .09);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .9);
+}
+:root[data-theme="light"] .topbar .brand { color: var(--text); }
+
+/* Panes need a defined edge on a bright page, not a glow. */
+:root[data-theme="light"] .tile,
+:root[data-theme="light"] .food-cell,
+:root[data-theme="light"] .chip,
+:root[data-theme="light"] .set-group {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 1px 2px rgba(28, 30, 38, .06),
+    0 10px 24px -18px rgba(28, 30, 38, .30);
+}
+
+/* The action chips were reading as one salmon block. */
+:root[data-theme="light"] .chip { background: rgba(255, 255, 255, .78); }
+:root[data-theme="light"] .chip:hover { background: #fff; }
+
+.guide-pick { margin: 6px 0 18px; }
+.guide-pick-label {
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px;
+}
+.guide-pick .orb-row { margin-bottom: 2px; }

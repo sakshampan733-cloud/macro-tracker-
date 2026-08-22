@@ -17,6 +17,7 @@
 
 import { el, sheet, icon, append } from '../ui.js';
 import { get, commit } from '../store.js';
+import { ORBS, applyOrb } from '../theme.js';
 
 const PAGES = [
   {
@@ -25,6 +26,15 @@ const PAGES = [
     body: [
       'Most trackers give you a number and let you believe it. This one tells you how confident that number actually is, because a weighed 200 g of rice and a guessed bowl of it are not the same measurement even when they read the same.',
       'Everything else follows from that.',
+    ],
+  },
+  {
+    title: 'Make it yours',
+    lead: 'Pick a look before you start.',
+    pick: true,
+    body: [
+      'The glow behind the glass, and whether the app is dark or light. Both change everything you see from here, including the rest of this guide.',
+      'You can change your mind any time in Settings.',
     ],
   },
   {
@@ -86,6 +96,58 @@ const PAGES = [
   },
 ];
 
+/*
+ * Choosing the look, inside the guide.
+ *
+ * Shipping with a fixed colour means the first thing everyone sees is
+ * someone else's taste. Asking here costs one page, applies instantly,
+ * and means the remaining pages are read in the palette they picked —
+ * which is also the quickest way to show them it worked.
+ */
+function appearancePicker() {
+  const wrap = el('div.guide-pick');
+
+  const themes = el('div.theme-row');
+  const setTheme = v => {
+    commit(s => { s.settings.theme = v; }, 'settings');
+    const root = document.documentElement;
+    if (v === 'auto') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', v);
+    applyOrb(get().settings.orb || 'red', v);
+    [...themes.children].forEach(b => b.setAttribute('aria-pressed',
+      String(b.dataset.theme === v)));
+  };
+  for (const [value, label] of [['dark','Dark'], ['light','Light'], ['auto','System']]) {
+    themes.append(el('button.theme-opt', {
+      type: 'button', dataset: { theme: value },
+      'aria-pressed': String((get().settings.theme || 'dark') === value),
+      onclick: () => setTheme(value),
+    }, el('div', { class: 'theme-swatch ' + value }), el('span.micro', {}, label)));
+  }
+
+  const orbs = el('div.orb-row');
+  for (const [key, o] of Object.entries(ORBS)) {
+    const dot = el('button.orb-dot' + ((get().settings.orb || 'red') === key ? '.is-on' : ''), {
+      type: 'button', title: o.label, 'aria-label': o.label,
+      style: { '--swatch': `rgb(${o.dark})` },
+      onclick: () => {
+        commit(s => { s.settings.orb = key; }, 'settings');
+        applyOrb(key, get().settings.theme || 'dark');
+        [...orbs.children].forEach(c => c.classList.remove('is-on'));
+        dot.classList.add('is-on');
+      },
+    });
+    orbs.append(dot);
+  }
+
+  wrap.append(
+    el('div.guide-pick-label', {}, 'Background'),
+    orbs,
+    el('div.guide-pick-label', { style: { marginTop: '18px' } }, 'Theme'),
+    themes);
+  return wrap;
+}
+
 export function openGuide({ onDone = () => {} } = {}) {
   let i = 0;
 
@@ -110,6 +172,8 @@ export function openGuide({ onDone = () => {} } = {}) {
       el('h2.guide-title', {}, p.title),
       el('div.guide-lead', {}, p.lead),
     ];
+
+    if (p.pick) kids.push(appearancePicker());
 
     if (p.rows) {
       const list = el('div.guide-rows');

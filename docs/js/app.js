@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.22-guide';
+export const VERSION = '2026.08.22-polish';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
@@ -281,7 +281,6 @@ maybeShowGuide();
  */
 installSwipe({
   surface: main,
-  scroller,
   order: TABS.map(t => t.id),
   current: () => ctx.route,
   go: id => ctx.go(id),
