@@ -64,6 +64,7 @@ const EMPTY = () => ({
   whoop: { rows: {}, importedAt: null },
   settings: {
     orb: 'amber',          // hue of the ambient background circle
+    openGroups: [],        // which settings categories are expanded
     units: 'metric',
     diet: 'all',
     waterUnit: 'ml',

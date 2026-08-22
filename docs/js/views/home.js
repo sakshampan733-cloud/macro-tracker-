@@ -213,8 +213,32 @@ function picker(s, ctx, key) {
     clear(remote);
     if (q.length >= 2) {
       clear(grid);
+
+      /* Meals first. A saved meal is the thing you are most likely to be
+         reaching for by name — "fried rice" should find the dish you built,
+         not just the rice in it — and it was the one thing search could not
+         see. */
+      const needle = q.toLowerCase();
+      const meals = mealsList().filter(m => m.name.toLowerCase().includes(needle));
+      if (meals.length) {
+        grid.append(label('Your meals'));
+        const mg = el('div.food-grid');
+        for (const m of meals) {
+          const mt = mealTotals(m);
+          mg.append(el('button.food-cell.is-meal', {
+            onclick: () => openMealLogger(m, { dateKey: key, onSaved: ctx.refresh }),
+          },
+            el('span.fc-name', {}, m.name),
+            el('span.fc-kcal', {}, `${Math.round(mt.kcal || 0)} · ${m.items.length} items`)));
+        }
+        grid.append(mg);
+      }
+
       const hits = searchLocal(q);
-      if (hits.length) grid.append(cells(hits.slice(0, 24).map(toItem)));
+      if (hits.length) {
+        if (meals.length) grid.append(label('Foods'));
+        grid.append(cells(hits.slice(0, 24).map(toItem)));
+      }
       grid.append(remote);
       return;
     }

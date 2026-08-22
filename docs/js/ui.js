@@ -9,7 +9,16 @@ export function el(tag, props = {}, ...children) {
   for (const [k, v] of Object.entries(props || {})) {
     if (v == null || v === false) continue;
     if (k === 'class') node.className += (node.className ? ' ' : '') + v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+    else if (k === 'style' && typeof v === 'object') {
+      /* Object.assign silently drops custom properties — style['--x'] = v
+         is a no-op on a CSSStyleDeclaration, which is why colour swatches
+         passed as --swatch rendered with no colour at all. */
+      for (const [sk, sv] of Object.entries(v)) {
+        if (sv == null) continue;
+        if (sk.startsWith('--')) node.style.setProperty(sk, String(sv));
+        else node.style[sk] = sv;
+      }
+    }
     else if (k === 'html') node.innerHTML = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
     else if (k === 'dataset') Object.assign(node.dataset, v);

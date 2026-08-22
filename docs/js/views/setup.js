@@ -5,7 +5,7 @@
  * each answer changes, and then gets out of the way.
  */
 
-import { el, clear, field, segmented, toast, icon, sheet, confirmSheet, kcal, empty } from '../ui.js';
+import { el, clear, field, segmented, toast, icon, sheet, confirmSheet, kcal, empty, append } from '../ui.js';
 import { get, commit, exportJSON, importJSON, reset, pushBackup } from '../store.js';
 import {
   ACTIVITY, GOALS, bmrFor, predictedTDEE, macroTargets, bestTDEE, waterTarget, age,
@@ -166,6 +166,48 @@ function orbPicker(ctx) {
   return row;
 }
 
+
+/*
+ * A settings group.
+ *
+ * Settings had grown to eleven labelled sections on one page — everything
+ * visible at once, which means nothing is findable. Collapsing them turns
+ * it into a short list of categories you can scan, with the contents one
+ * tap away.
+ *
+ * Open state is persisted rather than held in a local variable, because
+ * almost every control in here calls ctx.refresh() when you change it —
+ * an unsaved open state would slam every group shut the moment you
+ * touched a toggle.
+ */
+function group(ctx, key, title, subtitle, ...children) {
+  const s = get();
+  const open = (s.settings.openGroups || []).includes(key);
+
+  const body = el('div.set-body');
+  if (open) append(body, ...children);
+
+  const head = el('button.set-head', {
+    type: 'button',
+    'aria-expanded': String(open),
+    onclick: () => {
+      commit(st => {
+        const list = st.settings.openGroups || [];
+        const i = list.indexOf(key);
+        if (i >= 0) list.splice(i, 1); else list.push(key);
+        st.settings.openGroups = list;
+      }, 'settings');
+      ctx.refresh();
+    },
+  },
+    el('div.grow', {},
+      el('div.set-title', {}, title),
+      el('div.set-sub', {}, subtitle)),
+    el('span.set-chev', {}, icon('chevron', 16)));
+
+  return el('div.set-group' + (open ? '.is-open' : ''), {}, head, body);
+}
+
 export function renderSettings(root, ctx) {
   const s = get();
   const p = s.profile;
@@ -226,7 +268,8 @@ export function renderSettings(root, ctx) {
   const best = bestTDEE(s, p);
   const targets = macroTargets(p, best.kcal);
 
-  root.append(
+  append(root,
+
     el('h1', { style: { marginBottom: '14px' } }, 'Settings'),
 
     el('div.tile', {},
@@ -238,185 +281,186 @@ export function renderSettings(root, ctx) {
           el('div.v', {}, kcal(best.kcal), best.sigma ? ` ±${best.sigma}` : ''))),
       el('div.fine', { style: { marginTop: '8px' } }, best.why || '')),
 
-    el('div.section-label', {}, el('span.micro', {}, 'Body')),
-    el('div.field-2', {}, field('Height (cm)', fHeight), field('Weight (kg)', fWeight)),
-    el('div.field-2', {}, field('Born', fYear), field('Body fat %', fBf)),
-    field('Training', actBox),
-    field('Goal', goalBox),
-    field('Rate (kg per week)', fRate,
-      'Negative loses, positive gains. Beyond about 0.75 kg a week in either direction the cost lands on muscle.'),
+    group(ctx, 'body', 'Body and goal',
+      'Height, weight, training, and the goal everything is measured against.',
+      el('div.field-2', {}, field('Height (cm)', fHeight), field('Weight (kg)', fWeight)),
+      el('div.field-2', {}, field('Born', fYear), field('Body fat %', fBf)),
+      field('Training', actBox),
+      field('Goal', goalBox),
+      field('Rate (kg per week)', fRate,
+        'Negative loses, positive gains. Beyond about 0.75 kg a week in either direction the cost lands on muscle.'),
 
-    /* A goal with a deadline is configuration, not a daily reading, so it
-       belongs here rather than taking space on a screen you check hourly. */
-    el('div.section-label', {}, el('span.micro', {}, 'Time-bound goal')),
-    goalTile(s, ctx),
+      /* A goal with a deadline is configuration, not a daily reading, so it
+         belongs here rather than taking space on a screen you check hourly. */
+      goalTile(s, ctx)),
 
-    el('div.section-label', {}, el('span.micro', {}, 'Your food')),
-    el('div.tile', {},
-      el('div.between', {},
-        el('div', {},
-          el('div', { style: { fontWeight: '500' } }, 'Food library and meals'),
-          el('div.fine', { style: { marginTop: '3px' } },
-            'Everything you have built, scanned or saved.')),
-        el('button.btn.sm', { onclick: () => ctx.go('foods') }, 'Open'))),
+    group(ctx, 'target', 'Targets',
+      'Where your maintenance figure comes from.',
+      field('Maintenance source', tdeeBox,
+        'Best available prefers your own adaptive figure, falls back to Whoop, then the formula.')),
 
-    el('div.section-label', {}, el('span.micro', {}, 'How targets are set')),
-    field('Maintenance source', tdeeBox,
-      'Best available prefers your own adaptive figure, falls back to Whoop, then the formula.'),
+    group(ctx, 'food', 'Food',
+      'Your library, suggestions, and glass size.',
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', {},
+            el('div', { style: { fontWeight: '500' } }, 'Food library and meals'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              'Everything you have built, scanned or saved.')),
+          el('button.btn.sm', { onclick: () => ctx.go('foods') }, 'Open'))),
+      field('Suggestions', dietBox),
+      field('Glass size (ml)', fGlass)),
 
-    el('div.section-label', {}, el('span.micro', {}, 'Preferences')),
+    group(ctx, 'whoop', 'Whoop',
+      'The strap this app leans on.',
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', {},
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Whoop data'),
+            el('div.micro', { style: { marginTop: '3px' } },
+              Object.keys(s.whoop.rows || {}).length
+                ? `${Object.keys(s.whoop.rows).length} days imported`
+                : 'Not imported')),
+          el('button.btn.sm', { onclick: () => openWhoopConnect(ctx) }, 'Set up')))),
 
-    field('Background', orbPicker(ctx),
-      'The glow behind the glass. It tints both themes.'),
-    field('Suggestions', dietBox),
-    field('Glass size (ml)', fGlass),
-
-    el('div.section-label', {}, el('span.micro', {}, 'Whoop')),
-    el('div.tile', {},
-      el('div.between', {},
-        el('div', {},
-          el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Whoop data'),
-          el('div.micro', { style: { marginTop: '3px' } },
-            Object.keys(s.whoop.rows || {}).length
-              ? `${Object.keys(s.whoop.rows).length} days imported`
-              : 'Not imported')),
-        el('button.btn.sm', { onclick: () => openWhoopConnect(ctx) }, 'Set up'))),
-
-    el('div.section-label', {}, el('span.micro', {}, 'Appearance')),
-    el('div.tile', {},
-      el('div.theme-row', {},
-        ...[
-          ['dark',  'Dark',   'dark'],
-          ['light', 'Light',  'light'],
-          ['auto',  'System', 'auto'],
-        ].map(([value, label, swatch]) => el('button.theme-opt', {
-          type: 'button',
-          'aria-pressed': String((s.settings.theme || 'dark') === value),
-          onclick: () => {
-            commit(st => { st.settings.theme = value; });
-            ctx.refresh();
+    group(ctx, 'look', 'Appearance',
+      'Theme and the glow behind the glass.',
+      field('Background', orbPicker(ctx),
+        'The glow behind the glass. It tints both themes.'),
+      el('div.tile', {},
+        el('div.theme-row', {},
+          ...[
+            ['dark',  'Dark',   'dark'],
+            ['light', 'Light',  'light'],
+            ['auto',  'System', 'auto'],
+          ].map(([value, label, swatch]) => el('button.theme-opt', {
+            type: 'button',
+            'aria-pressed': String((s.settings.theme || 'dark') === value),
+            onclick: () => {
+              commit(st => { st.settings.theme = value; });
+              ctx.refresh();
+            },
           },
-        },
-          el('div', { class: 'theme-swatch ' + swatch }),
-          el('span.micro', {}, label)))),
-      el('div.fine', { style: { marginTop: '10px' } },
-        'Dark is true black rather than dark grey — on an OLED screen those pixels are genuinely off, '
-        + 'which saves power and lets the cards read as objects floating in nothing.')),
+            el('div', { class: 'theme-swatch ' + swatch }),
+            el('span.micro', {}, label)))),
+        el('div.fine', { style: { marginTop: '10px' } },
+          'Dark is true black rather than dark grey — on an OLED screen those pixels are genuinely off, '
+          + 'which saves power and lets the cards read as objects floating in nothing.'))),
 
-    el('div.section-label', {}, el('span.micro', {}, 'Reading')),
-    el('div.tile', {},
-      el('div.between', {},
-        el('div', { style: { flex: '1', paddingRight: '12px' } },
-          el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Explanations'),
-          el('div.fine', { style: { marginTop: '3px' } },
-            'The paragraphs explaining what fibre, leucine or a limiting amino acid actually are. '
-            + 'Useful the first few times, clutter once you know. Your numbers and warnings stay either way.')),
-        el('button.btn.sm', {
-          onclick: () => {
-            commit(st => { st.settings.explain = st.settings.explain === false; });
-            toast(get().settings.explain === false ? 'Explanations off.' : 'Explanations on.');
-            ctx.refresh();
-          },
-        }, s.settings.explain === false ? 'Off' : 'On'))),
+    group(ctx, 'read', 'Reading',
+      'How much the app explains, and how much to trust it.',
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', { style: { flex: '1', paddingRight: '12px' } },
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Explanations'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              'The paragraphs explaining what fibre, leucine or a limiting amino acid actually are. '
+              + 'Useful the first few times, clutter once you know. Your numbers and warnings stay either way.')),
+          el('button.btn.sm', {
+            onclick: () => {
+              commit(st => { st.settings.explain = st.settings.explain === false; });
+              toast(get().settings.explain === false ? 'Explanations off.' : 'Explanations on.');
+              ctx.refresh();
+            },
+          }, s.settings.explain === false ? 'Off' : 'On'))),
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', {},
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'What to trust'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              'Which parts of this app are solid, which are guesses, and what it cannot see at all.')),
+          el('button.btn.sm', { onclick: () => openTrust() }, 'Read')))),
 
-    el('div.section-label', {}, el('span.micro', {}, 'How much to trust this')),
-    el('div.tile', {},
-      el('div.between', {},
-        el('div', {},
-          el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'What to trust'),
-          el('div.fine', { style: { marginTop: '3px' } },
-            'Which parts of this app are solid, which are guesses, and what it cannot see at all.')),
-        el('button.btn.sm', { onclick: () => openTrust() }, 'Read'))),
-
-    el('div.section-label', {}, el('span.micro', {}, 'Demo data')),
-    el('div.tile', {},
-      el('div', { style: { fontSize: '14px', fontWeight: '500' } },
-        get().settings.isDemo ? 'Demo data is loaded' : 'Try two years of data'),
-      el('div.fine', { style: { marginTop: '4px' } },
-        get().settings.isDemo
-          ? 'Everything you are looking at is generated. Clear it before you start logging for real — otherwise your first weeks get averaged in with someone who does not exist.'
-          : 'Fills the app with two years of plausible logs, weigh-ins, Whoop days and blood panels so every report has something to show. '
-            + 'Deliberately imperfect — a holiday where logging stopped, an eleven-week plateau, a festive regain.'),
-      el('div.btn-row', { style: { marginTop: '12px' } },
-        el('button.btn', {
-          onclick: async () => {
-            if (!(await confirmSheet({
-              title: 'Load two years of demo data?',
-              message: 'This replaces everything currently in the app — your log, weigh-ins, Whoop data and settings. Export a backup first if any of it is real.',
-              confirmLabel: 'Load demo data', danger: true,
-            }))) return;
-            toast('Generating two years…');
-            setTimeout(() => {
-              const demo = generateDemo({ years: 2 });
+    group(ctx, 'data', 'Data',
+      'Export, backup, demo data, and erasing.',
+      el('div.tile', {},
+        el('div', { style: { fontSize: '14px', fontWeight: '500' } },
+          get().settings.isDemo ? 'Demo data is loaded' : 'Try two years of data'),
+        el('div.fine', { style: { marginTop: '4px' } },
+          get().settings.isDemo
+            ? 'Everything you are looking at is generated. Clear it before you start logging for real — otherwise your first weeks get averaged in with someone who does not exist.'
+            : 'Fills the app with two years of plausible logs, weigh-ins, Whoop days and blood panels so every report has something to show. '
+              + 'Deliberately imperfect — a holiday where logging stopped, an eleven-week plateau, a festive regain.'),
+        el('div.btn-row', { style: { marginTop: '12px' } },
+          el('button.btn', {
+            onclick: async () => {
+              if (!(await confirmSheet({
+                title: 'Load two years of demo data?',
+                message: 'This replaces everything currently in the app — your log, weigh-ins, Whoop data and settings. Export a backup first if any of it is real.',
+                confirmLabel: 'Load demo data', danger: true,
+              }))) return;
+              toast('Generating two years…');
+              setTimeout(() => {
+                const demo = generateDemo({ years: 2 });
+                commit(st => {
+                  st.days = demo.days;
+                  st.whoop = demo.whoop;
+                  st.blood = demo.blood;
+                  st.meals = demo.meals;
+                  st.library = demo.library;
+                  st.supplementsTaken = demo.supplementsTaken;
+                  st.settings.isDemo = true;
+                }, 'import');
+                toast(`${demo.stats.days} days loaded.`);
+                location.reload();
+              }, 60);
+            },
+          }, get().settings.isDemo ? 'Regenerate' : 'Load demo data'),
+          get().settings.isDemo ? el('button.btn.danger', {
+            onclick: async () => {
+              if (!(await confirmSheet({
+                title: 'Clear the demo data?',
+                message: 'Everything generated will be removed and you will start from an empty app.',
+                confirmLabel: 'Clear it', danger: true,
+              }))) return;
               commit(st => {
-                st.days = demo.days;
-                st.whoop = demo.whoop;
-                st.blood = demo.blood;
-                st.meals = demo.meals;
-                st.library = demo.library;
-                st.supplementsTaken = demo.supplementsTaken;
-                st.settings.isDemo = true;
+                st.days = {}; st.whoop = { rows: {}, importedAt: null };
+                st.blood = {}; st.meals = {}; st.library = {};
+                st.supplementsTaken = []; st.settings.isDemo = false;
               }, 'import');
-              toast(`${demo.stats.days} days loaded.`);
               location.reload();
-            }, 60);
-          },
-        }, get().settings.isDemo ? 'Regenerate' : 'Load demo data'),
-        get().settings.isDemo ? el('button.btn.danger', {
+            },
+          }, 'Clear demo') : null)),
+      el('div.tile', {},
+        el('div.btn-row', { style: { marginBottom: '10px' } },
+          el('button.btn', { onclick: doExport }, icon('upload', 16), 'Export'),
+          el('button.btn', { onclick: doImport }, 'Import')),
+        el('button.btn.block', { onclick: async () => { await pushBackup(); toast('Snapshot sent to the Mac.'); } },
+          'Back up to the Mac now'),
+        el('div.fine', { style: { marginTop: '10px' } },
+          'Everything lives in this browser. Export regularly, and keep the Mac backup on — clearing Safari data would otherwise take the log with it.')),
+
+      el('div.tile', {},
+        el('button.btn.danger.block', {
           onclick: async () => {
-            if (!(await confirmSheet({
-              title: 'Clear the demo data?',
-              message: 'Everything generated will be removed and you will start from an empty app.',
-              confirmLabel: 'Clear it', danger: true,
-            }))) return;
-            commit(st => {
-              st.days = {}; st.whoop = { rows: {}, importedAt: null };
-              st.blood = {}; st.meals = {}; st.library = {};
-              st.supplementsTaken = []; st.settings.isDemo = false;
-            }, 'import');
-            location.reload();
+            if (await confirmSheet({
+              title: 'Erase everything?',
+              message: 'Every logged day, your food library, and your Whoop import will be deleted from this device. Export first if you want a copy.',
+              confirmLabel: 'Erase everything', danger: true,
+            })) { reset(); location.reload(); }
           },
-        }, 'Clear demo') : null)),
+        }, 'Erase all data')),
 
-    el('div.section-label', {}, el('span.micro', {}, 'Your data')),
-    el('div.tile', {},
-      el('div.btn-row', { style: { marginBottom: '10px' } },
-        el('button.btn', { onclick: doExport }, icon('upload', 16), 'Export'),
-        el('button.btn', { onclick: doImport }, 'Import')),
-      el('button.btn.block', { onclick: async () => { await pushBackup(); toast('Snapshot sent to the Mac.'); } },
-        'Back up to the Mac now'),
-      el('div.fine', { style: { marginTop: '10px' } },
-        'Everything lives in this browser. Export regularly, and keep the Mac backup on — clearing Safari data would otherwise take the log with it.')),
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', {},
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Version'),
+            el('div.micro', { style: { marginTop: '3px' } }, VERSION)),
+          el('button.btn.sm', {
+            onclick: async () => {
+              toast('Checking…');
+              try {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map(r => r.unregister()));
+                for (const k of await caches.keys()) await caches.delete(k);
+              } catch { /* nothing cached, nothing to clear */ }
+              location.reload();
+            },
+          }, 'Force update'))),
 
-    el('div.tile', {},
-      el('button.btn.danger.block', {
-        onclick: async () => {
-          if (await confirmSheet({
-            title: 'Erase everything?',
-            message: 'Every logged day, your food library, and your Whoop import will be deleted from this device. Export first if you want a copy.',
-            confirmLabel: 'Erase everything', danger: true,
-          })) { reset(); location.reload(); }
-        },
-      }, 'Erase all data')),
+      el('div', { style: { height: '20px' } })),
 
-    el('div.tile', {},
-      el('div.between', {},
-        el('div', {},
-          el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Version'),
-          el('div.micro', { style: { marginTop: '3px' } }, VERSION)),
-        el('button.btn.sm', {
-          onclick: async () => {
-            toast('Checking…');
-            try {
-              const regs = await navigator.serviceWorker.getRegistrations();
-              await Promise.all(regs.map(r => r.unregister()));
-              for (const k of await caches.keys()) await caches.delete(k);
-            } catch { /* nothing cached, nothing to clear */ }
-            location.reload();
-          },
-        }, 'Force update'))),
-
-    el('div', { style: { height: '20px' } }),
+    
   );
 
   function doExport() {
