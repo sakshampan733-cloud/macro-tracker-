@@ -23,9 +23,9 @@ import {
 import { haptic } from '../feedback.js';
 import {
   METHODS, GRADE_MULT, macrosFor, addEntry, updateEntry, MEALS,
-  mealForNow, dayKey, toggleFavourite, isFavourite,
+  mealForNow, dayKey, toggleFavourite, isFavourite, saveFood, get,
 } from '../store.js';
-import { atwater } from '../data/foods.js';
+import { atwater, BY_ID } from '../data/foods.js';
 
 const MEAL_META = {
   breakfast: { label: 'Breakfast', glyph: '☕' },
@@ -46,10 +46,70 @@ export function openPortion(food, {
   entry = null,
   onSaved = () => {},
 } = {}) {
+  /*
+   * A food with no nutrition panel cannot be portioned, and every
+   * calculation downstream assumes one exists. The callers all check
+   * before opening, but a function that throws a TypeError deep in a
+   * chart helper when handed an incomplete record is a trap for the next
+   * caller — say so plainly instead.
+   */
+  if (!food || !food.per100) {
+    toast('That food has no nutrition panel yet. Build it from the packet.', 'err');
+    return null;
+  }
+
   const servings = (food.serv || []).map(s => Array.isArray(s) ? { l: s[0], g: s[1] } : s);
   const units = [...servings, { l: 'grams', g: 1, raw: true }];
   const grade = food.grade || (food.src === 'openfoodfacts' || food.barcode ? 'B' : 'C');
   const foodId = food.id || food.barcode || null;
+
+  /*
+   * Is this food already yours?
+   *
+   * A scanned product exists only in the sheet you are looking at until
+   * something writes it down. Nothing did: portion.js logged an entry and
+   * never touched the library, so a scanned food survived only because
+   * "Recent" is computed from the log. Scan something and close without
+   * logging and it was gone — you had to eat it to keep it.
+   *
+   * Reference foods are excluded: they are already available everywhere
+   * and copying them into your library would just create duplicates.
+   */
+  const isReference = !!(foodId && BY_ID[foodId]);
+
+  /*
+   * Already saved?
+   *
+   * Not by key: saveFood mints a fresh 'my:' id, so a scanned product is
+   * never stored under the id it arrived with, and looking it up that way
+   * offered to save it again every single time. A barcode is the thing
+   * that actually identifies it; name is the fallback for foods built by
+   * hand, which have no barcode at all.
+   */
+  const inLibrary = Object.values(get().library).some(f =>
+    (food.barcode && f.barcode && f.barcode === food.barcode)
+    || (f.n || '').toLowerCase() === String(food.n || food.name || '').toLowerCase());
+  /* inLibrary gates the action; it has to gate the button too, or a food
+     you already saved keeps offering to save itself. */
+  const savable = !entry && !isReference && !inLibrary
+    && !!(food.n || food.name) && !!food.per100;
+
+  let saved = inLibrary;
+
+  const rememberFood = () => {
+    if (!savable || saved) return null;
+    const rec = saveFood({
+      n: food.n || food.name,
+      brand: food.brand || '',
+      per100: food.per100,
+      barcode: food.barcode || null,
+      serv: servings,
+      grade,
+      src: food.src || (food.barcode ? 'openfoodfacts' : 'custom'),
+    });
+    saved = true;
+    return rec;
+  };
 
   /* Start from the food's own serving where it has one — that is how it is
      eaten, and it means the first thing on screen is usually already right. */
@@ -260,7 +320,20 @@ export function openPortion(food, {
         + 'a tapped serving is a portion, a typed weight is weighed. Tap it to override.',
         { style: { marginTop: '12px' } }),
     ),
-    foot: el('button.btn.primary.block', {
+    foot: el('div.btn-row', {},
+      savable ? el('button.btn.ghost', {
+        style: { flex: '0 0 auto', padding: '15px 16px' },
+        onclick: e => {
+          const rec = rememberFood();
+          if (!rec) { toast('Already in your foods.'); return; }
+          haptic('success');
+          toast(`${rec.n} saved to your foods.`);
+          e.currentTarget.disabled = true;
+          e.currentTarget.textContent = 'Saved';
+          onSaved();
+        },
+      }, icon('plus', 16), 'Save only') : null,
+      el('button.btn.primary.grow', {
       style: { fontSize: '17px', padding: '15px' },
       onclick: () => {
         const gr = gramsNow();
@@ -279,6 +352,9 @@ export function openPortion(food, {
         };
         if (entry) { updateEntry(dateKey, entry.id, payload); toast('Updated.'); }
         else {
+          /* Logging something scanned should keep it too — otherwise the
+             only copy of it is the log line you just wrote. */
+          rememberFood();
           addEntry(dateKey, payload);
           toast(`${Math.round(macrosFor(food.per100, gr).kcal)} kcal logged.`);
         }
@@ -286,7 +362,7 @@ export function openPortion(food, {
         s.close();
         onSaved();
       },
-    }, entry ? 'Save changes' : 'Log it'),
+    }, entry ? 'Save changes' : 'Log it')),
   });
 
   return s;
