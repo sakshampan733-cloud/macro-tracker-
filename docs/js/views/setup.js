@@ -13,6 +13,7 @@ import {
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
 import { generateDemo } from '../demo.js';
+import { goalTile } from './goal.js';
 import { VERSION } from '../app.js';
 
 /* ── Onboarding ─────────────────────────────────────────────────────── */
@@ -217,6 +218,20 @@ export function renderSettings(root, ctx) {
     field('Goal', goalBox),
     field('Rate (kg per week)', fRate,
       'Negative loses, positive gains. Beyond about 0.75 kg a week in either direction the cost lands on muscle.'),
+
+    /* A goal with a deadline is configuration, not a daily reading, so it
+       belongs here rather than taking space on a screen you check hourly. */
+    el('div.section-label', {}, el('span.micro', {}, 'Time-bound goal')),
+    goalTile(s, ctx),
+
+    el('div.section-label', {}, el('span.micro', {}, 'Your food')),
+    el('div.tile', {},
+      el('div.between', {},
+        el('div', {},
+          el('div', { style: { fontWeight: '500' } }, 'Food library and meals'),
+          el('div.fine', { style: { marginTop: '3px' } },
+            'Everything you have built, scanned or saved.')),
+        el('button.btn.sm', { onclick: () => ctx.go('foods') }, 'Open'))),
 
     el('div.section-label', {}, el('span.micro', {}, 'How targets are set')),
     field('Maintenance source', tdeeBox,

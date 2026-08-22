@@ -292,6 +292,7 @@ export function barRow(points, { h = 56, colourFor = () => 'var(--accent)' } = {
 export function healthBars(points, {
   h = 150, colour = 'var(--accent)', unit = '', dp = 0,
   showRange = true, barMin = 3, gap = 0.34,
+  band = null, colourFor = null,
 } = {}) {
   const svg = svgEl('svg', { class: 'hchart' });
   svg.setAttribute('height', String(h));
@@ -307,9 +308,20 @@ export function healthBars(points, {
 
   const hi = Math.max(...vals);
   const lo = Math.min(...vals);
-  // Bars read from a baseline; starting the scale at the minimum would make
-  // a 2% difference look like a cliff.
-  const base = lo > 0 && (hi - lo) / hi < 0.55 ? lo * 0.92 : 0;
+  /*
+   * Where the bars start from.
+   *
+   * Padding below the minimum by a share of the *value* collapses any
+   * series whose variation is small next to its magnitude: ninety days of
+   * weight moving 0.4 kg around 85 kg became ninety identical full-height
+   * bars. Pad by a share of the range instead, so the chart shows the
+   * variation that exists — while still refusing to start at the minimum,
+   * which would turn noise into a cliff.
+   */
+  const range = hi - lo;
+  const base = range === 0
+    ? Math.max(0, lo - Math.max(1, Math.abs(lo) * 0.02))
+    : (lo > 0 && range / hi < 0.55 ? lo - range * 0.45 : 0);
   const span = (hi - base) || 1;
 
   const topPad = showRange ? 26 : 8;
@@ -323,12 +335,26 @@ export function healthBars(points, {
   const hiIdx = vals.length ? points.findIndex(p => p.v === hi) : -1;
   const loIdx = vals.length ? points.findIndex(p => p.v === lo) : -1;
 
+  /* Your own normal band, drawn behind the bars. A reading means little
+     without it: 48 ms of HRV is good or poor depending entirely on whose
+     wrist it came from. */
+  if (band && band.lo != null && band.hi != null) {
+    const yHi = y(Math.min(band.hi, hi));
+    const yLo = y(Math.max(band.lo, base));
+    svg.append(svgEl('rect', {
+      class: 'hband', x: 0, y: yHi.toFixed(1),
+      width: w, height: Math.max(1, yLo - yHi).toFixed(1),
+      fill: 'currentColor', opacity: 0.07,
+    }));
+  }
+
   points.forEach((p, i) => {
     if (p.v == null) return;
     const top = y(p.v);
     const height = Math.max(barMin, topPad + plot - top);
     const x = i * slot + (slot - bw) / 2;
-    const c = typeof colour === 'function' ? colour(p.v, p) : colour;
+    const c = colourFor ? colourFor(p.v, p)
+      : (typeof colour === 'function' ? colour(p.v, p) : colour);
     const bar = svgEl('rect', {
       class: 'hbar',
       x: x.toFixed(1), y: top.toFixed(1),
@@ -400,4 +426,110 @@ export function segmentBar(segments, { h = 30, radius = 8 } = {}) {
     }
   });
   return wrap;
+}
+
+
+/*
+ * healthLine — for quantities that are continuous.
+ *
+ * Bars imply a count you could have more or fewer of; weight and blood
+ * markers are levels, and a level reads as a line. Apple Health makes the
+ * same split, and it matters here because a bar chart of a trend weight is
+ * ninety near-identical rectangles carrying one bit of information.
+ *
+ * The y-range hugs the data, so the axis shows the movement rather than
+ * the distance from zero — which for an 85 kg person is all of it.
+ */
+export function healthLine(points, {
+  h = 150, colour = 'var(--accent)', unit = '', dp = 1,
+  showRange = true, raw = null,
+} = {}) {
+  const svg = svgEl('svg', { class: 'hchart hline' });
+  svg.setAttribute('height', String(h));
+  const pts = points.filter(p => p && p.v != null);
+  if (!pts.length) return svg;
+
+  const w = 340;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const vals = pts.map(p => p.v);
+  const rawVals = (raw || []).filter(p => p && p.v != null).map(p => p.v);
+  const hi = Math.max(...vals, ...rawVals);
+  const lo = Math.min(...vals, ...rawVals);
+  const range = (hi - lo) || Math.max(1, Math.abs(hi) * 0.02);
+  const top = hi + range * 0.30;
+  const bot = lo - range * 0.30;
+  const span = top - bot;
+
+  const topPad = showRange ? 18 : 8;
+  const botPad = 16;
+  const plot = h - topPad - botPad;
+  const n = pts.length;
+  const X = i => (n === 1 ? w / 2 : (i / (n - 1)) * w);
+  const Y = v => topPad + plot - ((v - bot) / span) * plot;
+
+  const gid = 'lg' + Math.random().toString(36).slice(2, 8);
+  const defs = svgEl('defs');
+  const grad = svgEl('linearGradient', { id: gid, x1: '0', y1: '0', x2: '0', y2: '1' });
+  grad.append(
+    svgEl('stop', { offset: '0%',   'stop-color': colour, 'stop-opacity': '.26' }),
+    svgEl('stop', { offset: '100%', 'stop-color': colour, 'stop-opacity': '0' }));
+  defs.append(grad); svg.append(defs);
+
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${X(i).toFixed(2)},${Y(p.v).toFixed(2)}`).join('');
+  svg.append(svgEl('path', {
+    d: `${d}L${X(n - 1).toFixed(2)},${(topPad + plot).toFixed(2)}L${X(0).toFixed(2)},${(topPad + plot).toFixed(2)}Z`,
+    fill: `url(#${gid})`, stroke: 'none',
+  }));
+
+  // The actual readings, faint, behind the trend they were smoothed into.
+  if (raw && raw.length) {
+    for (let i = 0; i < raw.length; i++) {
+      const p = raw[i];
+      if (!p || p.v == null) continue;
+      svg.append(svgEl('circle', {
+        cx: X(i).toFixed(2), cy: Y(p.v).toFixed(2), r: 1.5,
+        fill: colour, opacity: '.30',
+      }));
+    }
+  }
+
+  const line = svgEl('path', {
+    d, fill: 'none', stroke: colour, 'stroke-width': 2,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+    'vector-effect': 'non-scaling-stroke',
+  });
+  svg.append(line);
+
+  if (showRange) {
+    const hiI = vals.indexOf(Math.max(...vals));
+    const loI = vals.indexOf(Math.min(...vals));
+    const mark = (i, v, above) => {
+      const t = svgEl('text', {
+        x: Math.min(w - 26, Math.max(20, X(i))).toFixed(1),
+        y: (Y(v) + (above ? -7 : 13)).toFixed(1),
+        class: 'hlabel', 'text-anchor': 'middle',
+      });
+      t.textContent = v.toFixed(dp) + unit;
+      svg.append(t);
+    };
+    mark(hiI, vals[hiI], true);
+    if (loI !== hiI) mark(loI, vals[loI], false);
+  }
+
+  if (!reduced()) {
+    const len = 1400;
+    line.style.strokeDasharray = String(len);
+    line.style.strokeDashoffset = String(len);
+    let done = false;
+    const settle = () => { if (done) return; done = true; line.style.strokeDashoffset = '0'; };
+    requestAnimationFrame(() => {
+      line.style.transition = 'stroke-dashoffset .85s cubic-bezier(.22,1,.36,1)';
+      settle();
+    });
+    setTimeout(settle, 1200);
+  }
+
+  return svg;
 }

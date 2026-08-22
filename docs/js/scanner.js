@@ -38,6 +38,27 @@ function zxingHints(ZXing) {
   return hints;
 }
 
+/*
+ * Decode a canvas.
+ *
+ * BrowserMultiFormatReader has no decodeFromCanvas method — the name reads
+ * plausibly and throws a TypeError, which is how this survived: both call
+ * sites caught it silently, so every browser lacking a native
+ * BarcodeDetector decoded precisely nothing, forever. Going through the
+ * luminance source and binarizer is the supported route.
+ */
+function decodeCanvas(ZXing, reader, canvas) {
+  const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+  const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+  return reader.decodeBitmap(bitmap);
+}
+
+export function isNotFound(ZXing, e) {
+  return (ZXing.NotFoundException && e instanceof ZXing.NotFoundException)
+    || /NotFound|No MultiFormat Readers/i.test(String(e && (e.name + e.message)));
+}
+
+
 export function cameraSupported() {
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
@@ -129,7 +150,7 @@ export async function decodeImageFile(file) {
       canvas.height = Math.round(sh * scale);
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
       try {
-        const res = reader.decodeFromCanvas(canvas);
+        const res = decodeCanvas(ZXing, reader, canvas);
         if (res) return res.getText();
       } catch { /* try the next crop */ }
     }
@@ -181,9 +202,12 @@ export class Scanner {
       return false;
     }
 
-    this.video.srcObject = this.stream;
+    /* Both attributes must be in place before the stream attaches, or iOS
+       hands the video to the fullscreen player instead of the page. */
     this.video.setAttribute('playsinline', '');
+    this.video.setAttribute('muted', '');
     this.video.muted = true;
+    this.video.srcObject = this.stream;
     await this.video.play().catch(() => {});
     this.track = this.stream.getVideoTracks()[0];
     this.running = true;
@@ -240,6 +264,8 @@ export class Scanner {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+    let reported = false;
+
     while (this.running) {
       const vw = this.video.videoWidth, vh = this.video.videoHeight;
       if (vw && vh) {
@@ -250,9 +276,19 @@ export class Scanner {
         canvas.width = vw; canvas.height = bandH;
         ctx.drawImage(this.video, 0, y0, vw, bandH, 0, 0, vw, bandH);
         try {
-          const res = this.reader.decodeFromCanvas(canvas);
+          const res = decodeCanvas(ZXing, this.reader, canvas);
           if (res) this._vote(res.getText());
-        } catch { /* NotFoundException on most frames, by design */ }
+        } catch (e) {
+          /*
+           * A frame with no barcode in it is the normal case and must stay
+           * silent. Anything else is a genuine fault, and it gets said once
+           * rather than swallowed for the lifetime of the scanner.
+           */
+          if (!isNotFound(ZXing, e) && !reported) {
+            reported = true;
+            this.onError('The decoder failed on this device: ' + e.message);
+          }
+        }
       }
       await new Promise(r => setTimeout(r, 90));
     }

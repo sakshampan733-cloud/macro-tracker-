@@ -7,8 +7,8 @@
  */
 
 import {
-  el, clear, icon, kcal, g, sparkline, distribution, toast, sheet, field,
-  segmented, empty, dateLabel, confirmSheet,
+  el, clear, icon, kcal, g, distribution, toast, sheet, field,
+  segmented, empty, dateLabel, confirmSheet, explain,
 } from '../ui.js';
 import { get, commit, dayKey, setWeight, peekDay, weightSeries, totals } from '../store.js';
 import {
@@ -18,9 +18,9 @@ import {
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict } from '../nutrition.js';
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
-import { goalTile } from './goal.js';
 import {
   ring, areaChart, stageBar, liveDot, barRow, recoveryColour, countUp,
+  healthBars, healthLine, segmentBar,
 } from '../charts.js';
 import { openReport } from './report.js';
 import {
@@ -35,7 +35,6 @@ export function renderBody(root, ctx) {
     (root.classList.add('stagger'), el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Body'),
       el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report'))),
-    goalTile(s, ctx),
     checkInTile(s, ctx),
     weightTile(ctx),
     tdeeTile(s),
@@ -142,10 +141,14 @@ function weightTile(ctx) {
   const first = withTrend[0];
   const change = latest && first ? latest.trend - first.trend : 0;
 
+  /* Trend, not the raw scale — the daily number swings a kilo on water and
+     the bars would just be noise. */
+  const recent = withTrend.slice(-90);
   const chart = withTrend.length > 2
-    ? sparkline(
-        withTrend.map(p => ({ v: p.kg })),
-        { h: 76, trend: withTrend.map(p => ({ v: p.trend })) })
+    ? healthLine(
+        recent.map(p => ({ v: p.trend, label: `${p.date}: ${p.kg.toFixed(1)} kg` })),
+        { h: 146, colour: 'var(--accent)', unit: ' kg', dp: 1,
+          raw: recent.map(p => ({ v: p.kg })) })
     : null;
 
   return el('div.tile', {},
@@ -329,9 +332,13 @@ function vitalsSection(s, ctx) {
       { label: 'REM',  value: today.remH || 0, colour: 'var(--m-f)' },
       { label: 'Light', value: light, colour: 'var(--line-2)' },
     ];
-    wrap.append(el('div.tile', {},
+    wrap.append(el('div.tile.tappable', {
+      role: 'button', tabIndex: 0,
+      onclick: () => openSleepDetail(s, ctx),
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSleepDetail(s, ctx); } },
+    },
       el('div.between', { style: { marginBottom: '10px' } },
-        el('h3', {}, 'Last night'),
+        el('h3', {}, 'Last night', icon('chevron', 14)),
         el('span.num', { style: { fontSize: '15px' } },
           `${today.sleepH.toFixed(1)} h`)),
       stageBar(stages),
@@ -361,21 +368,25 @@ function vitalsSection(s, ctx) {
      */
     const base = stats(pts.map(p => p.v));
     if (!base) return null;
-    return el('div.tile', {},
+    return el('div.tile.tappable', {
+      role: 'button', tabIndex: 0,
+      onclick: () => openMetric(s, metric, ctx),
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, metric, ctx); } },
+    },
       el('div.between', { style: { marginBottom: '8px' } },
         el('div', {},
-          el('div.micro', {}, info.label),
+          el('div.micro', {}, info.label, icon('chevron', 12)),
           el('div.num', { style: { fontSize: '19px', marginTop: '2px', color: colour } },
             info.latest.v.toFixed(info.dp) + (info.unit ? ' ' + info.unit : ''))),
         el('div', { style: { textAlign: 'right' } },
           el('div.micro', {}, '30-day range'),
           el('div.num', { style: { fontSize: '12px', marginTop: '3px', color: 'var(--muted)' } },
             `${base.min.toFixed(info.dp)}–${base.max.toFixed(info.dp)}`))),
-      areaChart(pts.map(p => ({ v: p.v })), {
-        colour, h: 96, showDots: true,
-        band: { lo: base.p25, hi: base.p75 },
+      healthBars(pts.map(p => ({ v: p.v, label: `${p.date}: ${p.v.toFixed(info.dp)} ${info.unit}` })), {
+        colour, h: 132, unit: info.unit ? ' ' + info.unit : '',
+        dp: info.dp, band: { lo: base.p25, hi: base.p75 },
       }),
-      el('div.fine', { style: { marginTop: '6px' } },
+      el('div.fine', { style: { marginTop: '8px' } },
         'Shaded band is where this normally sits for you.'),
     );
   };
@@ -388,16 +399,19 @@ function vitalsSection(s, ctx) {
   /* ── the fortnight, at a glance ── */
   const recentRec = seriesFor(s.whoop, 'recovery', 14);
   if (recentRec.length > 3) {
-    wrap.append(el('div.tile', {},
+    wrap.append(el('div.tile.tappable', {
+      role: 'button', tabIndex: 0,
+      onclick: () => openMetric(s, 'recovery', ctx),
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, 'recovery', ctx); } },
+    },
       el('div.between', { style: { marginBottom: '10px' } },
-        el('h3', {}, 'Last fortnight'),
+        el('h3', {}, 'Last fortnight', icon('chevron', 14)),
         el('span.micro', {}, `avg ${Math.round(rec.recent.mean)}%`)),
-      barRow(recentRec.map(p => ({ v: p.v, label: `${p.date}: ${Math.round(p.v)}%` })),
-             { h: 62, colourFor: recoveryColour }),
-      el('div.between', { style: { marginTop: '6px' } },
-        el('span.micro', {}, recentRec[0].date.slice(5)),
-        el('span.micro', {}, 'green ≥67 · amber ≥34 · red below'),
-        el('span.micro', {}, recentRec[recentRec.length - 1].date.slice(5))),
+      healthBars(recentRec.map(p => ({ v: p.v, label: `${p.date}: ${Math.round(p.v)}%` })), {
+        h: 132, unit: '%', dp: 0, colourFor: recoveryColour,
+      }),
+      el('div.between', { style: { marginTop: '8px' } },
+        el('span.micro', {}, 'green ≥67 · amber ≥34 · red below')),
     ));
   }
 
@@ -452,7 +466,8 @@ function openMetric(s, metric, ctx) {
 
       el('div.tile', {},
         el('div.micro', { style: { marginBottom: '8px' } }, `Last ${Math.min(60, series.length)} days`),
-        sparkline(series.slice(-60).map(p => ({ v: p.v })), { h: 90 })),
+        healthBars(series.slice(-60).map(p => ({ v: p.v, label: `${p.date}: ${p.v}` })),
+          { h: 140, colour: 'var(--accent)', unit: ' ' + info.unit, dp: info.dp })),
 
       el('div.tile', {},
         ...[
@@ -470,6 +485,88 @@ function openMetric(s, metric, ctx) {
         `Today is at the ${place.pct}th percentile of everything you've recorded, `
         + `${Math.abs(place.z).toFixed(1)} standard deviations ${place.z >= 0 ? 'above' : 'below'} your average. `
         + `Read that as ${place.verdict}.`)),
+    ),
+  });
+}
+
+/*
+ * Sleep, opened up.
+ *
+ * The tile answers "how long"; this answers "made of what, and is that
+ * normal for me". Stage hours are compared against your own recent
+ * average rather than a textbook target, because the healthy share of
+ * deep sleep varies enough between people that a fixed number would call
+ * most nights abnormal.
+ */
+function openSleepDetail(s, ctx) {
+  const w = s.whoop || {};
+  /* Rows are keyed by date, not stored as an array — reading .days here
+     found nothing and returned silently, which is why the pane opened
+     onto no sheet at all. */
+  const days = Object.entries(w.rows || {}).sort()
+    .map(([date, r]) => ({ date, ...r }))
+    .filter(d => d.sleepH);
+  const last = days[days.length - 1];
+  if (!last) { toast('No sleep recorded yet.'); return; }
+
+  const light = n => Math.max(0, (n.sleepH || 0) - (n.remH || 0) - (n.swsH || 0));
+  const recent = days.slice(-28);
+  const avg = k => recent.length
+    ? recent.reduce((a, d) => a + (k === 'light' ? light(d) : (d[k] || 0)), 0) / recent.length : 0;
+
+  const stages = [
+    { label: 'Deep', key: 'swsH',  value: last.swsH || 0, mean: avg('swsH'),  colour: 'var(--m-p)' },
+    { label: 'REM',  key: 'remH',  value: last.remH || 0, mean: avg('remH'),  colour: 'var(--m-f)' },
+    { label: 'Light', key: 'light', value: light(last),   mean: avg('light'), colour: 'var(--line-2)' },
+  ];
+
+  const durSeries = days.slice(-60).map(d => ({ v: d.sleepH, label: `${d.date}: ${d.sleepH.toFixed(1)} h` }));
+  const dur = placeInRange(w, 'sleepH', last.sleepH);
+
+  sheet({
+    title: 'Sleep',
+    body: el('div', {},
+      el('div.tile.tile-hero', {},
+        el('div.readout', {},
+          el('div', {},
+            el('div.micro', {}, last.date),
+            el('div.readout-main', {}, last.sleepH.toFixed(1),
+              el('span.readout-pm', {}, ' h'))),
+          last.sleepPerf != null ? el('div.readout-side', {},
+            el('div.micro', {}, 'Performance'),
+            el('div.v', {}, Math.round(last.sleepPerf) + '%')) : null),
+        el('div', { style: { marginTop: '16px' } }, stageBar(stages)),
+        el('div.stage-key', {}, ...stages.map(st => el('span.micro', {},
+          el('i', { style: { background: st.colour } }),
+          `${st.label} ${st.value.toFixed(1)}h`)))),
+
+      el('div.section-label', {}, el('span.micro', {}, 'Stages against your own 28-day average')),
+      el('div.tile', {}, ...stages.map(st => {
+        const diff = st.value - st.mean;
+        const pct = last.sleepH ? (st.value / last.sleepH) * 100 : 0;
+        return el('div.between', { style: { padding: '9px 0', borderBottom: '1px solid var(--line)' } },
+          el('span', { style: { fontSize: '13.5px', color: 'var(--text-2)' } },
+            el('i.dot', { style: { background: st.colour } }), st.label),
+          el('span.num', { style: { fontSize: '13.5px' } },
+            `${st.value.toFixed(1)} h · ${Math.round(pct)}% · `,
+            el('span', { style: { color: Math.abs(diff) < 0.25 ? 'var(--muted)' : (diff > 0 ? 'var(--good)' : 'var(--caution)') } },
+              `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}`)));
+      })),
+
+      el('div.section-label', {}, el('span.micro', {}, 'Duration, last 60 nights')),
+      el('div.tile', {}, healthBars(durSeries, { h: 150, colour: 'var(--accent)', unit: ' h', dp: 1 })),
+
+      el('div.tile', {},
+        el('div.micro', { style: { marginBottom: '6px' } }, 'Where last night sits in your history'),
+        distribution({ stats: dur.stats, value: last.sleepH, dp: 1 })),
+
+      last.debtH ? el('div.note', {}, el('div', {},
+        `You are carrying ${last.debtH.toFixed(1)} h of sleep debt. Whoop accumulates that against `
+        + 'your own need estimate, so it clears with a long night rather than several ordinary ones.')) : null,
+
+      explain('Deep sleep front-loads the night and REM back-loads it, so a night cut short at '
+        + 'the end loses REM disproportionately while one started late loses deep. That is why the '
+        + 'split is worth reading alongside the total rather than instead of it.'),
     ),
   });
 }

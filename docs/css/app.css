@@ -1016,12 +1016,16 @@ body::after {
 :root,
 :root[data-theme="dark"] {
   --bg:        #000000;
-  --bg-2:      #08080A;
-  --surface:   #0D0D0F;
-  --surface-2: #151517;
-  --raised:    #1D1D20;
-  --line:      #242427;
-  --line-2:    #323236;
+  --bg-2:      rgba(255, 255, 255, .022);
+
+  /* Surfaces are translucent, not painted. A card is a pane of glass over
+     the ambient wash — that is the whole look, and solid fills killed it
+     no matter how much blur the bars had. */
+  --surface:   rgba(255, 255, 255, .045);
+  --surface-2: rgba(255, 255, 255, .028);
+  --raised:    rgba(255, 255, 255, .085);
+  --line:      rgba(255, 255, 255, .07);
+  --line-2:    rgba(255, 255, 255, .13);
 
   --text:      #F4F4F6;
   --text-2:    #A9A9B0;
@@ -1032,8 +1036,8 @@ body::after {
   --accent-2:  #1E6B60;
   --accent-ink:#04231F;
 
-  --glass:       rgba(18, 18, 21, .62);
-  --glass-solid: rgba(13, 13, 15, .97);
+  --glass:       rgba(20, 20, 24, .44);
+  --glass-solid: rgba(10, 10, 12, .82);
   --glass-line:  rgba(244, 244, 246, .10);
   --glass-hi:    rgba(255, 255, 255, .06);
   --glass-active:rgba(244, 244, 246, .10);
@@ -1046,13 +1050,14 @@ body::after {
 }
 
 :root[data-theme="light"] {
-  --bg:        #F4F4F6;
-  --bg-2:      #FFFFFF;
-  --surface:   #FFFFFF;
-  --surface-2: #FBFBFC;
-  --raised:    #EFEFF2;
-  --line:      #E3E3E8;
-  --line-2:    #D2D2DA;
+  /* Bone, not paper. The ambient fields below tint through the panes. */
+  --bg:        #EFEAE3;
+  --bg-2:      rgba(255, 255, 255, .38);
+  --surface:   rgba(255, 255, 255, .52);
+  --surface-2: rgba(255, 255, 255, .34);
+  --raised:    rgba(255, 255, 255, .78);
+  --line:      rgba(60, 45, 30, .10);
+  --line-2:    rgba(60, 45, 30, .17);
 
   --text:      #131316;
   --text-2:    #4B4B55;
@@ -1142,14 +1147,19 @@ body::after { opacity: var(--grain); }
   --glass-bg:     rgba(16, 16, 19, .58);
   --glass-strong: rgba(11, 11, 13, .74);
   --glass-brd:    rgba(255, 255, 255, .10);
-  --glass-hi:     rgba(255, 255, 255, .055);
-  --blur:         saturate(180%) blur(28px);
+  --glass-hi:     rgba(255, 255, 255, .07);
+  --blur:         saturate(190%) blur(34px);
 
-  /* A single ambient wash behind everything, so the black is not dead. */
+  /* One light source, one hue.
+     Several coloured fields read as decoration; a single orb reads as a
+     room the panes are sitting in, which is what the reference has. The
+     glass then has one consistent thing to refract instead of four. */
+  --orb: 232, 132, 58;
   --ambient:
-    radial-gradient(120% 70% at 12% -8%,  color-mix(in srgb, var(--accent) 11%, transparent), transparent 58%),
-    radial-gradient(100% 60% at 92% 4%,   rgba(122, 90, 200, .10), transparent 62%),
-    radial-gradient(140% 80% at 50% 108%, rgba(61, 219, 196, .05), transparent 60%);
+    radial-gradient(58% 42% at 50% 34%, rgba(var(--orb), .40) 0%,
+                                        rgba(var(--orb), .16) 42%,
+                                        rgba(var(--orb), .04) 68%,
+                                        transparent 82%);
 }
 
 :root[data-theme="light"] {
@@ -1157,23 +1167,26 @@ body::after { opacity: var(--grain); }
      bone and sand, with colour bleeding through, never a flat sheet. */
   --bg:        #F3EFEA;
   --bg-2:      #FBF8F5;
-  --surface:   rgba(255, 255, 255, .78);
-  --surface-2: rgba(255, 255, 255, .62);
-  --raised:    rgba(255, 255, 255, .92);
+  --surface:   rgba(255, 255, 255, .40);
+  --surface-2: rgba(255, 255, 255, .26);
+  --raised:    rgba(255, 255, 255, .70);
   --line:      rgba(60, 48, 40, .10);
   --line-2:    rgba(60, 48, 40, .17);
 
-  --text:      #1B1714;
-  --text-2:    #554C45;
-  --muted:     #7C716A;
-  --dim:       #A79C94;
+  /* Contrast against the pane, not against the page: a .40-alpha white
+     card over a warm orb sits nearer #E8DDD2 than #FFF, so the greys have
+     to come down to keep secondary text readable rather than decorative. */
+  --text:      #14100D;
+  --text-2:    #453D36;
+  --muted:     #665C54;
+  --dim:       #8A7F76;
 
-  --accent:    #0E9C8E;
-  --accent-2:  #0A7A6F;
+  --accent:    #0A7A6E;
+  --accent-2:  #06584F;
   --accent-ink:#FFFFFF;
 
-  --glass-bg:     rgba(255, 255, 255, .55);
-  --glass-strong: rgba(255, 255, 255, .74);
+  --glass-bg:     rgba(255, 255, 255, .34);
+  --glass-strong: rgba(255, 255, 255, .56);
   --glass-brd:    rgba(255, 255, 255, .70);
   --glass-hi:     rgba(255, 255, 255, .85);
   --blur:         saturate(180%) blur(26px);
@@ -1183,11 +1196,13 @@ body::after { opacity: var(--grain); }
   --lift:       0 1px 2px rgba(60,48,40,.05), 0 10px 26px -14px rgba(60,48,40,.20);
   --lift-lg:    0 2px 8px rgba(60,48,40,.06), 0 26px 56px -24px rgba(60,48,40,.26);
 
-  /* Warm light fields, the C.Lab / sunset palette, used as atmosphere. */
+  /* The same single orb, warmed and lifted so it reads on a pale ground. */
+  --orb: 240, 146, 64;
   --ambient:
-    radial-gradient(110% 62% at 88% -6%, rgba(255, 148, 60, .20), transparent 60%),
-    radial-gradient(100% 58% at 6% 2%,  rgba(140, 190, 255, .16), transparent 58%),
-    radial-gradient(130% 70% at 50% 106%, rgba(255, 196, 150, .16), transparent 62%);
+    radial-gradient(58% 42% at 50% 34%, rgba(var(--orb), .52) 0%,
+                                        rgba(var(--orb), .24) 42%,
+                                        rgba(var(--orb), .07) 68%,
+                                        transparent 82%);
 }
 
 /* The wash sits behind everything and does not scroll — the app has a sky. */
@@ -1210,7 +1225,26 @@ body { background: transparent; }
   box-shadow:
     0 8px 32px -8px rgba(0,0,0,.45),
     inset 0 1px 0 var(--glass-hi);
+  max-width: 460px;          /* four tabs, so the pill can be narrower */
 }
+
+/* The selected tab is a lozenge that slides, not a colour swap. */
+.tab {
+  position: relative; z-index: 1;
+  transition: color .26s cubic-bezier(.22,1,.36,1);
+}
+.tab::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  border-radius: 999px;
+  background: var(--glass-active);
+  box-shadow: inset 0 1px 0 var(--glass-hi);
+  opacity: 0; transform: scale(.82);
+  transition: opacity .28s cubic-bezier(.22,1,.36,1),
+              transform .34s cubic-bezier(.34,1.56,.64,1);
+}
+.tab[aria-current="page"]::before { opacity: 1; transform: scale(1); }
+.tab[aria-current="page"] .ic { transform: translateY(-1px) scale(1.06); }
+.tab .ic { transition: transform .34s cubic-bezier(.34,1.56,.64,1); }
 :root[data-theme="light"] .tabs {
   box-shadow: 0 8px 30px -10px rgba(60,48,40,.28), inset 0 1px 0 var(--glass-hi);
 }
@@ -1246,16 +1280,26 @@ body { background: transparent; }
 }
 .sheet-head, .sheet-foot { background: transparent; border-color: var(--glass-brd); }
 
-/* Tiles become glass panels rather than solid blocks. */
+/* Tiles are panes, not blocks: transparent enough that the wash and the
+   content behind them show through, held together by a hairline edge and
+   a single top highlight rather than by a fill. */
 .tile {
   background: var(--sheen), var(--surface);
-  backdrop-filter: saturate(140%) blur(14px);
-  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  backdrop-filter: saturate(185%) blur(30px);
+  -webkit-backdrop-filter: saturate(185%) blur(30px);
   border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--edge-light), var(--lift);
 }
 .tile-hero, .tile-field {
-  backdrop-filter: saturate(150%) blur(18px);
-  -webkit-backdrop-filter: saturate(150%) blur(18px);
+  backdrop-filter: saturate(200%) blur(36px);
+  -webkit-backdrop-filter: saturate(200%) blur(36px);
+  border-radius: 26px;
+}
+/* Nested panes must not double the frost — it turns milky fast. */
+.tile .tile, .tile-field .tile {
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  background: var(--surface-2);
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -1344,3 +1388,177 @@ body { background: transparent; }
 
 .has-sticky .topbar { position: static; }
 .has-sticky .sticky-glass { top: 0; }
+
+
+/* ── Air ──────────────────────────────────────────────────────────────
+   Minimalism is mostly spacing. The old rhythm was tight enough that
+   panes read as one continuous slab; separating them is what makes each
+   one legible as its own object.                                      */
+.tile { padding: 20px; margin-bottom: 14px; }
+.tile.flush { padding: 0; }
+.view > .tile:last-child { margin-bottom: 0; }
+
+.section-label {
+  margin: 26px 2px 11px;
+  letter-spacing: .16em; text-transform: uppercase;
+  font-size: 10.5px; font-weight: 600; color: var(--muted);
+}
+.view > .section-label:first-child { margin-top: 6px; }
+
+/* Numbers carry the screen, so they get the weight and the room. */
+.readout-main { font-weight: 300; letter-spacing: -.03em; }
+.tile-hero { padding: 26px 22px; }
+
+/* Hairlines instead of drawn boxes wherever a box was only a separator. */
+.row + .row { border-top: 1px solid var(--line); }
+
+/* ── Tap-to-expand ────────────────────────────────────────────────────
+   Anything that opens a detail view says so by responding to the press,
+   and by carrying a chevron. Whoop's pattern: the summary is the door.  */
+.tile.tappable {
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .22s cubic-bezier(.22,1,.36,1),
+              background .22s ease, border-color .22s ease;
+}
+.tile.tappable:active { transform: scale(.985); }
+.tile.tappable:hover { border-color: var(--line-2); }
+.tile.tappable h3 .ic { color: var(--dim); margin-left: 6px; vertical-align: -2px; }
+
+i.dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 8px; vertical-align: 0;
+}
+
+/* ── Food grid ────────────────────────────────────────────────────────
+   Names only. An icon per food would be either a guess or a stock
+   pictogram, and neither helps you find the thing you already know the
+   name of — the name is the fastest identifier there is.               */
+.food-grid {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+}
+.food-cell {
+  display: flex; flex-direction: column; justify-content: space-between;
+  min-height: 78px; padding: 12px 12px 10px;
+  border-radius: 16px; border: 1px solid var(--line);
+  background: var(--surface-2);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  text-align: left; cursor: pointer; color: var(--text);
+  transition: transform .2s cubic-bezier(.22,1,.36,1), border-color .2s ease, background .2s ease;
+}
+.food-cell:active { transform: scale(.96); }
+.food-cell:hover { border-color: var(--line-2); background: var(--raised); }
+.food-cell .fc-name {
+  font-size: 12.5px; font-weight: 500; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.food-cell .fc-kcal {
+  font-size: 11px; color: var(--muted);
+  font-variant-numeric: tabular-nums; margin-top: 8px;
+}
+
+/* ── Home ─────────────────────────────────────────────────────────────
+   Fixed regions, not a flowing document. The readout keeps its size and
+   the grid takes the remainder, so the reach to your most-eaten food is
+   the same on an empty day and a full one.                             */
+
+.readout-block {
+  display: block; width: 100%; text-align: left;
+  border: 1px solid var(--line); cursor: pointer;
+  color: inherit; font: inherit;
+  transition: transform .2s cubic-bezier(.22,1,.36,1), border-color .2s ease;
+}
+.readout-block:active { transform: scale(.99); }
+.readout-block:hover { border-color: var(--line-2); }
+
+.readout-top { display: flex; align-items: flex-start; justify-content: space-between; }
+.readout-top .readout-main { font-size: 54px; line-height: .96; font-weight: 250; letter-spacing: -.045em; }
+.readout-top .readout-side { text-align: right; }
+.readout-top .readout-side .v { font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* The cups. Vertical fills read as "how full am I" far faster than a row
+   of horizontal bars, which is the one question this screen answers. */
+.cups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 22px; }
+.cup { text-align: center; }
+.cup-bar {
+  position: relative; height: 68px; border-radius: 12px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  overflow: hidden; display: flex; align-items: flex-end;
+}
+.cup-bar i {
+  display: block; width: 100%; border-radius: 0 0 11px 11px;
+  transition: height .7s cubic-bezier(.22,1,.36,1);
+}
+.cup-n { font-size: 15px; font-weight: 550; margin-top: 9px; font-variant-numeric: tabular-nums; }
+.cup-l { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.cup-t { font-size: 10.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+.readout-more {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--muted);
+  letter-spacing: .1em; text-transform: uppercase;
+}
+
+.home-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+.chip {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  padding: 13px 6px; border-radius: 16px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  backdrop-filter: saturate(170%) blur(20px);
+  -webkit-backdrop-filter: saturate(170%) blur(20px);
+  color: var(--text); font-size: 11.5px; font-weight: 500; cursor: pointer;
+  transition: transform .18s cubic-bezier(.22,1,.36,1), background .18s ease, border-color .18s ease;
+}
+.chip:active { transform: scale(.95); }
+.chip:hover { background: var(--raised); border-color: var(--line-2); }
+.chip .ic { color: var(--accent); }
+
+.home-search { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.home-search .ic { color: var(--dim); flex: none; }
+.home-search input { border: 0; background: transparent; flex: 1; min-width: 0; }
+.home-search input:focus { outline: none; }
+
+.grid-empty {
+  padding: 26px 18px; text-align: center; font-size: 13px;
+  color: var(--text-2); border-radius: 18px;
+  border: 1px dashed var(--line-2); background: var(--surface-2);
+}
+
+.food-cell.is-meal { border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); }
+.food-cell.is-meal .fc-kcal { color: var(--accent); }
+
+.mini-head {
+  padding: 11px 16px 6px; font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+}
+.mini-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-top: 1px solid var(--line); font-size: 13.5px;
+}
+.mini-row .num { font-variant-numeric: tabular-nums; color: var(--text-2); }
+.mini-x {
+  width: 26px; height: 26px; border-radius: 50%; flex: none;
+  border: 1px solid var(--line); background: transparent;
+  color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer;
+}
+.mini-x:hover { color: var(--warn); border-color: var(--warn); }
+
+
+/* An overflowing cup says so on its face. */
+.cup.is-over .cup-bar { border-color: var(--warn); }
+.cup.is-over .cup-n, .cup.is-over .cup-t { color: var(--warn); }
+.cup-over {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 650; color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0,0,0,.45);
+}
+
+/* The floating pill overlays the page, so the page must end above it. */
+#scroller { padding-bottom: calc(var(--tab-gap, 14px) + 60px + 28px); }
+
+.hchart .hlabel { font-size: 8px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.hchart.hline { width: 100%; overflow: visible; }

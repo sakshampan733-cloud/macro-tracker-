@@ -12,8 +12,9 @@
  */
 
 import {
-  el, sheet, toast, icon, g, field, sparkline, confirmSheet, explain,
+  el, sheet, toast, icon, g, field, confirmSheet, explain,
 } from '../ui.js';
+import { healthLine } from '../charts.js';
 import { get, commit, dayKey, totals } from '../store.js';
 import {
   MARKERS, MARKER_GROUPS, statusOf, STATUS_LABEL, STATUS_COLOUR,
@@ -157,7 +158,8 @@ export function openMarkerDetail(key, ctx) {
 
       series.length > 1 ? el('div.tile', {},
         el('div.micro', { style: { marginBottom: '8px' } }, `${series.length} panels`),
-        sparkline(series.map(p => ({ v: p.v })), { h: 80 }),
+        healthLine(series.map(p => ({ v: p.v, label: `${p.date}: ${p.v}` })),
+          { h: 130, colour: 'var(--accent)', unit: ' ' + m.unit, dp: m.dp }),
         el('div.between', { style: { marginTop: '6px' } },
           el('span.micro', {}, series[0].date),
           el('span.micro', {}, latest.date))) : null,

@@ -38,10 +38,13 @@ export function renderToday(root, ctx) {
     nowCard(s, targets, key, ctx),
     energyTile(t, targets, s, key, ctx),
     macroTile(t, targets, key, ctx),
+
+    mealsTile(key, ctx),
+
+    /* Everything below is review, not entry, so it sits after the log. */
     waterTile(t, targets, key, ctx),
     supplementsTile(s, key, ctx),
     nutrientsTile(s, key, ctx) || el('div'),
-    mealsTile(key, ctx),
   );
 }
 

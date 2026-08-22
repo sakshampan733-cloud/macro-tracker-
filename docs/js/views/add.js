@@ -7,10 +7,10 @@
  */
 
 import {
-  el, clear, sheet, toast, icon, kcal, grams, g, empty, field, segmented, confirmSheet,
+  el, clear, sheet, toast, icon, kcal, grams, g, empty, field, segmented, confirmSheet, explain,
 } from '../ui.js';
 import {
-  get, saveFood, frequentFoods, recentFoods, dayKey, totals,
+  get, saveFood, frequentFoods, recentFoods, dayKey, totals, addEntry,
   mealsList, mealTotals, logMeal, deleteMeal, renameMeal, MEALS,
 } from '../store.js';
 import { FOODS, GROUPS, atwater } from '../data/foods.js';
@@ -68,8 +68,20 @@ function consumedHeader(s, ctx) {
 }
 
 export function renderAdd(root, ctx) {
-  const s = get();
   clear(root);
+  root.append(consumedHeader(get(), ctx), el('div', { style: { height: '14px' } }),
+    foodSurface(ctx));
+}
+
+/*
+ * The food-entry surface: search, the shortcut buttons, and the grid of
+ * things you actually eat. Today hosts this directly so that logging a
+ * meal never costs a tab change — you add the food and watch the numbers
+ * above it move. Add kept its own tab only as a deep link.
+ */
+export function foodSurface(ctx) {
+  const s = get();
+  const root = el('div');
 
   const search = el('input', {
     type: 'search', placeholder: 'Search your foods and the database',
@@ -80,9 +92,6 @@ export function renderAdd(root, ctx) {
   const results = el('div');
 
   root.append(
-    consumedHeader(s, ctx),
-    el('div', { style: { height: '14px' } }),
-
     el('div.btn-row', { style: { marginBottom: '10px' } },
       el('button.btn.primary', { onclick: () => openScanner(ctx) }, icon('scan', 18), 'Scan'),
       el('button.btn.primary', { onclick: () => openMealBuilder({ onSaved: ctx.refresh }) },
@@ -93,6 +102,10 @@ export function renderAdd(root, ctx) {
         icon('pot', 18), 'Home dish'),
       el('button.btn', { onclick: () => openBuilder({ onSaved: ctx.refresh }) },
         icon('foods', 18), 'New food')),
+
+    el('div.btn-row', { style: { marginBottom: '14px' } },
+      el('button.btn.ghost', { onclick: () => openQuickAdd(ctx) },
+        icon('bolt', 18), 'Quick add macros')),
 
     el('div.field', {}, search),
     results,
@@ -186,14 +199,14 @@ export function renderAdd(root, ctx) {
     }
 
     if (freq.length) {
-      results.append(sectionLabel('You eat these most'), listTile(freq.map(toItem), ctx));
+      results.append(sectionLabel('You eat these most'), foodGrid(freq.map(toItem), ctx));
     }
     if (recent.length) {
-      results.append(sectionLabel('Recent'), listTile(recent.map(toItem), ctx));
+      results.append(sectionLabel('Recent'), foodGrid(recent.map(toItem), ctx));
     }
     const lib = Object.values(s.library);
     if (lib.length) {
-      results.append(sectionLabel('Your foods'), listTile(lib.slice(0, 12).map(toItem), ctx));
+      results.append(sectionLabel('Your foods'), foodGrid(lib.slice(0, 12).map(toItem), ctx));
     }
     if (!freq.length && !recent.length && !lib.length && !meals.length) {
       results.append(el('div.tile', {}, empty(
@@ -204,6 +217,94 @@ export function renderAdd(root, ctx) {
   }
 
   showShortcuts();
+  return root;
+}
+
+/*
+ * Quick add.
+ *
+ * For the meal you cannot itemise and are not going to pretend you can:
+ * a restaurant plate, someone else's cooking, the thing you ate an hour
+ * ago from memory. Typing three numbers you half-know beats logging
+ * nothing at all, so this exists — but it is graded 'D' and carries the
+ * estimate error bar, so the day's confidence widens honestly rather
+ * than the guess passing itself off as a weighed measurement.
+ */
+export function openQuickAdd(ctx) {
+  const key = ctx.date || dayKey();
+  const v = { p: '', c: '', f: '', kcal: '', name: '', meal: mealForNowLocal() };
+
+  const num = (label, k, unit) => el('label.field-row', {},
+    el('span.fl', {}, label),
+    el('input', {
+      type: 'number', inputMode: 'decimal', min: '0', step: '0.1', placeholder: '0',
+      oninput: e => { v[k] = e.target.value; sync(); },
+    }),
+    el('span.fu', {}, unit));
+
+  const derived = el('div.fine');
+  const sync = () => {
+    const p = +v.p || 0, c = +v.c || 0, f = +v.f || 0;
+    const fromMacros = p * 4 + c * 4 + f * 9;
+    derived.textContent = (+v.kcal)
+      ? `Stated ${Math.round(+v.kcal)} kcal · macros account for ${Math.round(fromMacros)} kcal`
+      : `${Math.round(fromMacros)} kcal from the macros you entered`;
+  };
+  sync();
+
+  const sh = sheet({
+    title: 'Quick add',
+    body: el('div', {},
+      el('div.tile', {},
+        el('label.field-row', {},
+          el('span.fl', {}, 'Name'),
+          el('input', { type: 'text', placeholder: 'Lunch out',
+            oninput: e => { v.name = e.target.value; } })),
+        num('Protein', 'p', 'g'),
+        num('Carbs', 'c', 'g'),
+        num('Fat', 'f', 'g'),
+        num('Calories', 'kcal', 'kcal'),
+        el('div', { style: { marginTop: '10px' } }, derived)),
+
+      el('div.tile', {},
+        el('div.micro', { style: { marginBottom: '8px' } }, 'Meal'),
+        segmented(MEALS.map(m => ({ id: m, label: MEAL_LABELS[m] })), v.meal,
+          m => { v.meal = m; })),
+
+      explain('Entered by hand, so this is graded D and carries a ±25% error bar. '
+        + 'It counts toward your day, and the day\u2019s uncertainty widens to say so.'),
+
+      el('button.btn.primary.block', {
+        style: { marginTop: '14px' },
+        onclick: () => {
+          const p = +v.p || 0, c = +v.c || 0, f = +v.f || 0;
+          const kc = +v.kcal || (p * 4 + c * 4 + f * 9);
+          if (!kc) { toast('Enter at least one number.'); return; }
+          /* Expressed as 100 g of a food whose per-100 g values are the
+             numbers typed. That keeps it inside the existing entry model,
+             so totals, error propagation and the day report all handle it
+             without a special case. */
+          addEntry(key, {
+            name: v.name.trim() || 'Quick add',
+            meal: v.meal, method: 'estimate', grade: 'D', quick: true,
+            grams: 100,
+            per100: { kcal: kc, p, c, f },
+          });
+          toast('Added.');
+          sh.close();
+          ctx.refresh?.();
+        },
+      }, 'Add to today'),
+    ),
+  });
+}
+
+function mealForNowLocal() {
+  const h = new Date().getHours();
+  if (h < 11) return 'breakfast';
+  if (h < 16) return 'lunch';
+  if (h < 19) return 'snack';
+  return 'dinner';
 }
 
 const sectionLabel = text => el('div.section-label', {}, el('span.micro', {}, text));
@@ -301,7 +402,7 @@ function openMealOptions(m, ctx) {
  * with a printed panel is grade B; defaulting everything to C would widen
  * the error bars on the most reliable data in the app.
  */
-function toItem(f) {
+export function toItem(f) {
   return {
     id: f.id || f.ref,
     n: f.n || f.name,
@@ -317,7 +418,7 @@ function toItem(f) {
 }
 
 /* Ranked so an exact word match beats a substring buried mid-name. */
-function searchLocal(q) {
+export function searchLocal(q) {
   const s = get();
   const needle = q.toLowerCase();
   const pool = [...Object.values(s.library).map(toItem), ...FOODS.map(toItem)];
@@ -338,6 +439,25 @@ function searchLocal(q) {
   }
   hits.sort((a, b) => b.score - a.score);
   return hits.slice(0, 25).map(h => h.f);
+}
+
+/*
+ * The grid. Deliberately no icons: there is no honest pictogram for
+ * "moong dal" or "whey isolate", and a stock one would slow recognition
+ * rather than speed it. The name is the fastest identifier available,
+ * so the cell gives it two lines and gets out of the way.
+ */
+function foodGrid(items, ctx) {
+  const grid = el('div.food-grid');
+  for (const f of items) {
+    const per = f.per100 || {};
+    grid.append(el('button.food-cell', {
+      onclick: () => openPortion(f, { dateKey: ctx.date || dayKey(), onSaved: ctx.refresh }),
+    },
+      el('span.fc-name', {}, f.n),
+      el('span.fc-kcal', {}, `${Math.round(per.kcal || 0)} kcal · ${Math.round(per.p || 0)}P`)));
+  }
+  return grid;
 }
 
 function listTile(items, ctx) {

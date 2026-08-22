@@ -12,8 +12,9 @@
  */
 
 import {
-  el, sheet, kcal, g, grams, sparkline, icon, segmented, explain, dateLabel,
+  el, sheet, kcal, g, grams, icon, segmented, explain, dateLabel,
 } from '../ui.js';
+import { healthLine } from '../charts.js';
 import { get, totals, byMeal, dayKey, shiftDay, entryMacros } from '../store.js';
 import { macroTargets, bestTDEE } from '../nutrition.js';
 import { dayQuality, leucineByMeal, LEUCINE_THRESHOLD_G } from '../data/quality.js';
@@ -356,7 +357,8 @@ export function openReport(ctx, initialDays = 7) {
                   ((r.weights[r.weights.length - 1].kg - r.weights[0].kg) >= 0 ? '+' : '')
                   + (r.weights[r.weights.length - 1].kg - r.weights[0].kg).toFixed(1) + ' kg')),
               el('span.micro', {}, `${r.weights.length} weigh-ins`)),
-            sparkline(r.weights.map(x => ({ v: x.kg })), { h: 70 }))) : null,
+            healthLine(r.weights.map(x => ({ v: x.kg, label: `${x.date}: ${x.kg} kg` })),
+              { h: 120, colour: 'var(--accent)', unit: ' kg', dp: 1 }))) : null,
 
       ) : null,
     );

@@ -5,13 +5,14 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.21-remodel';
+export const VERSION = '2026.08.22-split';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';
 import { solveDensities } from './dishes.js';
 import { bestTDEE } from './nutrition.js';
 import { renderToday } from './views/today.js';
+import { renderHome } from './views/home.js';
 import { renderAdd } from './views/add.js';
 import { renderPlan } from './views/plan.js';
 import { renderBody } from './views/body.js';
@@ -20,29 +21,39 @@ import { renderOnboarding, renderSettings } from './views/setup.js';
 import { autoSyncWhoop } from './views/body.js';
 import { captureFromUrl, isConnected, relayUrl, syncWhoop } from './whooprelay.js';
 
+/*
+ * Two apps in one, plus the passive screens.
+ *
+ * Home is for logging and nothing else. Detail is the same day with every
+ * layer of analysis on it. Splitting them means the common action — add a
+ * food — never scrolls past an explanation you have already read, and the
+ * depth is still one tap away rather than deleted.
+ */
 const TABS = [
-  { id: 'today', label: 'Today', icon: 'today', render: renderToday },
-  { id: 'add',   label: 'Add',   icon: 'plus',  render: renderAdd },
-  { id: 'plan',  label: 'Plan',  icon: 'coach', render: renderPlan },
-  { id: 'foods', label: 'Foods', icon: 'foods', render: renderFoods },
-  { id: 'body',  label: 'Body',  icon: 'body',  render: renderBody },
+  { id: 'home',   label: 'Home',   icon: 'plus',  render: renderHome },
+  { id: 'detail', label: 'Detail', icon: 'today', render: renderToday },
+  { id: 'body',   label: 'Body',   icon: 'body',  render: renderBody },
+  { id: 'plan',   label: 'Plan',   icon: 'coach', render: renderPlan },
 ];
 
 const ROUTES = Object.fromEntries(TABS.map(t => [t.id, t.render]));
 ROUTES.settings = renderSettings;
+ROUTES.add = renderAdd;      // no tab; kept for old links and the shortcut
+ROUTES.foods = renderFoods;  // reached from Settings, not a tab of its own
+ROUTES.today = renderToday;  // old bookmarks land on Detail
 
 /* Screens that pin their own header. The brand bar scrolls away on these
    so two sticky bars never fight for the same few pixels. */
-const STICKY_ROUTES = new Set(['add']);
+const STICKY_ROUTES = new Set(['add', 'home']);
 
 const ctx = {
-  route: 'today',
+  route: 'home',
   date: dayKey(),
   tab: 'mine',
   go(route, props = {}) {
     ctx.route = route;
     Object.assign(ctx, props);
-    location.hash = route === 'today' && props.date === undefined ? '' : '#' + route;
+    location.hash = route === 'home' && props.date === undefined ? '' : '#' + route;
     draw();
     scroller.scrollTo({ top: 0, behavior: 'instant' });
   },
@@ -155,7 +166,7 @@ function draw() {
   const view = el('div');
   main.append(view);
 
-  const render = ROUTES[ctx.route] || renderToday;
+  const render = ROUTES[ctx.route] || renderHome;
   try {
     render(view, ctx);
   } catch (e) {
@@ -181,7 +192,7 @@ window.addEventListener('hashchange', () => {
 /* The day rolls over while the app sits open on a phone overnight. */
 setInterval(() => {
   const today = dayKey();
-  if (ctx.route === 'today' && ctx.date !== today && ctx.date === dayKey(new Date(Date.now() - 86400000))) {
+  if ((ctx.route === 'home' || ctx.route === 'detail') && ctx.date !== today && ctx.date === dayKey(new Date(Date.now() - 86400000))) {
     ctx.date = today;
     draw();
   }
