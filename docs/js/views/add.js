@@ -415,27 +415,113 @@ export function toItem(f) {
 }
 
 /* Ranked so an exact word match beats a substring buried mid-name. */
+/*
+ * Matching a typed query against one piece of text.
+ *
+ * Returns a tier, not a percentage — the tiers are far enough apart that
+ * ownership and frequency can be added on top without a good reference
+ * match ever leapfrogging something you scanned yourself.
+ *
+ * The last tier is a subsequence match, which is what makes short typing
+ * work: "pgs" finds "Post-gym shake", "brnrice" finds "Brown rice". It
+ * scores low, so it only surfaces things nothing better matched.
+ */
+export function matchScore(text, needle) {
+  if (!text) return 0;
+  const t = text.toLowerCase();
+  if (t === needle) return 1000;
+  if (t.startsWith(needle)) return 800;
+  if (t.split(/[\s,/()\-]+/).some(w => w.startsWith(needle))) return 650;
+  if (t.includes(needle)) return 450;
+
+  /*
+   * Subsequence, but only a tight one starting at a word.
+   *
+   * A plain in-order scan matches almost anything: "whey" is a
+   * subsequence of "Subway Chicken Teriyaki". Requiring the run to begin
+   * at a word start and to finish inside a short span keeps the useful
+   * case ("mbwh" for "MB Whey Isolate") without the noise.
+   */
+  if (needle.length < 3) return 0;
+  const span = Math.max(12, needle.length * 4);
+  for (let start = 0; start < t.length; start++) {
+    if (start && !/[\s,/()\-]/.test(t[start - 1])) continue;   // word starts only
+    if (t[start] !== needle[0]) continue;
+    let i = 0;
+    for (let j = start; j < t.length && j - start < span; j++) {
+      if (t[j] === needle[i]) i++;
+      if (i === needle.length) return 200;
+    }
+  }
+  return 0;
+}
+
+/*
+ * Search your foods and the reference database together.
+ *
+ * Yours come first, always. The old scoring gave a library food +25 while
+ * the match tiers were 35 apart, so something you had scanned yourself
+ * lost to a stock entry that happened to match nearer the start of its
+ * name — you had to type a food's full name to see your own version of
+ * it. Ownership is now worth more than any difference in match quality,
+ * because a food you took the trouble to add is by definition one you
+ * eat, and the stock database is the fallback rather than the point.
+ *
+ * Frequency breaks ties beneath that: among your own foods, the ones you
+ * actually eat surface first.
+ */
 export function searchLocal(q) {
   const s = get();
-  const needle = q.toLowerCase();
-  const pool = [...Object.values(s.library).map(toItem), ...FOODS.map(toItem)];
-  const hits = [];
+  const needle = q.toLowerCase().trim();
+  if (!needle) return [];
 
-  for (const f of pool) {
-    const name = (f.n || '').toLowerCase();
-    const brand = (f.brand || '').toLowerCase();
-    let score = 0;
-    if (name === needle) score = 100;
-    else if (name.startsWith(needle)) score = 70;
-    else if (name.split(/[\s,/()-]+/).some(w => w.startsWith(needle))) score = 55;
-    else if (name.includes(needle)) score = 35;
-    else if (brand.includes(needle)) score = 20;
-    if (!score) continue;
-    if (String(f.id).startsWith('my:')) score += 25;
-    hits.push({ f, score });
-  }
+  const uses = new Map();
+  for (const f of frequentFoods(400)) uses.set(f.ref || f.name, f.times || 0);
+
+  const hits = [];
+  const consider = (item, ownership) => {
+    const base = Math.max(
+      matchScore(item.n, needle),
+      matchScore(item.brand || '', needle) * 0.6,
+    );
+    if (!base) return;
+    const seen = uses.get(item.id) || uses.get(item.n) || 0;
+    hits.push({ f: item, score: base + ownership + Math.min(seen, 25) * 10 });
+  };
+
+  /* 2000 clears the whole match-tier range, so anything of yours outranks
+     anything stock, however well the stock entry happens to match. */
+  for (const f of Object.values(s.library)) consider(toItem(f), 2000);
+  for (const f of FOODS) consider(toItem(f), 0);
+
   hits.sort((a, b) => b.score - a.score);
-  return hits.slice(0, 25).map(h => h.f);
+
+  /* De-duplicate by name: a food you scanned and its stock twin should
+     appear once, as yours. */
+  const seenNames = new Set();
+  const out = [];
+  for (const h of hits) {
+    const key = (h.f.n || '').toLowerCase();
+    if (seenNames.has(key)) continue;
+    seenNames.add(key);
+    out.push(h.f);
+    if (out.length >= 25) break;
+  }
+  return out;
+}
+
+/* Your saved meals, matched the same way, so partial typing finds them. */
+export function searchMeals(q) {
+  const needle = q.toLowerCase().trim();
+  if (!needle) return [];
+  return mealsList()
+    .map(m => ({ m, match: matchScore(m.name, needle), uses: Math.min(m.uses || 0, 25) * 10 }))
+    /* Filter on the match, not the total — adding the use-count first meant
+       every meal you had ever logged scored above zero and came back for
+       any query at all. */
+    .filter(x => x.match > 0)
+    .sort((a, b) => (b.match + b.uses) - (a.match + a.uses))
+    .map(x => x.m);
 }
 
 /*

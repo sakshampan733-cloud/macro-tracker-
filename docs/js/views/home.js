@@ -23,7 +23,7 @@ import {
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
-import { openScanner, openQuickAdd, openBuilder, searchLocal, toItem } from './add.js';
+import { openScanner, openQuickAdd, openBuilder, searchLocal, searchMeals, toItem } from './add.js';
 import { searchProducts, resolveBarcode, validEAN } from '../off.js';
 import { openDish } from './dish.js';
 
@@ -218,8 +218,7 @@ function picker(s, ctx, key) {
          reaching for by name — "fried rice" should find the dish you built,
          not just the rice in it — and it was the one thing search could not
          see. */
-      const needle = q.toLowerCase();
-      const meals = mealsList().filter(m => m.name.toLowerCase().includes(needle));
+      const meals = searchMeals(q);
       if (meals.length) {
         grid.append(label('Your meals'));
         const mg = el('div.food-grid');
