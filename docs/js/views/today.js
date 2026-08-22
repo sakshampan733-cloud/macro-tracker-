@@ -527,9 +527,9 @@ function openEntryActions(e, key, ctx) {
             el('div.micro', {}, 'Amount'),
             el('div.v', {}, grams(e.grams) + ' g'))),
         el('div', { style: { display: 'flex', gap: '16px', marginTop: '10px', flexWrap: 'wrap' } },
-          el('span.num', { style: { fontSize: '13px', color: 'var(--m-p)' } }, `${g(m.p, 1)} g protein`),
-          el('span.num', { style: { fontSize: '13px', color: 'var(--m-c)' } }, `${g(m.c, 1)} g carbs`),
-          el('span.num', { style: { fontSize: '13px', color: 'var(--m-f)' } }, `${g(m.f, 1)} g fat`))),
+          el('span.num', { style: { fontSize: '13px', color: 'var(--m-p-ink)' } }, `${g(m.p, 1)} g protein`),
+          el('span.num', { style: { fontSize: '13px', color: 'var(--m-c-ink)' } }, `${g(m.c, 1)} g carbs`),
+          el('span.num', { style: { fontSize: '13px', color: 'var(--m-f-ink)' } }, `${g(m.f, 1)} g fat`))),
       el('div.btn-row', {},
         el('button.btn', {
           onclick: () => {

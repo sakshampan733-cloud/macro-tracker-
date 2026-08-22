@@ -89,9 +89,9 @@ function ideasTile(result, ctx) {
           el('span.qt', {}, i.label)))),
       el('div.idea-macros', {},
         el('span', {}, el('b', {}, kcal(m.kcal)), ' kcal'),
-        el('span', { style: { color: 'var(--m-p)' } }, el('b', {}, Math.round(m.p)), ' P'),
-        el('span', { style: { color: 'var(--m-c)' } }, el('b', {}, Math.round(m.c)), ' C'),
-        el('span', { style: { color: 'var(--m-f)' } }, el('b', {}, Math.round(m.f)), ' F'),
+        el('span', { style: { color: 'var(--m-p-ink)' } }, el('b', {}, Math.round(m.p)), ' P'),
+        el('span', { style: { color: 'var(--m-c-ink)' } }, el('b', {}, Math.round(m.c)), ' C'),
+        el('span', { style: { color: 'var(--m-f-ink)' } }, el('b', {}, Math.round(m.f)), ' F'),
         el('button.btn.sm', {
           style: { marginLeft: 'auto' },
           onclick: () => {

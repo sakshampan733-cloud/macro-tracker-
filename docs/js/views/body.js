@@ -178,7 +178,7 @@ function weightTile(ctx) {
         el('div', { style: { textAlign: 'right' } },
           el('div.micro', {}, 'Since ' + dateLabel(first.date)),
           el('div.num', {
-            style: { fontSize: '18px', marginTop: '2px', color: change < 0 ? 'var(--good)' : change > 0 ? 'var(--m-c)' : 'var(--text)' },
+            style: { fontSize: '18px', marginTop: '2px', color: change < 0 ? 'var(--good)' : change > 0 ? 'var(--m-c-ink)' : 'var(--text)' },
           }, (change >= 0 ? '+' : '') + change.toFixed(1) + ' kg'))),
       chart,
       el('div.fine', { style: { marginTop: '6px' } },

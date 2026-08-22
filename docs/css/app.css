@@ -44,6 +44,12 @@
   --m-fib:   #8FD97A;
   --m-water: #7C8CFF;
 
+  /* On black the fill colour is already the legible one. */
+  --m-p-ink:   #56C2FF;
+  --m-c-ink:   #FFB84D;
+  --m-f-ink:   #C08CFF;
+  --m-fib-ink: #8FD97A;
+
   --sans: 'Plex', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --cond: 'PlexCond', 'Plex', -apple-system, system-ui, sans-serif;
   --mono: 'PlexMono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -387,10 +393,10 @@ h3 { font-size: 15px; }
   line-height: 1;
 }
 .conf.weighed  { color: var(--accent); border-color: var(--accent-2); background: rgba(61,219,196,.09); }
-.conf.label    { color: var(--m-p);    border-color: #24506e; background: rgba(86,194,255,.09); }
+.conf.label    { color: var(--m-p-ink);    border-color: #24506e; background: rgba(86,194,255,.09); }
 .conf.portion  { color: var(--caution);border-color: #6b5623; background: rgba(255,193,77,.09); }
 .conf.estimate { color: var(--warn);   border-color: #6e2f2a; background: rgba(255,107,91,.09); }
-.conf.dish     { color: var(--m-f);   border-color: #4a3a63; background: rgba(192,140,255,.09); }
+.conf.dish     { color: var(--m-f-ink);   border-color: #4a3a63; background: rgba(192,140,255,.09); }
 
 /* ── Controls ───────────────────────────────────────────────────────── */
 
@@ -1073,11 +1079,28 @@ body::after {
   --warn:      #C4362B;
   --caution:   #A66A00;
 
-  --m-p:       #1F7FC4;
-  --m-c:       #A66A00;
-  --m-f:       #7A4FBF;
-  --m-fib:     #3F8A3A;
-  --m-water:   #4257C4;
+  /*
+   * Macro colours, light mode.
+   *
+   * These were darkened wholesale so they would read as text on white.
+   * But they are overwhelmingly used as FILLS — the cups, the chart bars —
+   * and a fill that has been darkened for legibility just looks dull.
+   * Carbohydrate suffered worst: #A66A00 is mustard, against a genuinely
+   * bright amber in dark mode.
+   *
+   * Vivid values now, with a separate darker ink for the few places the
+   * colour carries text, so nothing loses contrast where it matters.
+   */
+  --m-p:       #1787E0;
+  --m-c:       #ED8B08;
+  --m-f:       #8654E8;
+  --m-fib:     #34A047;
+  --m-water:   #4C61D6;
+
+  --m-p-ink:   #14639F;
+  --m-c-ink:   #9A5A05;
+  --m-f-ink:   #6438C4;
+  --m-fib-ink: #227235;
 
   --glass:       rgba(255, 255, 255, .74);
   --glass-solid: rgba(255, 255, 255, .97);
