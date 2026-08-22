@@ -15,6 +15,7 @@ import { openTrust } from './trust.js';
 import { generateDemo } from '../demo.js';
 import { ORBS, applyOrb } from '../theme.js';
 import { goalTile } from './goal.js';
+import { openGuide } from './guide.js';
 import { VERSION } from '../app.js';
 
 /* ── Onboarding ─────────────────────────────────────────────────────── */
@@ -349,6 +350,13 @@ export function renderSettings(root, ctx) {
 
     group(ctx, 'read', 'Reading',
       'How much the app explains, and how much to trust it.',
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', { style: { flex: '1', paddingRight: '12px' } },
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Guide'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              'What each screen is for, how meals and scanning work, and what the ± means.')),
+          el('button.btn.sm', { onclick: () => openGuide() }, 'Read'))),
       el('div.tile', {},
         el('div.between', {},
           el('div', { style: { flex: '1', paddingRight: '12px' } },

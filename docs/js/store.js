@@ -65,6 +65,7 @@ const EMPTY = () => ({
   settings: {
     orb: 'red',            // hue of the ambient background circle
     openGroups: [],        // which settings categories are expanded
+    guideSeen: false,      // the first-run walkthrough has been shown
     units: 'metric',
     diet: 'all',
     waterUnit: 'ml',

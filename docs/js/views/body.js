@@ -26,28 +26,7 @@ import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
 } from '../whooprelay.js';
 
-/*
- * Set the orb's beat to your own resting heart rate.
- *
- * Whoop reports RHR in beats per minute; the animation wants a period in
- * seconds, so it is simply 60/rhr. Falling back to a plausible 60 bpm
- * when there is no strap data would be inventing a measurement on the one
- * screen that exists to show measurements, so with no data the orb
- * simply does not beat.
- */
-function setBeatFromWhoop(store) {
-  const rows = Object.entries(store.whoop?.rows || {}).sort();
-  const last = [...rows].reverse().find(([, r]) => r.rhr > 0);
-  const root = document.documentElement;
-  if (!last) { root.style.removeProperty('--beat'); root.removeAttribute('data-alive'); return null; }
-  const rhr = last[1].rhr;
-  root.style.setProperty('--beat', (60 / rhr).toFixed(3) + 's');
-  root.setAttribute('data-alive', '1');
-  return rhr;
-}
-
 export function renderBody(root, ctx) {
-  const beatBpm = setBeatFromWhoop(get());
   const s = get();
   clear(root);
 
