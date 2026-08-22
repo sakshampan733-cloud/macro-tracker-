@@ -1966,3 +1966,4 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   :root[data-route="body"][data-alive] body::before { animation: none; }
 }
+
