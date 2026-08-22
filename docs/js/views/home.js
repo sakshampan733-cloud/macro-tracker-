@@ -11,10 +11,11 @@
  * than adding your first.
  */
 
-import { el, clear, icon, kcal, toast, sheet, confirmSheet } from '../ui.js';
+import { el, clear, icon, kcal, toast, sheet, confirmSheet, append } from '../ui.js';
 import { flyToTotals, haptic } from '../feedback.js';
 import { openMealLogger } from './meallog.js';
 import { openMealBuilder } from './meal.js';
+import { topWhoopAdvice } from '../coachwhoop.js';
 import {
   get, totals, dayKey, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
@@ -35,11 +36,15 @@ export function renderHome(root, ctx) {
   const targets = dayTargets(s, key);
 
   clear(root);
-  root.append(
+  /* append() filters nulls; Element.append stringifies them, which is how
+     a literal "null" ended up sitting under the readout whenever Whoop
+     had nothing to say. */
+  append(root,
     readout(t, targets, ctx),
+    coachCard(s, targets, key, ctx),
     actions(ctx),
     picker(s, ctx, key),
-    miniLog(key, ctx),
+    logSection(key, ctx),
   );
 }
 
@@ -106,6 +111,44 @@ function readout(t, targets, ctx) {
  * button. The Indian dish estimator moved behind "Food", where it belongs:
  * it is a way of describing one thing you ate, not a way of building.
  */
+/*
+ * What Whoop has to say, on the screen where you log.
+ *
+ * This used to live only on Detail, which is the tab you open to read
+ * rather than the one you open to eat — so the strap's influence on the
+ * day was invisible at exactly the moment it mattered. It shows one card
+ * at a time, and nothing at all when there is no strap data or nothing
+ * worth saying.
+ */
+function coachCard(store, targets, key, ctx) {
+  let advice = null;
+  try { advice = topWhoopAdvice(store, targets, key); }
+  catch { return null; }
+  if (!advice) return null;
+
+  const card = el('div.tile.coach-card.' + (advice.tone === 'warn' ? 'is-warn' : 'is-good'), {},
+    el('div.coach-top', {},
+      el('span.coach-tag', {}, 'WHOOP'),
+      el('div.coach-head', {}, advice.headline)),
+    el('div.coach-body', {}, advice.body));
+
+  /* Named foods, tappable — a recommendation you cannot act on is a lecture. */
+  if (advice.action && advice.action.kind === 'foods' && advice.action.picks.length) {
+    const row = el('div.coach-picks');
+    for (const p of advice.action.picks) {
+      row.append(el('button.coach-pick', {
+        onclick: () => openPortion(toItem(p.food), { dateKey: key, onSaved: ctx.refresh }),
+      },
+        el('span.cp-name', {}, p.food.n || p.food.name),
+        el('span.cp-meta', {}, `${p.typical} g · ${p.wouldCost} kcal`)));
+    }
+    card.append(
+      el('div.coach-action-label', {}, advice.action.label),
+      row);
+  }
+  return card;
+}
+
 function actions(ctx) {
   return el('div.home-actions', {},
     el('button.chip', { onclick: () => openScanner(ctx) }, icon('scan', 17), 'Scan'),
@@ -259,6 +302,23 @@ function picker(s, ctx, key) {
   wrap.append(el('div.field.home-search', {}, icon('search', 16), search), grid);
   drawShortcuts();
   return wrap;
+}
+
+/*
+ * The log, with a heading.
+ *
+ * Without one it sat flush against the bottom of the food grid — two
+ * translucent panels sharing a single edge, which with blur and rounded
+ * corners reads as one crashing into the other rather than as two
+ * sections. A label separates them and says what the panel is.
+ */
+function logSection(key, ctx) {
+  const log = miniLog(key, ctx);
+  if (!log) return null;
+  log.classList.add('home-log');
+  return el('div.home-log-wrap', {},
+    el('div.section-label', {}, el('span.micro', {}, 'Logged today')),
+    log);
 }
 
 /*

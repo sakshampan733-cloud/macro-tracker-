@@ -1810,3 +1810,50 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
   border-color: var(--text);
   transform: scale(1.08);
 }
+
+/* ── Section separation on Home ───────────────────────────────────────
+   Glass panels need air between them: sharing an edge makes two panes
+   read as one broken pane, because the blur and the border of each are
+   doing the same job in the same pixels.                              */
+.food-grid { margin-bottom: 4px; }
+.home-log-wrap { margin-top: 8px; }
+.home-log-wrap .section-label { margin-top: 22px; }
+.home-log { margin-top: 0; }
+
+/* Anything landing directly after the grid keeps its distance, including
+   panels added later that do not know about this rule. */
+.food-grid + .tile,
+.food-grid + .food-grid { margin-top: 16px; }
+
+/* ── Whoop coach card ─────────────────────────────────────────────────
+   Marked as coming from the strap, because advice you can trace to a
+   measurement lands differently from advice that appeared.            */
+.coach-card { margin-top: 14px; border-left: 2px solid var(--accent); }
+.coach-card.is-warn { border-left-color: var(--caution); }
+.coach-top { display: flex; align-items: flex-start; gap: 10px; }
+.coach-tag {
+  flex: none; margin-top: 2px;
+  font-size: 9px; font-weight: 700; letter-spacing: .14em;
+  padding: 3px 7px; border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+.coach-card.is-warn .coach-tag {
+  background: color-mix(in srgb, var(--caution) 20%, transparent);
+  color: var(--caution);
+}
+.coach-head { font-size: 14.5px; font-weight: 560; line-height: 1.35; }
+.coach-body { margin-top: 9px; font-size: 13px; line-height: 1.6; color: var(--text-2); }
+.coach-action-label {
+  margin-top: 14px; font-size: 10px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+}
+.coach-picks { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+.coach-pick {
+  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+  padding: 10px 12px; border-radius: 13px;
+  border: 1px solid var(--line-2); background: var(--surface-2);
+  color: var(--text); cursor: pointer; text-align: left;
+}
+.coach-pick .cp-name { font-size: 12.5px; font-weight: 500; }
+.coach-pick .cp-meta { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
