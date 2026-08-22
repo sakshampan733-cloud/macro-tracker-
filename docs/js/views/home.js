@@ -20,6 +20,7 @@ import {
   get, totals, dayKey, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
+  scannedFoods, builtFoods,
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
@@ -332,13 +333,28 @@ function picker(s, ctx, key) {
     const favs = favouriteFoods().map(toItem);
     if (favs.length) grid.append(label('Favourites'), cells(favs));
 
+    /*
+     * Your own foods, split by where they came from.
+     *
+     * "Most eaten" and "Recent" are computed from the log, so a food you
+     * saved but have not eaten yet appears in neither — which is exactly
+     * the food you are most likely to be hunting for, having just scanned
+     * it. These rows are the library itself, and separating scanned from
+     * hand-entered matters because you remember which one a thing was.
+     */
+    const scanned = scannedFoods(12).map(toItem);
+    if (scanned.length) grid.append(label('Scanned'), cells(scanned));
+
+    const built = builtFoods(12).map(toItem);
+    if (built.length) grid.append(label('Added by hand'), cells(built));
+
     const freq = frequentFoods(18).map(toItem);
     if (freq.length) grid.append(label('Most eaten'), cells(freq));
 
     const recent = recentFoods(12).map(toItem);
     if (recent.length) grid.append(label('Recent'), cells(recent));
 
-    if (!meals.length && !freq.length && !recent.length) {
+    if (!meals.length && !freq.length && !recent.length && !scanned.length && !built.length) {
       grid.append(el('div.grid-empty', {},
         'Scan something or build a food, and it lands here for good.'));
     }

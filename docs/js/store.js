@@ -604,11 +604,51 @@ export function mealTotals(m) {
 
 /* ── Personal food library ──────────────────────────────────────────── */
 
+/*
+ * Save a food to your library, keeping where it came from.
+ *
+ * This used to stamp src:'custom' on everything, which destroyed the one
+ * fact that distinguishes a scanned packet from something you typed in by
+ * hand — the scan flow passed 'openfoodfacts' and it was overwritten on
+ * the way in. Origin is worth keeping: a printed panel and your own
+ * estimate deserve to be told apart, and you should be able to find
+ * either one on its own.
+ */
 export function saveFood(food) {
   const id = food.id && food.id.startsWith('my:') ? food.id : 'my:' + uid();
-  const f = { ...food, id, src: 'custom', savedAt: Date.now() };
+  const src = food.src || (food.barcode ? 'openfoodfacts' : 'custom');
+  const f = { ...food, id, src, savedAt: Date.now() };
   commit(s => { s.library[id] = f; }, 'library');
   return f;
+}
+
+/* Where a library food came from. Barcode is the fallback for records
+   saved before origin was preserved. */
+export function foodOrigin(f) {
+  if (!f) return 'custom';
+  if (f.src === 'openfoodfacts' || f.src === 'off') return 'scanned';
+  if (f.barcode) return 'scanned';
+  return 'custom';
+}
+
+const byNewest = (a, b) => (b.savedAt || 0) - (a.savedAt || 0);
+
+/* Everything you scanned, newest first. */
+export function scannedFoods(limit = 18) {
+  const hide = new Set(state.hidden || []);
+  return Object.values(state.library)
+    .filter(f => foodOrigin(f) === 'scanned' && !hide.has(f.id))
+    .sort(byNewest)
+    .slice(0, limit);
+}
+
+/* Everything you entered yourself. */
+export function builtFoods(limit = 18) {
+  const hide = new Set(state.hidden || []);
+  return Object.values(state.library)
+    .filter(f => foodOrigin(f) === 'custom' && !hide.has(f.id))
+    .sort(byNewest)
+    .slice(0, limit);
 }
 
 export function deleteFood(id) {
