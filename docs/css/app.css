@@ -1935,3 +1935,34 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
   :root.swiping .tile, :root.swiping .food-cell, :root.swiping .chip,
   :root.swiping .set-group { background: var(--surface); }
 }
+
+/* ── The orb beats on Body ────────────────────────────────────────────
+   Two thumps and a rest, the shape of a real cardiac cycle rather than a
+   sine wave — systole is short and sharp, diastole is the long pause, and
+   a symmetric pulse reads as breathing instead of a heartbeat.
+
+   The period comes from your own resting heart rate, set as --beat by the
+   Body view. It is the app's own measurement driving its own motion, and
+   on a screen that is entirely about a living body it should not be a
+   made-up number.                                                      */
+@keyframes orbBeat {
+  0%   { transform: scale(1); }
+  8%   { transform: scale(1.045); }
+  16%  { transform: scale(1.004); }
+  26%  { transform: scale(1.026); }
+  38%  { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+
+:root[data-route="body"][data-alive] body::before {
+  animation: orbBeat var(--beat, 1.05s) cubic-bezier(.4, 0, .3, 1) infinite;
+  transform-origin: 50% 46%;
+  will-change: transform;
+}
+
+/* Never during a swipe — the gesture owns the motion then. */
+:root.swiping body::before { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-route="body"][data-alive] body::before { animation: none; }
+}

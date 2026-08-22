@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.22-swipe';
+export const VERSION = '2026.08.22-heartbeat';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
@@ -166,6 +166,8 @@ function draw() {
 
   nav.classList.remove('hide');
   main.classList.toggle('has-sticky', STICKY_ROUTES.has(ctx.route));
+  /* Lets CSS react to which screen you are on — the orb only beats on Body. */
+  document.documentElement.setAttribute('data-route', ctx.route);
   main.append(drawHeader());
 
   const view = el('div');
