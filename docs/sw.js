@@ -6,11 +6,12 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.08.22-orb';
+const CACHE = 'basal-2026.08.22-touch';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
-  'js/app.js', 'js/store.js', 'js/nutrition.js', 'js/whoop.js', 'js/coach.js',
+  'js/app.js',
+  'js/feedback.js', 'js/store.js', 'js/nutrition.js', 'js/whoop.js', 'js/coach.js',
   'js/off.js', 'js/scanner.js', 'js/ui.js', 'js/data/foods.js',
   'js/views/today.js', 'js/views/add.js', 'js/views/plan.js',
   'js/views/body.js', 'js/views/foods.js', 'js/views/setup.js', 'js/views/portion.js',

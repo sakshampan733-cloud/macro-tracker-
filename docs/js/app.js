@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.22-orb';
+export const VERSION = '2026.08.22-touch';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';
@@ -19,6 +19,7 @@ import { renderBody } from './views/body.js';
 import { renderFoods } from './views/foods.js';
 import { renderOnboarding, renderSettings } from './views/setup.js';
 import { autoSyncWhoop } from './views/body.js';
+import { installFeedback } from './feedback.js';
 import { captureFromUrl, isConnected, relayUrl, syncWhoop } from './whooprelay.js';
 
 /*
@@ -250,5 +251,7 @@ if (get().profile) {
 }
 
 const initial = location.hash.slice(1);
+installFeedback();
+
 if (initial && ROUTES[initial]) ctx.route = initial;
 draw();

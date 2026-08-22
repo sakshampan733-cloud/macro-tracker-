@@ -1575,3 +1575,126 @@ i.dot {
 
 .hchart .hlabel { font-size: 8px; fill: var(--muted); font-variant-numeric: tabular-nums; }
 .hchart.hline { width: 100%; overflow: visible; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sheets as floating glass
+   ═══════════════════════════════════════════════════════════════════════
+   The panel was already translucent, but it sat behind a 66%-black scrim
+   — everything behind it was blacked out first, so there was nothing left
+   to see through. Depth here comes from blur and a lit edge, not from
+   darkening the room.                                                   */
+
+.scrim {
+  background: rgba(10, 8, 14, .28);
+  backdrop-filter: saturate(120%) blur(2px);
+  -webkit-backdrop-filter: saturate(120%) blur(2px);
+}
+:root[data-theme="light"] .scrim { background: rgba(60, 44, 28, .16); }
+
+/* A panel that floats clear of the edges reads as an object sitting in
+   front of the app; one welded to the bottom reads as part of the chrome. */
+.sheet {
+  left: max(8px, env(safe-area-inset-left, 0px));
+  right: max(8px, env(safe-area-inset-right, 0px));
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  max-width: 560px; margin: 0 auto;
+  max-height: 88dvh;
+  border-radius: 30px;
+  border: 1px solid var(--glass-brd);
+  background:
+    linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,0) 44%),
+    var(--glass-bg);
+  backdrop-filter: saturate(200%) blur(40px);
+  -webkit-backdrop-filter: saturate(200%) blur(40px);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    0 2px 8px rgba(0,0,0,.28),
+    0 32px 80px -28px rgba(0,0,0,.85);
+  animation: sheetIn .42s cubic-bezier(.22,1,.36,1);
+  padding-bottom: 0;
+  overflow: hidden;
+}
+:root[data-theme="light"] .sheet {
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    0 2px 8px rgba(70,50,30,.10),
+    0 32px 80px -28px rgba(70,50,30,.40);
+}
+
+@keyframes sheetIn {
+  from { opacity: 0; transform: translateY(26px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A grab handle says "this is a surface you can dismiss" without a label. */
+.sheet-head { position: relative; padding: 20px 20px 14px; border-bottom: 1px solid var(--glass-brd); }
+.sheet-head::before {
+  content: ''; position: absolute; top: 8px; left: 50%;
+  width: 36px; height: 4px; margin-left: -18px; border-radius: 2px;
+  background: var(--line-2);
+}
+.sheet-body { padding: 18px 20px calc(20px + var(--safe-b)); }
+.sheet-foot {
+  background: transparent;
+  border-top: 1px solid var(--glass-brd);
+  padding: 14px 20px calc(14px + var(--safe-b));
+}
+
+/* Inside a glass panel, nested panes must not frost again — stacking blur
+   on blur goes milky and loses the thing you were seeing through it. */
+.sheet .tile {
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Press
+   ═══════════════════════════════════════════════════════════════════════
+   Every control compresses under the finger and springs back. The point
+   is not decoration: without it a tap and a missed tap look identical
+   until the next screen arrives, and on a slow lookup that is a long
+   time to wonder whether you actually hit the thing.                    */
+
+button, .tab, .row, .food-cell, .chip, .tile.tappable,
+.readout-block, .seg-item, .metric, .mini-x {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform .34s cubic-bezier(.34, 1.56, .64, 1),
+    background-color .2s ease,
+    border-color .2s ease,
+    opacity .2s ease;
+}
+
+button:active, .tab:active, .row:active, .seg-item:active, .metric:active {
+  transform: scale(var(--press, .955));
+  transition-duration: .09s;      /* down fast, back slow — that is the spring */
+}
+.food-cell:active, .chip:active { --press: .93; }
+.tile.tappable:active, .readout-block:active { --press: .985; }
+.mini-x:active { --press: .82; }
+.btn.block:active, .btn.primary.block:active { --press: .975; }
+
+/* The keyboard equivalent, so this is not a touch-only affordance. */
+button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
+.tile.tappable:focus-visible, .readout-block:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button, .tab, .row, .food-cell, .chip, .tile.tappable,
+  .readout-block, .seg-item, .metric, .mini-x { transition: none; }
+  button:active, .food-cell:active, .chip:active,
+  .tile.tappable:active, .readout-block:active { transform: none; }
+  .sheet { animation: none; }
+}
+
+/* The target of a fly-in acknowledges the arrival. */
+@keyframes pulseHit {
+  0%   { transform: scale(1); }
+  38%  { transform: scale(1.028); }
+  100% { transform: scale(1); }
+}
+.pulse { animation: pulseHit .46s cubic-bezier(.34,1.56,.64,1); }

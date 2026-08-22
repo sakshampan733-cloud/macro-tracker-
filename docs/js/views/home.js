@@ -12,6 +12,7 @@
  */
 
 import { el, clear, icon, kcal, toast } from '../ui.js';
+import { flyToTotals, haptic } from '../feedback.js';
 import {
   get, totals, dayKey, byMeal, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, logMeal,
@@ -213,7 +214,13 @@ function picker(s, ctx, key) {
       for (const m of meals.slice(0, 6)) {
         const mt = mealTotals(m);
         g.append(el('button.food-cell.is-meal', {
-          onclick: () => { logMeal(key, m.id); toast(`${m.name} logged.`); ctx.refresh(); },
+          onclick: e => {
+            flyToTotals(e.currentTarget);
+            logMeal(key, m.id);
+            haptic('success');
+            toast(`${m.name} logged.`);
+            ctx.refresh();
+          },
         },
           el('span.fc-name', {}, m.name),
           el('span.fc-kcal', {}, `${Math.round(mt.kcal || 0)} · ${m.items.length} items`)));

@@ -20,6 +20,7 @@
 import {
   el, sheet, toast, grams, kcal, g, icon, append, explain,
 } from '../ui.js';
+import { haptic } from '../feedback.js';
 import {
   METHODS, GRADE_MULT, macrosFor, addEntry, updateEntry, MEALS,
   mealForNow, dayKey, toggleFavourite, isFavourite,
@@ -263,7 +264,7 @@ export function openPortion(food, {
       style: { fontSize: '17px', padding: '15px' },
       onclick: () => {
         const gr = gramsNow();
-        if (!(gr > 0)) { toast('Set an amount first.', 'err'); return; }
+        if (!(gr > 0)) { haptic('warn'); toast('Set an amount first.', 'err'); return; }
         const payload = {
           name: food.n || food.name,
           brand: food.brand || '',
@@ -281,6 +282,7 @@ export function openPortion(food, {
           addEntry(dateKey, payload);
           toast(`${Math.round(macrosFor(food.per100, gr).kcal)} kcal logged.`);
         }
+        haptic('success');
         s.close();
         onSaved();
       },
