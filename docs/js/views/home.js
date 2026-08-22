@@ -19,6 +19,7 @@ import {
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
 import { openScanner, openQuickAdd, openBuilder, searchLocal, toItem } from './add.js';
+import { searchProducts, resolveBarcode, validEAN } from '../off.js';
 import { openDish } from './dish.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
@@ -111,10 +112,23 @@ function picker(s, ctx, key) {
   const grid = el('div');
   const wrap = el('div', {});
 
+  /*
+   * Local results are instant; the packaged-product lookup waits for you to
+   * stop typing. Firing a request per keystroke meant "lays" launched three
+   * overlapping searches that raced each other, and the loser frequently
+   * won — which is why a query with 22 000 matches rendered as "nothing
+   * matches". It also rate-limits the API for no benefit.
+   */
+  let debounce;
   const search = el('input', {
     type: 'search', placeholder: 'Search foods',
     autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false',
-    oninput: e => draw(e.target.value),
+    oninput: e => {
+      const q = e.target.value;
+      clearTimeout(debounce);
+      drawLocal(q);
+      debounce = setTimeout(() => drawRemote(q), 320);
+    },
   });
 
   function cells(items) {
@@ -130,19 +144,67 @@ function picker(s, ctx, key) {
     return g;
   }
 
-  function draw(q) {
-    q = (q || '').trim();
-    clear(grid);
+  let seq = 0;
+  const remote = el('div');
 
+  /* Whatever we already hold, drawn on the keystroke. */
+  function drawLocal(q) {
+    q = (q || '').trim();
+    seq++;                       // any in-flight remote result is now stale
+    clear(remote);
     if (q.length >= 2) {
+      clear(grid);
       const hits = searchLocal(q);
-      grid.append(hits.length
-        ? cells(hits.slice(0, 24).map(toItem))
-        : el('div.grid-empty', {}, `Nothing matches “${q}”.`,
-            el('button.btn.sm', { style: { marginTop: '10px' },
-              onclick: () => openBuilder({ name: q, onSaved: ctx.refresh }) }, 'Build it')));
+      if (hits.length) grid.append(cells(hits.slice(0, 24).map(toItem)));
+      grid.append(remote);
       return;
     }
+    drawShortcuts();
+  }
+
+  /* The network half, once you have stopped typing. */
+  async function drawRemote(q) {
+    q = (q || '').trim();
+    if (q.length < 2) return;
+    const mine = ++seq;
+
+    /* A typed barcode is the fallback for a scuffed or badly lit packet,
+       so it has to land in the same place a scan does. */
+    const digits = q.replace(/\s/g, '');
+    if (validEAN(digits)) {
+      remote.replaceChildren(el('div.grid-empty', {}, `Looking up ${digits}…`));
+      const food = await resolveBarcode(digits);
+      if (mine !== seq) return;
+      clear(grid);
+      grid.append(remote);
+      remote.replaceChildren(food.found
+        ? cells([toItem(food)])
+        : el('div.grid-empty', {}, 'No entry for that barcode.',
+            el('button.btn.sm', { style: { marginTop: '10px' },
+              onclick: () => openBuilder({ barcode: digits, onSaved: ctx.refresh }) },
+              'Enter it from the packet')));
+      return;
+    }
+
+    const localCount = searchLocal(q).length;
+    remote.replaceChildren(el('div.grid-empty', {}, 'Checking packaged products…'));
+    const r = await searchProducts(q);
+    if (mine !== seq) return;
+
+    if (r.products && r.products.length) {
+      remote.replaceChildren(label('Packaged'), cells(r.products.map(toItem).slice(0, 18)));
+    } else if (!localCount) {
+      remote.replaceChildren(el('div.grid-empty', {},
+        r.offline ? 'Packaged search is unreachable right now.' : `Nothing matches “${q}”.`,
+        el('button.btn.sm', { style: { marginTop: '10px' },
+          onclick: () => openBuilder({ name: q, onSaved: ctx.refresh }) }, 'Build it')));
+    } else {
+      remote.replaceChildren();
+    }
+  }
+
+  function drawShortcuts() {
+    clear(grid);
 
     const meals = mealsList();
     if (meals.length) {
@@ -174,7 +236,7 @@ function picker(s, ctx, key) {
   const label = text => el('div.section-label', {}, el('span.micro', {}, text));
 
   wrap.append(el('div.field.home-search', {}, icon('search', 16), search), grid);
-  draw('');
+  drawShortcuts();
   return wrap;
 }
 

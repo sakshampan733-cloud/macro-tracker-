@@ -19,8 +19,8 @@ import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn,
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import {
-  ring, areaChart, stageBar, liveDot, barRow, recoveryColour, countUp,
-  healthBars, healthLine, segmentBar,
+  ring, stageBar, liveDot, recoveryColour,
+  healthBars, healthLine,
 } from '../charts.js';
 import { openReport } from './report.js';
 import {

@@ -1050,8 +1050,8 @@ body::after {
 }
 
 :root[data-theme="light"] {
-  /* Bone, not paper. The ambient fields below tint through the panes. */
-  --bg:        #EFEAE3;
+  /* Bone, not paper. The ambient field below tints through the panes. */
+  --bg:        #E9E0D3;
   --bg-2:      rgba(255, 255, 255, .38);
   --surface:   rgba(255, 255, 255, .52);
   --surface-2: rgba(255, 255, 255, .34);
@@ -1154,24 +1154,33 @@ body::after { opacity: var(--grain); }
      Several coloured fields read as decoration; a single orb reads as a
      room the panes are sitting in, which is what the reference has. The
      glass then has one consistent thing to refract instead of four. */
+  /*
+   * One light source, one hue.
+   *
+   * Sized with the `circle` keyword and a single radius: giving a radial
+   * gradient two percentages makes an ellipse that stretches with the
+   * viewport, which is why this read as a squashed smear rather than an
+   * orb. vmax keeps it round and the same shape on any screen.
+   */
   --orb: 232, 132, 58;
   --ambient:
-    radial-gradient(58% 42% at 50% 34%, rgba(var(--orb), .40) 0%,
-                                        rgba(var(--orb), .16) 42%,
-                                        rgba(var(--orb), .04) 68%,
-                                        transparent 82%);
+    radial-gradient(circle 62vmax at 50% 46%,
+                    rgba(var(--orb), .42) 0%,
+                    rgba(var(--orb), .19) 34%,
+                    rgba(var(--orb), .06) 58%,
+                    transparent 76%);
 }
 
 :root[data-theme="light"] {
   /* Warm off-white, not clinical white — the reference light direction is
      bone and sand, with colour bleeding through, never a flat sheet. */
-  --bg:        #F3EFEA;
-  --bg-2:      #FBF8F5;
-  --surface:   rgba(255, 255, 255, .40);
-  --surface-2: rgba(255, 255, 255, .26);
-  --raised:    rgba(255, 255, 255, .70);
-  --line:      rgba(60, 48, 40, .10);
-  --line-2:    rgba(60, 48, 40, .17);
+  --bg:        #EAE1D4;
+  --bg-2:      rgba(255, 255, 255, .42);
+  --surface:   rgba(255, 255, 255, .52);
+  --surface-2: rgba(255, 255, 255, .34);
+  --raised:    rgba(255, 255, 255, .80);
+  --line:      rgba(66, 48, 28, .15);
+  --line-2:    rgba(66, 48, 28, .23);
 
   /* Contrast against the pane, not against the page: a .40-alpha white
      card over a warm orb sits nearer #E8DDD2 than #FFF, so the greys have
@@ -1196,13 +1205,17 @@ body::after { opacity: var(--grain); }
   --lift:       0 1px 2px rgba(60,48,40,.05), 0 10px 26px -14px rgba(60,48,40,.20);
   --lift-lg:    0 2px 8px rgba(60,48,40,.06), 0 26px 56px -24px rgba(60,48,40,.26);
 
-  /* The same single orb, warmed and lifted so it reads on a pale ground. */
+  /* The same circle, warmed for a pale ground. Light mode was washing out
+     because the orb was faint AND the panes were near-white AND the ground
+     was near-white — three pale layers stacked. The orb carries more
+     weight and the ground drops a step so the glass has an edge. */
   --orb: 240, 146, 64;
   --ambient:
-    radial-gradient(58% 42% at 50% 34%, rgba(var(--orb), .52) 0%,
-                                        rgba(var(--orb), .24) 42%,
-                                        rgba(var(--orb), .07) 68%,
-                                        transparent 82%);
+    radial-gradient(circle 62vmax at 50% 46%,
+                    rgba(var(--orb), .40) 0%,
+                    rgba(var(--orb), .20) 34%,
+                    rgba(var(--orb), .07) 58%,
+                    transparent 76%);
 }
 
 /* The wash sits behind everything and does not scroll — the app has a sky. */
