@@ -15,8 +15,7 @@
  */
 
 import {
-  el, sheet, toast, kcal, grams, g, icon, field, append, confirmSheet,
-} from '../ui.js';
+  el, sheet, toast, kcal, grams, g, icon, field, append, confirmSheet, replaceKids } from '../ui.js';
 import { get, saveFood, dayKey } from '../store.js';
 import { FOODS, BY_ID, atwater } from '../data/foods.js';
 import { openPortion } from './portion.js';
@@ -141,7 +140,7 @@ export function openPot({ onSaved = () => {} } = {}) {
     const density = yielded > 0 ? r.kcal / yielded : 0;
     const lossPct = r.grams > 0 && cookedG > 0 ? (1 - cookedG / r.grams) * 100 : null;
 
-    summary.replaceChildren(
+    replaceKids(summary, 
       el('div.tile', {},
         el('div.readout', {},
           el('div', {},

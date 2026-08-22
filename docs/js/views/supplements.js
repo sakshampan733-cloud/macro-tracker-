@@ -7,7 +7,7 @@
  * deficit you closed at breakfast.
  */
 
-import { el, sheet, toast, icon, g } from '../ui.js';
+import { el, sheet, toast, icon, g, replaceKids } from '../ui.js';
 import {
   get, commit, dayKey, suppsTaken, toggleSupplement, setSupplementList,
 } from '../store.js';
@@ -100,7 +100,7 @@ export function openSupplementPicker(ctx) {
   const body = el('div', {});
 
   const render = () => {
-    body.replaceChildren(
+    replaceKids(body, 
       el('p', { style: { color: 'var(--text-2)', marginTop: 0, lineHeight: '1.55' } },
         'Tick what you actually take. Only these show up on Today, and what you tick off each day counts toward your micronutrient totals.'),
 

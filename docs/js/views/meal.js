@@ -13,8 +13,7 @@
  */
 
 import {
-  el, sheet, toast, kcal, grams, g, icon, field, segmented, confirmSheet,
-} from '../ui.js';
+  el, sheet, toast, kcal, grams, g, icon, field, segmented, confirmSheet, replaceKids } from '../ui.js';
 import { get, saveMeal, updateMeal, MEALS, METHODS, macrosFor, dayKey, logMeal } from '../store.js';
 import { FOODS, BY_ID } from '../data/foods.js';
 import { STYLES, per100For, densityFor } from '../dishes.js';
@@ -145,7 +144,7 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
 
   function renderSummary() {
     const t = totals();
-    summary.replaceChildren(
+    replaceKids(summary, 
       el('div.tile', {},
         el('div.readout', {},
           el('div', {},

@@ -12,7 +12,7 @@
  */
 
 import {
-  el, sheet, kcal, g, grams, icon, segmented, explain, dateLabel, field,
+  el, sheet, kcal, g, grams, icon, segmented, explain, dateLabel, field, replaceKids,
 } from '../ui.js';
 import { healthLine } from '../charts.js';
 import { get, totals, byMeal, dayKey, shiftDay, entryMacros } from '../store.js';
@@ -309,7 +309,7 @@ export function openReport(ctx, initialDays = 7) {
     const t = r.targets;
     const vsTarget = t ? Math.round(r.mean.kcal - t.kcal) : null;
 
-    body.replaceChildren(
+    replaceKids(body,
       el('div.seg', { style: { marginBottom: '10px' } },
         ...PRESETS.map(p => el('button', {
           type: 'button',

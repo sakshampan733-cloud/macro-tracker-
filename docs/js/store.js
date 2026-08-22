@@ -63,7 +63,7 @@ const EMPTY = () => ({
   cache: {},
   whoop: { rows: {}, importedAt: null },
   settings: {
-    orb: 'amber',          // hue of the ambient background circle
+    orb: 'red',            // hue of the ambient background circle
     openGroups: [],        // which settings categories are expanded
     units: 'metric',
     diet: 'all',

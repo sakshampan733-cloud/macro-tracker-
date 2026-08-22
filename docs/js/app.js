@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.22-search';
+export const VERSION = '2026.08.22-swipe';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
@@ -21,6 +21,7 @@ import { renderOnboarding, renderSettings } from './views/setup.js';
 import { autoSyncWhoop } from './views/body.js';
 import { installFeedback } from './feedback.js';
 import { applyOrb } from './theme.js';
+import { installSwipe } from './swipe.js';
 import { guard } from './boot.js';
 import { captureFromUrl, isConnected, relayUrl, syncWhoop } from './whooprelay.js';
 
@@ -119,7 +120,7 @@ function applyTheme(pref) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dark ? '#000000' : '#F4F4F6');
   root.style.colorScheme = pref === 'auto' ? 'light dark' : pref;
-  applyOrb(get().settings?.orb || 'amber', pref);
+  applyOrb(get().settings?.orb || 'red', pref);
 }
 
 /* React to the system flipping while the app is open, on 'auto'. */
@@ -269,6 +270,18 @@ addEventListener('pagehide', flush);
 addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
 
 installFeedback();
+
+/*
+ * Swipe between the four tabs. Only the tab order — settings, foods and
+ * the report are destinations you enter and leave, not places in a row.
+ */
+installSwipe({
+  surface: main,
+  scroller,
+  order: TABS.map(t => t.id),
+  current: () => ctx.route,
+  go: id => ctx.go(id),
+});
 
 if (initial && ROUTES[initial]) ctx.route = initial;
 draw();

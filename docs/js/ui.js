@@ -67,6 +67,15 @@ export const append = (node, ...kids) => {
   kids.flat().forEach(k => { if (k != null && k !== false) node.append(k); });
   return node;
 };
+/* replaceChildren has the same flaw as append: a null child becomes the
+   literal text "null". Anywhere the child list has conditionals in it,
+   go through this instead. */
+export const replaceKids = (node, ...kids) => {
+  node.replaceChildren();
+  kids.flat().forEach(k => { if (k != null && k !== false) node.append(k); });
+  return node;
+};
+
 export const $ = (s, r = document) => r.querySelector(s);
 
 /* ── Formatting ─────────────────────────────────────────────────────── */

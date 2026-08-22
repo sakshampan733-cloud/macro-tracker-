@@ -7,8 +7,7 @@
  */
 
 import {
-  el, clear, sheet, toast, icon, kcal, grams, g, empty, field, segmented, confirmSheet, explain,
-} from '../ui.js';
+  el, clear, sheet, toast, icon, kcal, grams, g, empty, field, segmented, confirmSheet, explain, replaceKids } from '../ui.js';
 import {
   get, saveFood, frequentFoods, recentFoods, dayKey, totals, addEntry,
   mealsList, mealTotals, logMeal, deleteMeal, renameMeal, MEALS,
@@ -664,7 +663,7 @@ export function openScanner(ctx) {
     onError: (msg, d) => {
       // Collapse the dead video box and say plainly what to do instead.
       wrap.style.display = 'none';
-      failureBox.replaceChildren(el('div.note.warn', {},
+      replaceKids(failureBox, el('div.note.warn', {},
         el('div', {},
           el('b', {}, (d && d.title) || 'The camera did not start'),
           el('div.fine', { style: { marginTop: '4px' } }, msg),

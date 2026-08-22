@@ -1162,7 +1162,7 @@ body::after { opacity: var(--grain); }
    * viewport, which is why this read as a squashed smear rather than an
    * orb. vmax keeps it round and the same shape on any screen.
    */
-  --orb: 206, 134, 78;
+  --orb: 198, 76, 66;
   --ambient:
     radial-gradient(circle 62vmax at 50% 46%,
                     rgba(var(--orb), .42) 0%,
@@ -1214,7 +1214,7 @@ body::after { opacity: var(--grain); }
      because the orb was faint AND the panes were near-white AND the ground
      was near-white — three pale layers stacked. The orb carries more
      weight and the ground drops a step so the glass has an edge. */
-  --orb: 216, 146, 88;
+  --orb: 208, 88, 76;
   --ambient:
     radial-gradient(circle 62vmax at 50% 46%,
                     rgba(var(--orb), .52) 0%,
@@ -1905,3 +1905,33 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
   background: var(--surface-2);
 }
 .set-body > .section-label:first-child { margin-top: 10px; }
+
+/* ── While a swipe is in flight ───────────────────────────────────────
+   The frost comes off every pane so the orb reads sharp through them —
+   the half-clear look from the reference — and, not incidentally, so the
+   browser is not recompositing a screenful of backdrop-filters at 60fps,
+   which is what makes this kind of gesture stutter.                   */
+:root.swiping .tile,
+:root.swiping .food-cell,
+:root.swiping .chip,
+:root.swiping .tabs,
+:root.swiping .set-group,
+:root.swiping .sticky-glass,
+:root.swiping .topbar {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Surfaces go more transparent too, or removing the blur just leaves a
+   flat wash sitting over the orb. */
+:root.swiping .tile,
+:root.swiping .set-group { background: color-mix(in srgb, var(--surface) 55%, transparent); }
+:root.swiping .food-cell,
+:root.swiping .chip      { background: color-mix(in srgb, var(--surface-2) 50%, transparent); }
+
+:root.swiping #app { will-change: transform; }
+:root.swiping * { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root.swiping .tile, :root.swiping .food-cell, :root.swiping .chip,
+  :root.swiping .set-group { background: var(--surface); }
+}

@@ -20,16 +20,16 @@
  * still tints the panes without becoming the subject.
  */
 export const ORBS = {
+  red:     { label: 'Red',     dark: '198, 76, 66',   light: '208, 88, 76' },
   amber:   { label: 'Amber',   dark: '206, 134, 78',  light: '216, 146, 88' },
   rose:    { label: 'Rose',    dark: '196, 110, 122', light: '206, 124, 134' },
   violet:  { label: 'Violet',  dark: '138, 120, 186', light: '148, 132, 194' },
   ocean:   { label: 'Ocean',   dark: '94, 138, 178',  light: '104, 148, 186' },
   emerald: { label: 'Emerald', dark: '92, 152, 132',  light: '100, 160, 140' },
-  ember:   { label: 'Ember',   dark: '190, 104, 88',  light: '200, 116, 98' },
 };
 
 export function applyOrb(name, theme) {
-  const orb = ORBS[name] || ORBS.amber;
+  const orb = ORBS[name] || ORBS.red;
   const dark = theme === 'dark'
     || (theme !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches !== false);
   document.documentElement.style.setProperty('--orb', dark ? orb.dark : orb.light);

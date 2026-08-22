@@ -144,7 +144,7 @@ const stat = (label, value, hue) =>
    you are picking a colour, so the control should be the colour. */
 function orbPicker(ctx) {
   const row = el('div.orb-row');
-  const current = get().settings.orb || 'amber';
+  const current = get().settings.orb || 'red';
   for (const [key, o] of Object.entries(ORBS)) {
     const dot = el('button.orb-dot' + (key === current ? '.is-on' : ''), {
       type: 'button', title: o.label, 'aria-label': o.label,

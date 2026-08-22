@@ -8,8 +8,7 @@
 
 import {
   el, clear, icon, kcal, g, distribution, toast, sheet, field,
-  segmented, empty, dateLabel, confirmSheet, explain,
-} from '../ui.js';
+  segmented, empty, dateLabel, confirmSheet, explain, replaceKids } from '../ui.js';
 import { get, commit, dayKey, setWeight, peekDay, weightSeries, totals } from '../store.js';
 import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
@@ -604,7 +603,7 @@ export function openWhoopRelay(ctx) {
     let health = null;
     if (base) health = await checkRelay(base);
 
-    body.replaceChildren(
+    replaceKids(body, 
       el('ol', { style: { color: 'var(--text-2)', fontSize: '13.5px', lineHeight: '1.75',
                           paddingLeft: '18px', marginTop: 0 } },
         el('li', {}, 'Deploy the worker from ', el('b', {}, 'relay/worker.js'), ' in the repo, on a free Cloudflare account.'),
