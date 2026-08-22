@@ -2080,3 +2080,42 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
     var(--surface-2);
   border-color: var(--line-2);
 }
+
+/* ── Cells with their own secondary action ────────────────────────────
+   A grid tile is now a container with two buttons: the tile itself, and
+   a small "more" control. Long-press is gone — on iOS the OS raises its
+   text-selection callout before any JavaScript runs, so holding a tile
+   selected the page instead of opening a menu.                        */
+.cell-wrap {
+  position: relative;
+  display: block;
+  padding: 0;
+  cursor: default;
+}
+.cell-main {
+  display: flex; flex-direction: column; justify-content: space-between;
+  width: 100%; min-height: 78px;
+  padding: 12px 30px 10px 12px;      /* room on the right for the control */
+  background: none; border: 0; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+  border-radius: inherit;
+}
+.cell-more {
+  position: absolute; top: 4px; right: 4px;
+  width: 28px; height: 28px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; background: transparent;
+  color: var(--dim); font-size: 15px; line-height: 1; cursor: pointer;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+.cell-more:hover { background: var(--raised); color: var(--text-2); }
+.cell-more:active { transform: scale(.86); }
+.cell-wrap.is-fav::after { right: 34px; }   /* keep the star clear of it */
+
+/* Nothing in a tappable tile should ever become a text selection. */
+.food-cell, .chip, .tab, .cell-main, .cell-more, .mini-open, .scale-btn,
+.readout-block, .tile.tappable, .set-head, .orb-dot, .theme-opt {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

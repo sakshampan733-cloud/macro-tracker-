@@ -16,11 +16,16 @@ import {
   logMeal, mealTotals, MEALS, dayKey, shiftDay, macrosFor, entryMacros,
 } from '../store.js';
 import { haptic } from '../feedback.js';
+import { openMealBuilder } from './meal.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
 const PRESETS = [['½', 0.5], ['¾', 0.75], ['1', 1], ['1½', 1.5], ['2', 2]];
 
-export function openMealLogger(meal, { dateKey = dayKey(), onSaved = () => {} } = {}) {
+export function openMealLogger(meal, { dateKey = dayKey(), onSaved = () => {}, onEdit = null } = {}) {
+  /* Landing here after tapping a meal is exactly when you notice an
+     ingredient is wrong, so the way to change it has to be on this
+     screen rather than on a route with no tab. */
+  const edit = onEdit || (() => openMealBuilder({ meal, onSaved }));
   const state = {
     scale: 1,
     grams: {},                       // index -> grams, set only when you edit one
@@ -146,7 +151,12 @@ export function openMealLogger(meal, { dateKey = dayKey(), onSaved = () => {} } 
         dateLabelEl,
         el('button.btn.sm', { onclick: () => shift(1) }, 'Later', icon('chevron', 16))),
     ),
-    foot: el('button.btn.primary.block', {
+    foot: el('div.btn-row', {},
+      el('button.btn.ghost', {
+        style: { flex: '0 0 auto', padding: '15px 18px' },
+        onclick: () => { sh.close(); edit(); },
+      }, icon('edit', 16), 'Edit'),
+      el('button.btn.primary.grow', {
       style: { fontSize: '17px', padding: '15px' },
       onclick: () => {
         const t = totalsNow();
@@ -161,7 +171,7 @@ export function openMealLogger(meal, { dateKey = dayKey(), onSaved = () => {} } 
         sh.close();
         onSaved();
       },
-    }, 'Log it'),
+    }, 'Log it')),
   });
 
   return sh;

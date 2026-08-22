@@ -19,7 +19,7 @@ import { topWhoopAdvice } from '../coachwhoop.js';
 import {
   get, totals, dayKey, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
-  favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood,
+  favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
@@ -193,12 +193,25 @@ function picker(s, ctx, key) {
     for (const f of items) {
       const per = f.per100 || {};
       const ref = f.id || f.ref || f.n;
-      const cell = el('button.food-cell' + (isFavourite(ref) ? '.is-fav' : ''), {
-        onclick: () => openPortion(f, { dateKey: key, onSaved: ctx.refresh }),
-      },
-        el('span.fc-name', {}, f.n),
-        el('span.fc-kcal', {}, `${Math.round(per.kcal || 0)} · ${Math.round(per.p || 0)}P`));
-      attachHold(cell, () => openFoodActions(f, ref, ctx));
+      /*
+       * A visible button rather than a long press.
+       *
+       * Press-and-hold on a web page triggers the OS text-selection
+       * callout before any JavaScript sees it, so on an iPhone holding a
+       * tile selected half the screen instead of opening a menu. There is
+       * no reliable way to have both, and a control you can see is better
+       * than a gesture you have to be told about anyway.
+       */
+      const cell = el('div.food-cell.cell-wrap' + (isFavourite(ref) ? '.is-fav' : ''), {},
+        el('button.cell-main', {
+          onclick: () => openPortion(f, { dateKey: key, onSaved: ctx.refresh }),
+        },
+          el('span.fc-name', {}, f.n),
+          el('span.fc-kcal', {}, `${Math.round(per.kcal || 0)} · ${Math.round(per.p || 0)}P`)),
+        el('button.cell-more', {
+          'aria-label': `More for ${f.n}`,
+          onclick: e => { e.stopPropagation(); openFoodActions(f, ref, ctx); },
+        }, '\u22EF'));
       g.append(cell);
     }
     return g;
@@ -225,11 +238,16 @@ function picker(s, ctx, key) {
         const mg = el('div.food-grid');
         for (const m of meals) {
           const mt = mealTotals(m);
-          mg.append(el('button.food-cell.is-meal', {
-            onclick: () => openMealLogger(m, { dateKey: key, onSaved: ctx.refresh }),
-          },
-            el('span.fc-name', {}, m.name),
-            el('span.fc-kcal', {}, `${Math.round(mt.kcal || 0)} · ${m.items.length} items`)));
+          mg.append(el('div.food-cell.is-meal.cell-wrap', {},
+            el('button.cell-main', {
+              onclick: () => openMealLogger(m, { dateKey: key, onSaved: ctx.refresh }),
+            },
+              el('span.fc-name', {}, m.name),
+              el('span.fc-kcal', {}, `${Math.round(mt.kcal || 0)} · ${m.items.length} items`)),
+            el('button.cell-more', {
+              'aria-label': `More for ${m.name}`,
+              onclick: e => { e.stopPropagation(); openMealActions(m, ctx); },
+            }, '\u22EF')));
         }
         grid.append(mg);
       }
@@ -295,13 +313,18 @@ function picker(s, ctx, key) {
       const g = el('div.food-grid');
       for (const m of meals.slice(0, 6)) {
         const mt = mealTotals(m);
-        g.append(el('button.food-cell.is-meal', {
-          /* Opens rather than logs: you almost never eat exactly the
-             portion you saved, and silently assuming you did was wrong. */
-          onclick: () => openMealLogger(m, { dateKey: key, onSaved: ctx.refresh }),
-        },
-          el('span.fc-name', {}, m.name),
-          el('span.fc-kcal', {}, `${Math.round(mt.kcal || 0)} · ${m.items.length} items`)));
+        g.append(el('div.food-cell.is-meal.cell-wrap', {},
+          el('button.cell-main', {
+            /* Opens rather than logs: you almost never eat exactly the
+               portion you saved, and assuming you did was wrong. */
+            onclick: () => openMealLogger(m, { dateKey: key, onSaved: ctx.refresh }),
+          },
+            el('span.fc-name', {}, m.name),
+            el('span.fc-kcal', {}, `${Math.round(mt.kcal || 0)} · ${m.items.length} items`)),
+          el('button.cell-more', {
+            'aria-label': `More for ${m.name}`,
+            onclick: e => { e.stopPropagation(); openMealActions(m, ctx); },
+          }, '\u22EF')));
       }
       grid.append(g);
     }
@@ -449,53 +472,6 @@ function openEntryDetail(entry, key, ctx) {
     { dateKey: key, entry, onSaved: ctx.refresh });
 }
 
-/*
- * Press and hold.
- *
- * A grid cell has one obvious job — log this — so the second action has
- * nowhere to live without adding a button to every tile and making the
- * grid busier than the list it replaced. Hold is the iOS convention for
- * "more about this thing", and it costs nothing until used.
- *
- * The tricky part is that a hold must not also fire the tap, and must not
- * fire while you are scrolling the grid with your finger down.
- */
-const HOLD_MS = 420;
-const HOLD_SLOP = 10;
-
-function attachHold(node, onHold) {
-  let timer = null, sx = 0, sy = 0, fired = false;
-
-  const cancel = () => { clearTimeout(timer); timer = null; };
-
-  node.addEventListener('pointerdown', e => {
-    if (e.button != null && e.button !== 0) return;
-    fired = false; sx = e.clientX; sy = e.clientY;
-    timer = setTimeout(() => {
-      fired = true;
-      haptic('select');
-      onHold();
-    }, HOLD_MS);
-  });
-
-  node.addEventListener('pointermove', e => {
-    if (!timer) return;
-    if (Math.abs(e.clientX - sx) > HOLD_SLOP || Math.abs(e.clientY - sy) > HOLD_SLOP) cancel();
-  });
-
-  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) {
-    node.addEventListener(ev, cancel);
-  }
-
-  /* Swallow the click that follows a completed hold, in the capture phase,
-     so the portion sheet does not open behind the menu. */
-  node.addEventListener('click', e => {
-    if (fired) { e.preventDefault(); e.stopImmediatePropagation(); fired = false; }
-  }, true);
-
-  node.addEventListener('contextmenu', e => e.preventDefault());
-}
-
 function openFoodActions(food, ref, ctx) {
   const fav = isFavourite(ref);
   const s = get();
@@ -534,3 +510,35 @@ function openFoodActions(food, ref, ctx) {
 const action = (label, ic, onclick, danger = false) =>
   el('button.row' + (danger ? '.is-danger' : ''), { onclick },
     icon(ic, 17), el('span.grow', {}, label), icon('chevron', 14));
+
+/*
+ * The meal's own actions.
+ *
+ * Editing one used to be reachable only from a route with no tab, so
+ * changing an ingredient — swapping the paneer in your fried rice — had
+ * no path from the screen you actually use.
+ */
+function openMealActions(meal, ctx) {
+  const sh = sheet({
+    title: meal.name,
+    body: el('div', {},
+      el('div.tile.flush', {},
+        action('Edit ingredients', 'edit', () => {
+          sh.close();
+          openMealBuilder({ meal, onSaved: ctx.refresh });
+        }),
+        action('Delete this meal', 'trash', async () => {
+          if (!(await confirmSheet({
+            title: 'Delete ' + meal.name + '?',
+            message: 'The saved recipe goes. Days you already logged it on keep their entries.',
+            confirmLabel: 'Delete', danger: true,
+          }))) return;
+          deleteMeal(meal.id);
+          toast('Deleted.');
+          sh.close(); ctx.refresh();
+        }, true)),
+      el('div.fine', { style: { marginTop: '10px' } },
+        'Editing changes the recipe from now on. Meals you have already logged keep the amounts they were logged with.')),
+  });
+  return sh;
+}
