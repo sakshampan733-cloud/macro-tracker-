@@ -290,7 +290,7 @@ function vitalsSection(s, ctx) {
   );
 
   /* ── the hero: recovery, flanked by what drives it ── */
-  const hero = el('div.tile', {},
+  const hero = el('div.tile.tile-field', {},
     el('div.vitals-hero', {},
       el('div.vitals-side', {},
         sideStat('HRV', hrv?.latest?.v, 'ms', 0, s, 'hrv', ctx),
@@ -302,15 +302,21 @@ function vitalsSection(s, ctx) {
         onclick: () => openMetric(s, 'recovery', ctx),
         onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, 'recovery', ctx); } },
       },
-        ring({ value: recV, max: 100, size: 152, stroke: 12,
-               colour, label: 'RECOVERY', unit: '%',
-               sub: recV == null ? '' : recV >= 67 ? 'ready' : recV >= 34 ? 'moderate' : 'rest' })),
+        (() => {
+          const r = ring({ value: recV, max: 100, size: 152, stroke: 12,
+                 colour, label: 'RECOVERY', unit: '%',
+                 sub: recV == null ? '' : recV >= 67 ? 'ready' : recV >= 34 ? 'moderate' : 'rest' });
+          r.style.setProperty('--ring-glow', `color-mix(in srgb, ${colour} 13%, transparent)`);
+          return r;
+        })()),
 
       el('div.vitals-side', {},
         sideStat('Sleep', sleep?.latest?.v, 'h', 1, s, 'sleepH', ctx),
         sideStat('Strain', strain?.latest?.v, '', 1, s, 'strain', ctx)),
     ),
   );
+  // the card's own atmosphere carries the reading before any number is read
+  hero.style.setProperty('--field', `color-mix(in srgb, ${colour} 20%, transparent)`);
   wrap.append(hero);
 
   /* ── sleep, as the stages it was actually made of ── */

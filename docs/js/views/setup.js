@@ -237,6 +237,27 @@ export function renderSettings(root, ctx) {
               : 'Not imported')),
         el('button.btn.sm', { onclick: () => openWhoopConnect(ctx) }, 'Set up'))),
 
+    el('div.section-label', {}, el('span.micro', {}, 'Appearance')),
+    el('div.tile', {},
+      el('div.theme-row', {},
+        ...[
+          ['dark',  'Dark',   'dark'],
+          ['light', 'Light',  'light'],
+          ['auto',  'System', 'auto'],
+        ].map(([value, label, swatch]) => el('button.theme-opt', {
+          type: 'button',
+          'aria-pressed': String((s.settings.theme || 'dark') === value),
+          onclick: () => {
+            commit(st => { st.settings.theme = value; });
+            ctx.refresh();
+          },
+        },
+          el('div', { class: 'theme-swatch ' + swatch }),
+          el('span.micro', {}, label)))),
+      el('div.fine', { style: { marginTop: '10px' } },
+        'Dark is true black rather than dark grey — on an OLED screen those pixels are genuinely off, '
+        + 'which saves power and lets the cards read as objects floating in nothing.')),
+
     el('div.section-label', {}, el('span.micro', {}, 'Reading')),
     el('div.tile', {},
       el('div.between', {},

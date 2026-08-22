@@ -874,3 +874,257 @@ input.num-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 10px;
 }
+
+/* ═══ Surface: depth, glass, gradient ══════════════════════════════════
+   The reference direction — soft gradient tiles, glass panels, generous
+   radii — applied without letting it eat the data. The rule throughout:
+   atmosphere lives in the BACKGROUND of a card, never behind a number.
+   Gradient under text is where "designed" turns into "unreadable", and it
+   is also where AI-made interfaces usually give themselves away.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --r:     14px;
+  --r-lg:  22px;
+  --r-sm:  10px;
+
+  /* One warm light source, top-left, consistent across every raised
+     surface — the thing that makes the reference images read as objects
+     rather than rectangles. */
+  --sheen:      linear-gradient(150deg, rgba(255,255,255,.055), rgba(255,255,255,0) 42%);
+  --edge-light: inset 0 1px 0 rgba(255,255,255,.07);
+  --lift:       0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  --lift-lg:    0 2px 4px rgba(0,0,0,.4), 0 20px 48px -20px rgba(0,0,0,.8);
+
+  --teal-glow:  color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Every tile becomes an object with a light on it. */
+.tile {
+  border-radius: var(--r-lg);
+  background:
+    var(--sheen),
+    linear-gradient(168deg, var(--surface-2) 0%, var(--surface) 58%);
+  border: 1px solid var(--line);
+  box-shadow: var(--lift), var(--edge-light);
+  padding: 17px 18px;
+}
+.tile.flush { padding: 0; }
+
+/* The hero card carries actual atmosphere — a teal field bleeding out of
+   the top-left, the app's colour used as light rather than as a stripe. */
+.tile-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(120% 90% at 8% -10%, var(--teal-glow), transparent 62%),
+    var(--sheen),
+    linear-gradient(168deg, var(--surface-2), var(--surface) 62%);
+  box-shadow: var(--lift-lg), var(--edge-light);
+  border: 1px solid var(--line-2);
+}
+
+/* Recovery, sleep and strain each get their own coloured field, so the
+   card itself carries the reading before you have read anything. */
+.tile-field {
+  position: relative; overflow: hidden;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  box-shadow: var(--lift), var(--edge-light);
+  background:
+    radial-gradient(130% 100% at 10% -15%, var(--field, transparent), transparent 60%),
+    var(--sheen),
+    linear-gradient(168deg, var(--surface-2), var(--surface) 60%);
+}
+
+/* Glass, for things that float above content rather than sit in it. */
+.glass {
+  background: rgba(22, 28, 34, .58);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--lift), var(--edge-light);
+}
+
+.btn {
+  border-radius: var(--r);
+  background: var(--sheen), linear-gradient(168deg, var(--raised), var(--surface-2));
+  box-shadow: var(--edge-light);
+}
+.btn.primary {
+  background: linear-gradient(168deg,
+    color-mix(in srgb, var(--accent) 92%, white),
+    var(--accent) 70%);
+  box-shadow: 0 6px 18px -8px var(--teal-glow), inset 0 1px 0 rgba(255,255,255,.25);
+}
+.btn.sm { border-radius: var(--r-sm); }
+
+.sheet { border-radius: var(--r-lg) var(--r-lg) 0 0; }
+input, select, textarea { border-radius: var(--r-sm); }
+.metric { border-radius: var(--r); }
+
+/* A quiet grain over the whole app. Flat gradients on OLED band into
+   visible steps; a little noise breaks that up and is most of why the
+   reference images read as photographed rather than rendered. */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 9999;
+  pointer-events: none; opacity: .022;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* The readout, given room to be the thing you look at first. */
+.readout-main { font-size: 52px; letter-spacing: -.045em; }
+.tile-hero .readout-main {
+  background: linear-gradient(178deg, var(--text), color-mix(in srgb, var(--text) 62%, var(--muted)));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.now-card {
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(120% 100% at 6% -20%, color-mix(in srgb, var(--now-accent) 16%, transparent), transparent 58%),
+    var(--sheen),
+    linear-gradient(168deg, var(--surface-2), var(--surface) 60%);
+  box-shadow: var(--lift), var(--edge-light);
+  border: 1px solid var(--line-2);
+  padding: 17px 18px;
+}
+.now-card::before { width: 0; }   /* the field replaces the stripe */
+
+.ring-wrap::after {
+  content: '';
+  position: absolute; inset: 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--ring-glow, transparent), transparent 68%);
+  pointer-events: none;
+}
+
+/* ═══ Themes ═══════════════════════════════════════════════════════════
+   Dark is genuinely black, not charcoal — on an OLED phone the pixels are
+   off, the tiles read as objects floating in nothing, and the teal has the
+   contrast to actually glow. Light is a real light theme, not an inverted
+   dark one: shadows soften, the sheen flips from white to shade, and the
+   grain drops away because it only reads as texture against black.
+
+   Every colour lives here. Nothing hard-codes a hex anywhere else, which
+   is what makes a second theme possible at all.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root,
+:root[data-theme="dark"] {
+  --bg:        #000000;
+  --bg-2:      #08080A;
+  --surface:   #0D0D0F;
+  --surface-2: #151517;
+  --raised:    #1D1D20;
+  --line:      #242427;
+  --line-2:    #323236;
+
+  --text:      #F4F4F6;
+  --text-2:    #A9A9B0;
+  --muted:     #76767D;
+  --dim:       #55555C;
+
+  --accent:    #3DDBC4;
+  --accent-2:  #1E6B60;
+  --accent-ink:#04231F;
+
+  --glass:       rgba(18, 18, 21, .62);
+  --glass-solid: rgba(13, 13, 15, .97);
+  --glass-line:  rgba(244, 244, 246, .10);
+  --glass-hi:    rgba(255, 255, 255, .06);
+  --glass-active:rgba(244, 244, 246, .10);
+
+  --sheen:      linear-gradient(150deg, rgba(255,255,255,.05), rgba(255,255,255,0) 42%);
+  --edge-light: inset 0 1px 0 rgba(255,255,255,.06);
+  --lift:       0 1px 2px rgba(0,0,0,.6), 0 10px 28px -14px rgba(0,0,0,.9);
+  --lift-lg:    0 2px 6px rgba(0,0,0,.6), 0 24px 56px -22px rgba(0,0,0,1);
+  --grain:      .022;
+}
+
+:root[data-theme="light"] {
+  --bg:        #F4F4F6;
+  --bg-2:      #FFFFFF;
+  --surface:   #FFFFFF;
+  --surface-2: #FBFBFC;
+  --raised:    #EFEFF2;
+  --line:      #E3E3E8;
+  --line-2:    #D2D2DA;
+
+  --text:      #131316;
+  --text-2:    #4B4B55;
+  --muted:     #6E6E7A;
+  --dim:       #9A9AA6;
+
+  /* The teal has to darken considerably to stay legible on white. */
+  --accent:    #0E9C8E;
+  --accent-2:  #0A7A6F;
+  --accent-ink:#FFFFFF;
+
+  --good:      #12855F;
+  --warn:      #C4362B;
+  --caution:   #A66A00;
+
+  --m-p:       #1F7FC4;
+  --m-c:       #A66A00;
+  --m-f:       #7A4FBF;
+  --m-fib:     #3F8A3A;
+  --m-water:   #4257C4;
+
+  --glass:       rgba(255, 255, 255, .74);
+  --glass-solid: rgba(255, 255, 255, .97);
+  --glass-line:  rgba(19, 19, 22, .10);
+  --glass-hi:    rgba(255, 255, 255, .85);
+  --glass-active:rgba(19, 19, 22, .06);
+
+  /* Light surfaces catch shade, not sheen — a white highlight on white is
+     invisible, and the depth has to come from the shadow instead. */
+  --sheen:      linear-gradient(150deg, rgba(19,19,22,.018), rgba(19,19,22,0) 44%);
+  --edge-light: inset 0 1px 0 rgba(255,255,255,.9);
+  --lift:       0 1px 2px rgba(19,19,22,.06), 0 8px 20px -12px rgba(19,19,22,.18);
+  --lift-lg:    0 2px 6px rgba(19,19,22,.07), 0 20px 44px -20px rgba(19,19,22,.22);
+  --grain:      0;          /* grain only reads as texture against black */
+
+  --teal-glow:  color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* Following the system, when no explicit choice has been made. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    color-scheme: light;
+  }
+}
+
+body::after { opacity: var(--grain); }
+
+/* On true black the tab bar needs its own edge or it dissolves. */
+:root[data-theme="dark"] .tabs { border: 1px solid var(--line); }
+
+/* Charts read differently on white: the track needs weight, the fills less. */
+:root[data-theme="light"] .rail-track { background: var(--raised); }
+:root[data-theme="light"] .stage-bar  { background: var(--raised); }
+:root[data-theme="light"] .bar-fill   { opacity: .92; }
+
+/* Theme picker in Settings. */
+.theme-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.theme-opt {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  padding: 11px 8px 9px;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  background: var(--surface-2);
+}
+.theme-opt[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.theme-swatch {
+  width: 100%; height: 30px; border-radius: 7px;
+  border: 1px solid var(--line);
+}
+.theme-swatch.dark  { background: linear-gradient(140deg, #000, #16161a); }
+.theme-swatch.light { background: linear-gradient(140deg, #fff, #e9e9ee); }
+.theme-swatch.auto  { background: linear-gradient(105deg, #000 50%, #fff 50%); }

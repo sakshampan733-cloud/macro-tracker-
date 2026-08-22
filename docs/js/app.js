@@ -80,6 +80,32 @@ function drawHeader() {
 }
 
 /*
+ * Put the chosen theme on the root element.
+ *
+ * 'auto' deliberately sets no attribute, which lets the CSS fall through to
+ * prefers-color-scheme. Also updates the browser chrome colour, so the
+ * status bar on an installed app matches rather than sitting as a grey band
+ * above a black screen.
+ */
+function applyTheme(pref) {
+  const root = document.documentElement;
+  if (pref === 'auto' || !pref) root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', pref);
+
+  const dark = pref === 'dark'
+    || (pref !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches !== false);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#000000' : '#F4F4F6');
+  root.style.colorScheme = pref === 'auto' ? 'light dark' : pref;
+}
+
+/* React to the system flipping while the app is open, on 'auto'. */
+window.matchMedia?.('(prefers-color-scheme: dark)')
+  .addEventListener?.('change', () => {
+    if ((get().settings?.theme || 'dark') === 'auto') applyTheme('auto');
+  });
+
+/*
  * Re-solve the home-dish densities before drawing.
  *
  * Entries store grams and a style, so every screen values them from this.
@@ -103,6 +129,7 @@ function refreshDensities() {
 
 function draw() {
   const s = get();
+  applyTheme(s.settings?.theme || 'dark');
   setExplanations(s.settings?.explain !== false);
   refreshDensities();
   clear(main);

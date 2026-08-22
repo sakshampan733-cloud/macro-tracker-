@@ -55,6 +55,7 @@ const EMPTY = () => ({
   library: {},
   meals: {},
   supplementsTaken: [],     // which supplement ids the user actually takes
+  favourites: [],           // food ids starred for the top of the list
   blood: {},                // blood panels, keyed by id
   recipes: {},
   cache: {},
@@ -69,6 +70,7 @@ const EMPTY = () => ({
     checkInDays: 14,        // fortnight by default — see the Body screen for why
     energyView: 'remaining',
     explain: true,          // show the teaching text, or just the numbers
+    theme: 'dark',          // 'dark' | 'light' | 'auto'
     isDemo: false,          // generated data is loaded, not real logging
     relayUrl: '',           // Cloudflare worker that fronts Whoop
     limitsOpen: false,
@@ -366,6 +368,25 @@ export function weightSeries() {
     .map(([k, d]) => ({ date: k, kg: d.weight }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/* ── Favourites ─────────────────────────────────────────────────────── */
+
+/* The handful of foods that should never need searching for. */
+export function toggleFavourite(id) {
+  if (!id) return;
+  commit(s => {
+    s.favourites = s.favourites || [];
+    const i = s.favourites.indexOf(id);
+    if (i >= 0) s.favourites.splice(i, 1);
+    else s.favourites.unshift(id);
+  }, 'favourites');
+}
+
+export function isFavourite(id) {
+  return !!(state.favourites || []).includes(id);
+}
+
+export function favouriteIds() { return [...(state.favourites || [])]; }
 
 /* ── Supplements ────────────────────────────────────────────────────── */
 
