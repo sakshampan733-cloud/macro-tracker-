@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.22-polish';
+export const VERSION = '2026.08.22-share';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
@@ -104,24 +104,39 @@ function drawHeader() {
 }
 
 /*
- * Put the chosen theme on the root element.
+ * Theme.
  *
- * 'auto' deliberately sets no attribute, which lets the CSS fall through to
- * prefers-color-scheme. Also updates the browser chrome colour, so the
- * status bar on an installed app matches rather than sitting as a grey band
- * above a black screen.
+ * 'auto' used to mean "set no attribute and let prefers-color-scheme
+ * decide". That worked for the colour tokens and nothing else: the app
+ * has 32 rules scoped to [data-theme="light"] — the header edge, the
+ * grain level, pane shadows, the orb tint — and none of them can match
+ * while the attribute is absent. The result was light tokens wearing dark
+ * corrections, which is the mixed appearance System mode showed.
+ *
+ * So auto RESOLVES now. The stored preference stays 'auto' and keeps
+ * following the system, but the attribute on the root is always a real
+ * 'dark' or 'light', and every rule in the stylesheet works as written.
  */
+function systemPrefersDark() {
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true;
+}
+
 function applyTheme(pref) {
   const root = document.documentElement;
-  if (pref === 'auto' || !pref) root.removeAttribute('data-theme');
-  else root.setAttribute('data-theme', pref);
+  const resolved = (!pref || pref === 'auto')
+    ? (systemPrefersDark() ? 'dark' : 'light')
+    : pref;
 
-  const dark = pref === 'dark'
-    || (pref !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches !== false);
+  root.setAttribute('data-theme', resolved);
+
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', dark ? '#000000' : '#F4F4F6');
-  root.style.colorScheme = pref === 'auto' ? 'light dark' : pref;
-  applyOrb(get().settings?.orb || 'red', pref);
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#000000' : '#EFEFF1');
+
+  /* colorScheme still advertises both on auto, so scrollbars and form
+     controls keep tracking the system rather than being pinned. */
+  root.style.colorScheme = (!pref || pref === 'auto') ? 'light dark' : resolved;
+
+  applyOrb(get().settings?.orb || 'red', resolved);
 }
 
 /* React to the system flipping while the app is open, on 'auto'. */

@@ -20,6 +20,9 @@
  * still tints the panes without becoming the subject.
  */
 export const ORBS = {
+  /* No glow at all. Some people want the glass over flat ground, and
+     "off" is a legitimate choice rather than an absence of one. */
+  none:    { label: 'None',    dark: null,            light: null },
   red:     { label: 'Red',     dark: '198, 76, 66',   light: '208, 88, 76' },
   amber:   { label: 'Amber',   dark: '206, 134, 78',  light: '216, 146, 88' },
   rose:    { label: 'Rose',    dark: '196, 110, 122', light: '206, 124, 134' },
@@ -29,8 +32,18 @@ export const ORBS = {
 };
 
 export function applyOrb(name, theme) {
+  const root = document.documentElement;
   const orb = ORBS[name] || ORBS.red;
   const dark = theme === 'dark'
     || (theme !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches !== false);
-  document.documentElement.style.setProperty('--orb', dark ? orb.dark : orb.light);
+
+  /* Switching the ambient off entirely rather than fading it to zero: a
+     transparent gradient still costs a full-screen paint on every frame. */
+  if (!orb.dark) {
+    root.style.removeProperty('--orb');
+    root.setAttribute('data-orb', 'none');
+    return;
+  }
+  root.removeAttribute('data-orb');
+  root.style.setProperty('--orb', dark ? orb.dark : orb.light);
 }

@@ -12,7 +12,7 @@
  */
 
 import {
-  el, sheet, kcal, g, grams, icon, segmented, explain, dateLabel, field, replaceKids,
+  el, sheet, kcal, g, grams, icon, segmented, explain, dateLabel, field, replaceKids, toast,
 } from '../ui.js';
 import { healthLine } from '../charts.js';
 import { get, totals, byMeal, dayKey, shiftDay, entryMacros } from '../store.js';
@@ -294,10 +294,100 @@ const PRESETS = [
 const spanDays = (from, to) =>
   Math.max(1, Math.round((new Date(to + 'T12:00:00') - new Date(from + 'T12:00:00')) / 86400000) + 1);
 
+
+/*
+ * Sharing a report.
+ *
+ * Plain text rather than a file or an image, because the thing people
+ * actually do with this is paste it into a message to a coach, a parent
+ * or a friend — and a .json attachment is useless to all three. It has to
+ * be readable by someone who has never seen the app.
+ *
+ * Coverage leads, because an average over four logged days out of
+ * fourteen is not a fortnight's diet and whoever reads this deserves to
+ * know that before they read the numbers.
+ */
+export function reportText(r, name = '') {
+  const pct = Math.round(r.coverage * 100);
+  const L = [];
+  const who = (name || '').trim();
+
+  L.push(who ? `${who} — Basal report` : 'Basal report');
+  L.push(`${r.from} to ${r.to}  (${r.days} day${r.days === 1 ? '' : 's'})`);
+  L.push('');
+  L.push(`Logged ${r.logged} of ${r.days} days — ${pct}% coverage`);
+  if (pct < 70) L.push('Averages below cover only the logged days, so read them as a sample.');
+  L.push('');
+
+  if (r.logged) {
+    L.push('DAILY AVERAGE');
+    L.push(`  Energy    ${Math.round(r.mean.kcal)} kcal`
+      + (r.targets ? `   (target ${Math.round(r.targets.kcal)})` : ''));
+    L.push(`  Protein   ${Math.round(r.mean.p)} g`
+      + (r.targets ? `   (target ${Math.round(r.targets.p)})` : ''));
+    L.push(`  Carbs     ${Math.round(r.mean.c)} g`
+      + (r.targets ? `   (target ${Math.round(r.targets.c)})` : ''));
+    L.push(`  Fat       ${Math.round(r.mean.f)} g`
+      + (r.targets ? `   (target ${Math.round(r.targets.f)})` : ''));
+    if (r.mean.fib)   L.push(`  Fibre     ${Math.round(r.mean.fib)} g`);
+    if (r.mean.sug)   L.push(`  Sugar     ${Math.round(r.mean.sug)} g`);
+    if (r.mean.sat)   L.push(`  Saturated ${Math.round(r.mean.sat)} g`);
+    if (r.mean.water) L.push(`  Water     ${(r.mean.water / 1000).toFixed(1)} L`);
+    L.push('');
+  }
+
+  if (r.weights && r.weights.length > 1) {
+    const a = r.weights[0], b = r.weights[r.weights.length - 1];
+    const d = b.kg - a.kg;
+    L.push('WEIGHT');
+    L.push(`  ${a.kg.toFixed(1)} kg on ${a.date}  ->  ${b.kg.toFixed(1)} kg on ${b.date}`);
+    L.push(`  ${d >= 0 ? '+' : ''}${d.toFixed(1)} kg over the period`);
+    L.push('');
+  }
+
+  if (r.timing && (r.timing.lateNights || r.timing.longGaps)) {
+    L.push('TIMING');
+    if (r.timing.lateNights) L.push(`  ${r.timing.lateNights} night${r.timing.lateNights === 1 ? '' : 's'} eating close to bedtime`);
+    if (r.timing.longGaps)   L.push(`  ${r.timing.longGaps} long gap${r.timing.longGaps === 1 ? '' : 's'} between meals`);
+    L.push('');
+  }
+
+  L.push('Measured with Basal.');
+  return L.join('\n');
+}
+
+/*
+ * Hand it to the platform if the platform has a share sheet, otherwise
+ * the clipboard. Both can fail — a share can be cancelled, a clipboard
+ * write can be refused without a user gesture — so the caller is told
+ * which happened rather than being left to assume it worked.
+ */
+export async function shareReport(r, name) {
+  const text = reportText(r, name);
+  const title = `Basal — ${r.from} to ${r.to}`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text });
+      return 'shared';
+    } catch (e) {
+      if (e && e.name === 'AbortError') return 'cancelled';
+      /* fall through to the clipboard */
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return 'copied';
+  } catch {
+    return 'failed';
+  }
+}
+
 export function openReport(ctx, initialDays = 7) {
   const store = get();
   let days = initialDays;
   let customFrom = null, customTo = null, customOpen = false;
+  let latest = null;   // the report currently on screen, for sharing
 
   const body = el('div');
 
@@ -305,6 +395,7 @@ export function openReport(ctx, initialDays = 7) {
     const to = customTo || dayKey();
     const from = customFrom || shiftDay(to, -(days - 1));
     const r = buildReport(store, from, to);
+    latest = r;
 
     const t = r.targets;
     const vsTarget = t ? Math.round(r.mean.kcal - t.kcal) : null;
@@ -409,5 +500,20 @@ export function openReport(ctx, initialDays = 7) {
   };
 
   render();
-  return sheet({ title: 'Report', body });
+  return sheet({
+    title: 'Report',
+    body,
+    foot: el('button.btn.primary.block', {
+      onclick: async e => {
+        const btn = e.currentTarget;
+        if (!latest) return;
+        const was = btn.textContent;
+        btn.textContent = 'Preparing…';
+        const how = await shareReport(latest, store.profile?.name);
+        btn.textContent = was;
+        if (how === 'copied') toast('Report copied — paste it anywhere.');
+        else if (how === 'failed') toast('Could not share. Try Export in Settings.', 'err');
+      },
+    }, icon('upload', 17), navigator.share ? 'Share this report' : 'Copy this report'),
+  });
 }

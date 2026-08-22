@@ -2004,3 +2004,22 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
   color: var(--muted); margin-bottom: 10px;
 }
 .guide-pick .orb-row { margin-bottom: 2px; }
+
+/* No orb: flat ground, glass unchanged. */
+:root[data-orb="none"] body::before { background: var(--bg); }
+
+/* The System swatch was a hard 50/50 split at 105deg, which renders as a
+   jagged step rather than a diagonal. A true 45° split with a hairline
+   reads as the two halves it is meant to show. */
+.theme-swatch.auto {
+  background: linear-gradient(45deg, #000 0%, #000 49.6%, rgba(255,255,255,.35) 49.6%,
+                              rgba(255,255,255,.35) 50.4%, #fff 50.4%, #fff 100%);
+}
+
+.orb-dot[title="None"] {
+  background:
+    linear-gradient(45deg, transparent 46%, var(--line-2) 46%,
+                    var(--line-2) 54%, transparent 54%),
+    var(--surface-2);
+  border-color: var(--line-2);
+}
