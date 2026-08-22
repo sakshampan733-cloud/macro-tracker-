@@ -10,7 +10,7 @@ import {
   el, clear, sheet, toast, icon, kcal, grams, g, empty, field, segmented, confirmSheet,
 } from '../ui.js';
 import {
-  get, saveFood, frequentFoods, recentFoods, dayKey,
+  get, saveFood, frequentFoods, recentFoods, dayKey, totals,
   mealsList, mealTotals, logMeal, deleteMeal, renameMeal, MEALS,
 } from '../store.js';
 import { FOODS, GROUPS, atwater } from '../data/foods.js';
@@ -20,6 +20,52 @@ import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
 import { openPot } from './pot.js';
 import { openMealBuilder } from './meal.js';
+import { dayTargets } from './today.js';
+
+/*
+ * A live header of what you have eaten so far, pinned above the search.
+ *
+ * Adding food and watching the day fill up were on separate tabs, so you
+ * logged blind and then went somewhere else to find out what it did. This
+ * is the single most useful thing Stupid Simple does: the consumed macros
+ * sit on the same screen you add from, and they move as you add.
+ */
+function consumedHeader(s, ctx) {
+  const key = ctx.date || dayKey();
+  const t = totals(key);
+  const targets = dayTargets(s, key);
+
+  const bar = (label, val, target, hue) => {
+    const pct = target > 0 ? Math.min(100, (val / target) * 100) : 0;
+    return el('div', {},
+      el('div.between', { style: { marginBottom: '3px' } },
+        el('span.micro', { style: { color: hue } }, label),
+        el('span.num', { style: { fontSize: '11.5px' } },
+          `${Math.round(val)}/${Math.round(target)}`)),
+      el('div', { style: {
+        height: '5px', borderRadius: '3px', background: 'var(--line)', overflow: 'hidden',
+      } },
+        el('div', { style: {
+          height: '100%', width: pct + '%', background: hue, borderRadius: '3px',
+          transition: 'width .5s cubic-bezier(.22,1,.36,1)',
+        } })));
+  };
+
+  const left = Math.round(targets.kcal - t.kcal);
+  return el('div.sticky-glass', {},
+    el('div.between', { style: { marginBottom: '9px' } },
+      el('div.flex', {},
+        el('span.num', { style: { fontSize: '21px', fontWeight: '500' } }, kcal(t.kcal)),
+        el('span.micro', { style: { marginLeft: '6px' } }, `of ${kcal(targets.kcal)}`)),
+      el('span.num', {
+        style: { fontSize: '13px', color: left < 0 ? 'var(--warn)' : 'var(--good)' },
+      }, left < 0 ? `${Math.abs(left)} over` : `${left} left`)),
+    el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' } },
+      bar('Protein', t.p, targets.p, 'var(--m-p)'),
+      bar('Carbs', t.c, targets.c, 'var(--m-c)'),
+      bar('Fat', t.f, targets.f, 'var(--m-f)')),
+  );
+}
 
 export function renderAdd(root, ctx) {
   const s = get();
@@ -34,7 +80,8 @@ export function renderAdd(root, ctx) {
   const results = el('div');
 
   root.append(
-    el('h1', { style: { marginBottom: '14px' } }, 'Add food'),
+    consumedHeader(s, ctx),
+    el('div', { style: { height: '14px' } }),
 
     el('div.btn-row', { style: { marginBottom: '10px' } },
       el('button.btn.primary', { onclick: () => openScanner(ctx) }, icon('scan', 18), 'Scan'),

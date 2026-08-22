@@ -547,3 +547,118 @@ function checkInStatus(ci, targetRateKgPerWeek) {
   }
   return { headline: 'Going the wrong way', tone: 'warn' };
 }
+
+
+/* ── Goals with a deadline ─────────────────────────────────────────── */
+
+/*
+ * "Lose 3 kg in two months" is how people actually think about this, and
+ * it is a more useful way to set a target than picking a weekly rate in the
+ * abstract — the rate falls out of the goal rather than the other way
+ * round.
+ *
+ * The honest part is what happens next: once there is a weight trend, the
+ * app compares the pace the goal needs against the pace actually happening
+ * and reports the gap, rather than quietly moving the finish line.
+ */
+export function goalStatus(store, profile, today = new Date()) {
+  const goal = store.goal;
+  if (!goal || !goal.targetKg || !goal.byDate) return null;
+
+  const start = new Date(goal.startDate + 'T12:00:00');
+  const end = new Date(goal.byDate + 'T12:00:00');
+  const totalDays = Math.max(1, Math.round((end - start) / 86400000));
+  const elapsed = Math.max(0, Math.round((today - start) / 86400000));
+  const daysLeft = Math.max(0, Math.round((end - today) / 86400000));
+
+  const series = Object.entries(store.days)
+    .filter(([, d]) => d.weight > 0)
+    .map(([date, d]) => ({ date, kg: d.weight }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const withTrend = trendWeight(series);
+  const current = withTrend.length ? withTrend[withTrend.length - 1].trend : profile.weightKg;
+
+  const totalChange = goal.targetKg - goal.startKg;
+  const doneChange = current - goal.startKg;
+  const remaining = goal.targetKg - current;
+
+  // progress against the goal, not against the calendar
+  const progress = totalChange !== 0
+    ? Math.max(0, Math.min(1, doneChange / totalChange))
+    : 0;
+
+  const neededPerWeek = daysLeft > 0 ? (remaining / daysLeft) * 7 : 0;
+
+  /* Actual pace from the last three weeks of trend, which is the shortest
+     window where the number means anything. */
+  let actualPerWeek = null;
+  const recent = withTrend.slice(-21);
+  if (recent.length >= 6) {
+    const t0 = new Date(recent[0].date).getTime();
+    const pts = recent.map(p => ({
+      x: (new Date(p.date).getTime() - t0) / 86400000, y: p.trend,
+    }));
+    const n = pts.length;
+    const mx = pts.reduce((a, p) => a + p.x, 0) / n;
+    const my = pts.reduce((a, p) => a + p.y, 0) / n;
+    const num = pts.reduce((a, p) => a + (p.x - mx) * (p.y - my), 0);
+    const den = pts.reduce((a, p) => a + (p.x - mx) ** 2, 0);
+    if (den) actualPerWeek = (num / den) * 7;
+  }
+
+  let projectedDate = null;
+  if (actualPerWeek && Math.abs(actualPerWeek) > 0.01
+      && Math.sign(actualPerWeek) === Math.sign(remaining || totalChange)) {
+    const weeks = remaining / actualPerWeek;
+    if (weeks > 0 && weeks < 260) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + Math.round(weeks * 7));
+      projectedDate = d.toISOString().slice(0, 10);
+    }
+  }
+
+  const onPace = actualPerWeek != null && neededPerWeek !== 0
+    ? actualPerWeek / neededPerWeek
+    : null;
+
+  return {
+    ...goal,
+    current: +current.toFixed(1),
+    remaining: +remaining.toFixed(1),
+    progress,
+    totalDays, elapsed, daysLeft,
+    neededPerWeek: +neededPerWeek.toFixed(2),
+    actualPerWeek: actualPerWeek == null ? null : +actualPerWeek.toFixed(2),
+    onPace,
+    projectedDate,
+    reached: totalChange < 0 ? current <= goal.targetKg : current >= goal.targetKg,
+  };
+}
+
+/*
+ * The pace a goal implies, and whether it is a sane one to attempt.
+ * Beyond roughly 1% of bodyweight a week the loss stops being mostly fat,
+ * so a goal that requires more than that is worth flagging before it is set
+ * rather than after it has failed.
+ */
+export function goalFeasibility(startKg, targetKg, days) {
+  const weeks = Math.max(0.1, days / 7);
+  const perWeek = (targetKg - startKg) / weeks;
+  const pctPerWeek = Math.abs(perWeek) / startKg * 100;
+  const losing = perWeek < 0;
+
+  let verdict = 'sensible';
+  if (pctPerWeek > 1.0) verdict = losing ? 'too fast' : 'mostly fat gain';
+  else if (pctPerWeek > 0.7) verdict = 'aggressive';
+  else if (pctPerWeek < 0.08) verdict = 'very gentle';
+
+  return {
+    perWeek: +perWeek.toFixed(2),
+    pctPerWeek: +pctPerWeek.toFixed(2),
+    verdict, losing,
+    suggestedDays: pctPerWeek > 1.0
+      ? Math.ceil(Math.abs(targetKg - startKg) / (startKg * 0.0075) * 7)
+      : null,
+  };
+}

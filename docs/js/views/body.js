@@ -18,6 +18,7 @@ import {
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict } from '../nutrition.js';
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
+import { goalTile } from './goal.js';
 import {
   ring, areaChart, stageBar, liveDot, barRow, recoveryColour, countUp,
 } from '../charts.js';
@@ -34,6 +35,7 @@ export function renderBody(root, ctx) {
     (root.classList.add('stagger'), el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Body'),
       el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report'))),
+    goalTile(s, ctx),
     checkInTile(s, ctx),
     weightTile(ctx),
     tdeeTile(s),

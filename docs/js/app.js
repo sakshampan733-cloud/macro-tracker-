@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.21-themes';
+export const VERSION = '2026.08.21-remodel';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';
@@ -31,6 +31,10 @@ const TABS = [
 const ROUTES = Object.fromEntries(TABS.map(t => [t.id, t.render]));
 ROUTES.settings = renderSettings;
 
+/* Screens that pin their own header. The brand bar scrolls away on these
+   so two sticky bars never fight for the same few pixels. */
+const STICKY_ROUTES = new Set(['add']);
+
 const ctx = {
   route: 'today',
   date: dayKey(),
@@ -49,12 +53,16 @@ const main = document.getElementById('app');
 const nav = document.getElementById('tabs');
 const scroller = document.getElementById('scroller');
 
-/* The pill shrinks aside while the page is moving and settles once it stops. */
+/* The pill shrinks aside while the page is moving and settles once it stops.
+   The brand bar picks up a hairline once anything has scrolled behind it. */
 let settle;
 scroller.addEventListener('scroll', () => {
   nav.classList.add('scrolling');
   clearTimeout(settle);
   settle = setTimeout(() => nav.classList.remove('scrolling'), 220);
+
+  const bar = main.querySelector('.topbar');
+  if (bar) bar.classList.toggle('scrolled', scroller.scrollTop > 4);
 }, { passive: true });
 
 function drawNav() {
@@ -141,6 +149,7 @@ function draw() {
   }
 
   nav.classList.remove('hide');
+  main.classList.toggle('has-sticky', STICKY_ROUTES.has(ctx.route));
   main.append(drawHeader());
 
   const view = el('div');

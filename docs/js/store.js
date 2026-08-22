@@ -57,6 +57,7 @@ const EMPTY = () => ({
   supplementsTaken: [],     // which supplement ids the user actually takes
   favourites: [],           // food ids starred for the top of the list
   blood: {},                // blood panels, keyed by id
+  goal: null,               // { startKg, targetKg, startDate, byDate }
   recipes: {},
   cache: {},
   whoop: { rows: {}, importedAt: null },

@@ -279,3 +279,125 @@ export function barRow(points, { h = 56, colourFor = () => 'var(--accent)' } = {
   });
   return wrap;
 }
+
+/* ── Apple Health style ─────────────────────────────────────────────── */
+
+/*
+ * The chart language Apple Health uses, and the reason it reads so well:
+ * rounded capsule bars rather than a hairline, the extremes labelled
+ * directly on the chart instead of on an axis you have to read across to,
+ * and no gridlines competing with the data. You take the shape in first and
+ * the numbers second, which is the right order for a glance.
+ */
+export function healthBars(points, {
+  h = 150, colour = 'var(--accent)', unit = '', dp = 0,
+  showRange = true, barMin = 3, gap = 0.34,
+} = {}) {
+  const svg = svgEl('svg', { class: 'hchart' });
+  svg.setAttribute('height', String(h));
+  if (!points.length) return svg;
+
+  const n = points.length;
+  const w = Math.max(300, n * 13);
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const vals = points.map(p => p.v).filter(v => v != null);
+  if (!vals.length) return svg;
+
+  const hi = Math.max(...vals);
+  const lo = Math.min(...vals);
+  // Bars read from a baseline; starting the scale at the minimum would make
+  // a 2% difference look like a cliff.
+  const base = lo > 0 && (hi - lo) / hi < 0.55 ? lo * 0.92 : 0;
+  const span = (hi - base) || 1;
+
+  const topPad = showRange ? 26 : 8;
+  const botPad = 20;
+  const plot = h - topPad - botPad;
+
+  const slot = w / n;
+  const bw = Math.max(barMin, slot * (1 - gap));
+  const y = v => topPad + plot - ((v - base) / span) * plot;
+
+  const hiIdx = vals.length ? points.findIndex(p => p.v === hi) : -1;
+  const loIdx = vals.length ? points.findIndex(p => p.v === lo) : -1;
+
+  points.forEach((p, i) => {
+    if (p.v == null) return;
+    const top = y(p.v);
+    const height = Math.max(barMin, topPad + plot - top);
+    const x = i * slot + (slot - bw) / 2;
+    const c = typeof colour === 'function' ? colour(p.v, p) : colour;
+    const bar = svgEl('rect', {
+      class: 'hbar',
+      x: x.toFixed(1), y: top.toFixed(1),
+      width: bw.toFixed(1), height: height.toFixed(1),
+      rx: Math.min(bw / 2, 4), fill: c,
+      opacity: p.dim ? 0.34 : 1,
+    });
+    if (p.label) {
+      const t = svgEl('title'); t.textContent = p.label; bar.append(t);
+    }
+    svg.append(bar);
+
+    if (!reduced()) {
+      bar.setAttribute('y', String(topPad + plot));
+      bar.setAttribute('height', '0');
+      const settle = () => {
+        bar.style.transition = `y .6s cubic-bezier(.22,1,.36,1) ${i * 12}ms, height .6s cubic-bezier(.22,1,.36,1) ${i * 12}ms`;
+        bar.setAttribute('y', top.toFixed(1));
+        bar.setAttribute('height', height.toFixed(1));
+      };
+      requestAnimationFrame(settle);
+      setTimeout(settle, 500);
+    }
+  });
+
+  /* Extremes labelled on the chart, where the eye already is. */
+  if (showRange && hiIdx >= 0) {
+    const put = (idx, val, above) => {
+      const x = Math.min(w - 26, Math.max(22, idx * slot + slot / 2));
+      const t = svgEl('text', {
+        class: 'hc-cap', x, y: above ? y(val) - 9 : h - 6,
+        'text-anchor': 'middle', fill: 'var(--text-2)',
+      });
+      t.textContent = fmt(val, dp) + unit;
+      svg.append(t);
+    };
+    put(hiIdx, hi, true);
+    if (loIdx >= 0 && lo !== hi) put(loIdx, lo, false);
+  }
+  return svg;
+}
+
+/*
+ * A stacked day-part bar — sleep stages, or where the day's calories fell.
+ * Same capsule language, read horizontally.
+ */
+export function segmentBar(segments, { h = 30, radius = 8 } = {}) {
+  const total = segments.reduce((a, s) => a + (s.value || 0), 0);
+  const wrap = document.createElement('div');
+  wrap.className = 'stage-bar';
+  wrap.style.height = h + 'px';
+  wrap.style.borderRadius = radius + 'px';
+  if (!total) return wrap;
+
+  segments.forEach((s, i) => {
+    if (!(s.value > 0)) return;
+    const seg = document.createElement('div');
+    seg.className = 'stage-seg';
+    seg.style.background = s.colour;
+    seg.title = `${s.label}: ${s.display ?? s.value}`;
+    const pct = (s.value / total) * 100;
+    seg.style.width = reduced() ? pct + '%' : '0%';
+    seg.style.transitionDelay = (i * 80) + 'ms';
+    wrap.append(seg);
+    if (!reduced()) {
+      const settle = () => { seg.style.width = pct + '%'; };
+      requestAnimationFrame(settle);
+      setTimeout(settle, 500);
+    }
+  });
+  return wrap;
+}

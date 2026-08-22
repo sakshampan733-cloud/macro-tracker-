@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.08.21-themes';
+const CACHE = 'basal-2026.08.21-remodel';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -19,7 +19,7 @@ const SHELL = [
   'js/views/macro.js', 'js/data/quality.js', 'js/data/quality-map.js',
   'js/views/supplements.js', 'js/data/supplements.js',
   'js/views/blood.js', 'js/data/bloodwork.js', 'js/views/report.js', 'js/demo.js',
-  'js/whooprelay.js', 'js/charts.js', 'js/coachnow.js',
+  'js/whooprelay.js', 'js/charts.js', 'js/coachnow.js', 'js/views/goal.js',
   'vendor/zxing.min.js',
   'fonts/ibm-plex-sans-400.woff2', 'fonts/ibm-plex-sans-500.woff2', 'fonts/ibm-plex-sans-600.woff2',
   'fonts/ibm-plex-sans-condensed-500.woff2', 'fonts/ibm-plex-sans-condensed-600.woff2',

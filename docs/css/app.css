@@ -1128,3 +1128,219 @@ body::after { opacity: var(--grain); }
 .theme-swatch.dark  { background: linear-gradient(140deg, #000, #16161a); }
 .theme-swatch.light { background: linear-gradient(140deg, #fff, #e9e9ee); }
 .theme-swatch.auto  { background: linear-gradient(105deg, #000 50%, #fff 50%); }
+
+/* ═══ Remodel: glass, warmth, depth ════════════════════════════════════
+   The previous pass added shadows but everything still sat on a flat
+   plane. This makes the app layered: content scrolls UNDER the chrome,
+   and the chrome is genuinely translucent, so you can see what is behind
+   it. That is what makes glass read as glass rather than as grey.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root, :root[data-theme="dark"] {
+  /* Glass over black needs less blur and more saturation than over white,
+     or it turns into flat charcoal. */
+  --glass-bg:     rgba(16, 16, 19, .58);
+  --glass-strong: rgba(11, 11, 13, .74);
+  --glass-brd:    rgba(255, 255, 255, .10);
+  --glass-hi:     rgba(255, 255, 255, .055);
+  --blur:         saturate(180%) blur(28px);
+
+  /* A single ambient wash behind everything, so the black is not dead. */
+  --ambient:
+    radial-gradient(120% 70% at 12% -8%,  color-mix(in srgb, var(--accent) 11%, transparent), transparent 58%),
+    radial-gradient(100% 60% at 92% 4%,   rgba(122, 90, 200, .10), transparent 62%),
+    radial-gradient(140% 80% at 50% 108%, rgba(61, 219, 196, .05), transparent 60%);
+}
+
+:root[data-theme="light"] {
+  /* Warm off-white, not clinical white — the reference light direction is
+     bone and sand, with colour bleeding through, never a flat sheet. */
+  --bg:        #F3EFEA;
+  --bg-2:      #FBF8F5;
+  --surface:   rgba(255, 255, 255, .78);
+  --surface-2: rgba(255, 255, 255, .62);
+  --raised:    rgba(255, 255, 255, .92);
+  --line:      rgba(60, 48, 40, .10);
+  --line-2:    rgba(60, 48, 40, .17);
+
+  --text:      #1B1714;
+  --text-2:    #554C45;
+  --muted:     #7C716A;
+  --dim:       #A79C94;
+
+  --accent:    #0E9C8E;
+  --accent-2:  #0A7A6F;
+  --accent-ink:#FFFFFF;
+
+  --glass-bg:     rgba(255, 255, 255, .55);
+  --glass-strong: rgba(255, 255, 255, .74);
+  --glass-brd:    rgba(255, 255, 255, .70);
+  --glass-hi:     rgba(255, 255, 255, .85);
+  --blur:         saturate(180%) blur(26px);
+
+  --sheen:      linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,0) 46%);
+  --edge-light: inset 0 1px 0 rgba(255,255,255,.85);
+  --lift:       0 1px 2px rgba(60,48,40,.05), 0 10px 26px -14px rgba(60,48,40,.20);
+  --lift-lg:    0 2px 8px rgba(60,48,40,.06), 0 26px 56px -24px rgba(60,48,40,.26);
+
+  /* Warm light fields, the C.Lab / sunset palette, used as atmosphere. */
+  --ambient:
+    radial-gradient(110% 62% at 88% -6%, rgba(255, 148, 60, .20), transparent 60%),
+    radial-gradient(100% 58% at 6% 2%,  rgba(140, 190, 255, .16), transparent 58%),
+    radial-gradient(130% 70% at 50% 106%, rgba(255, 196, 150, .16), transparent 62%);
+}
+
+/* The wash sits behind everything and does not scroll — the app has a sky. */
+html { background: var(--bg); }
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: -1;
+  background: var(--ambient), var(--bg);
+  background-attachment: fixed;
+}
+body { background: transparent; }
+
+/* ── Real glass ──────────────────────────────────────────────────────── */
+
+.tabs {
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-brd);
+  box-shadow:
+    0 8px 32px -8px rgba(0,0,0,.45),
+    inset 0 1px 0 var(--glass-hi);
+}
+:root[data-theme="light"] .tabs {
+  box-shadow: 0 8px 30px -10px rgba(60,48,40,.28), inset 0 1px 0 var(--glass-hi);
+}
+
+/* Content must run UNDER the bar for the blur to have anything to do. */
+#app { padding-bottom: calc(var(--tab-h) + 46px); }
+
+.topbar {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* A glass header that content scrolls beneath. */
+.sticky-glass {
+  position: sticky; top: 0; z-index: 30;
+  margin: 0 calc(var(--pad) * -1);
+  padding: 10px var(--pad) 12px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: 1px solid var(--glass-brd);
+  box-shadow: 0 6px 20px -12px rgba(0,0,0,.5);
+}
+
+.sheet {
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-brd);
+  border-bottom: 0;
+  box-shadow: 0 -8px 48px -12px rgba(0,0,0,.6), inset 0 1px 0 var(--glass-hi);
+}
+.sheet-head, .sheet-foot { background: transparent; border-color: var(--glass-brd); }
+
+/* Tiles become glass panels rather than solid blocks. */
+.tile {
+  background: var(--sheen), var(--surface);
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  border: 1px solid var(--line);
+}
+.tile-hero, .tile-field {
+  backdrop-filter: saturate(150%) blur(18px);
+  -webkit-backdrop-filter: saturate(150%) blur(18px);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .tabs, .sheet, .sticky-glass { background: var(--glass-solid); }
+}
+
+/* ── Apple Health style charts ───────────────────────────────────────── */
+
+.hchart { width: 100%; display: block; overflow: visible; }
+.hchart .hc-grid { stroke: var(--line); stroke-width: 1; }
+.hchart .hc-axis {
+  font-family: var(--mono); font-size: 9px; fill: var(--dim);
+  letter-spacing: .05em;
+}
+.hchart .hc-cap {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .04em;
+}
+
+/* Rounded capsule bars, the Apple Health signature. */
+.hbar { transition: opacity .2s; }
+.hbar:hover { opacity: .75; }
+
+.hchart-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-bottom: 4px;
+}
+.hchart-val {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 27px; font-weight: 500; letter-spacing: -.03em;
+}
+.hchart-val .u { font-size: 12px; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+
+/* A row that clearly opens something. */
+.open-row {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  padding: 13px 15px;
+  border-radius: var(--r);
+  background: var(--sheen), var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--lift);
+  margin-bottom: 9px;
+}
+.open-row:active { transform: scale(.99); }
+.open-row .grow { min-width: 0; }
+.open-row .chev { color: var(--dim); flex: none; }
+
+/* ── Stacking the two pinned bars ────────────────────────────────────
+   The brand bar and the consumed-macros header were both pinned to top:0
+   and drew over each other. The brand bar owns the top of the screen and
+   gets its own glass; the macro header sits directly beneath it, and
+   content passes under both.
+   ─────────────────────────────────────────────────────────────────────── */
+
+:root { --topbar-h: 54px; }
+
+.topbar {
+  z-index: 45;
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  min-height: var(--topbar-h);
+  border-bottom: 1px solid transparent;
+}
+
+.sticky-glass {
+  top: calc(var(--topbar-h) + var(--safe-t));
+  z-index: 30;
+  border-radius: 0 0 var(--r) var(--r);
+}
+
+/* A hairline appears under the brand bar only once content is behind it,
+   so the header does not look boxed-in at rest. */
+.topbar.scrolled { border-bottom-color: var(--glass-brd); }
+
+/* ── One pinned bar, not two ─────────────────────────────────────────
+   Stacking the brand bar and the macro header meant computing one's
+   offset from the other's height, and the height depended on the offset —
+   a loop that kept leaving a few pixels of overlap. On screens that pin
+   their own header, the brand bar simply scrolls away. The macro numbers
+   are worth keeping on screen; the wordmark is not.
+   ─────────────────────────────────────────────────────────────────────── */
+
+.topbar { min-height: 0; }
+
+.has-sticky .topbar { position: static; }
+.has-sticky .sticky-glass { top: 0; }
