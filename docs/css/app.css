@@ -1129,10 +1129,12 @@ body::after { opacity: var(--grain); }
 .theme-swatch {
   width: 100%; height: 30px; border-radius: 7px;
   border: 1px solid var(--line);
+  /* Never let a fill paint under a translucent border. */
+  background-clip: padding-box;
 }
 .theme-swatch.dark  { background: linear-gradient(140deg, #000, #16161a); }
 .theme-swatch.light { background: linear-gradient(140deg, #fff, #e9e9ee); }
-.theme-swatch.auto  { background: linear-gradient(105deg, #000 50%, #fff 50%); }
+.theme-swatch.auto  { background: #0a0a0c; }
 
 /* ═══ Remodel: glass, warmth, depth ════════════════════════════════════
    The previous pass added shadows but everything still sat on a flat
@@ -2011,9 +2013,41 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
 /* The System swatch was a hard 50/50 split at 105deg, which renders as a
    jagged step rather than a diagonal. A true 45° split with a hairline
    reads as the two halves it is meant to show. */
+/*
+ * The System swatch.
+ *
+ * Three separate causes of the same artefact, all removed rather than
+ * tuned:
+ *
+ *  - a hard colour stop on a diagonal cannot anti-alias, so it rasterised
+ *    as a visible stair;
+ *  - background-clip defaults to border-box, so the fill was painted
+ *    UNDER the 1px border — and that border is white at 7% in dark mode,
+ *    which is the pale line leaking down the left edge;
+ *  - measuring 50% across the border box put the split a pixel off centre
+ *    from the half you can actually see.
+ *
+ * So the halves are painted as elements inside a clipped box. No angle to
+ * alias, no gradient interacting with the border, and the seam is exactly
+ * where it looks like it should be.
+ */
 .theme-swatch.auto {
-  background: linear-gradient(45deg, #000 0%, #000 49.6%, rgba(255,255,255,.35) 49.6%,
-                              rgba(255,255,255,.35) 50.4%, #fff 50.4%, #fff 100%);
+  position: relative;
+  overflow: hidden;
+  background: #0a0a0c;
+  background-clip: padding-box;
+  border-color: rgba(132, 132, 138, .34);
+}
+.theme-swatch.auto::before {
+  content: '';
+  position: absolute; top: 0; right: 0; bottom: 0; left: 50%;
+  background: #f2f2f4;
+}
+.theme-swatch.auto::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 1px; transform: translateX(-.5px);
+  background: rgba(132, 132, 138, .5);
 }
 
 .orb-dot[title="None"] {
