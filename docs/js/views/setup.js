@@ -13,6 +13,7 @@ import {
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
 import { generateDemo } from '../demo.js';
+import { ORBS, applyOrb } from '../theme.js';
 import { goalTile } from './goal.js';
 import { VERSION } from '../app.js';
 
@@ -139,6 +140,32 @@ const stat = (label, value, hue) =>
 
 /* ── Settings ───────────────────────────────────────────────────────── */
 
+/* Six hues, shown as what they are rather than named in a dropdown —
+   you are picking a colour, so the control should be the colour. */
+function orbPicker(ctx) {
+  const row = el('div.orb-row');
+  const current = get().settings.orb || 'amber';
+  for (const [key, o] of Object.entries(ORBS)) {
+    const dot = el('button.orb-dot' + (key === current ? '.is-on' : ''), {
+      type: 'button', title: o.label, 'aria-label': o.label,
+      'aria-pressed': String(key === current),
+      style: { '--swatch': `rgb(${o.dark})` },
+      onclick: () => {
+        commit(st => { st.settings.orb = key; }, 'settings');
+        applyOrb(key, get().settings.theme || 'dark');
+        [...row.children].forEach(c => {
+          c.classList.remove('is-on');
+          c.setAttribute('aria-pressed', 'false');
+        });
+        dot.classList.add('is-on');
+        dot.setAttribute('aria-pressed', 'true');
+      },
+    });
+    row.append(dot);
+  }
+  return row;
+}
+
 export function renderSettings(root, ctx) {
   const s = get();
   const p = s.profile;
@@ -238,6 +265,9 @@ export function renderSettings(root, ctx) {
       'Best available prefers your own adaptive figure, falls back to Whoop, then the formula.'),
 
     el('div.section-label', {}, el('span.micro', {}, 'Preferences')),
+
+    field('Background', orbPicker(ctx),
+      'The glow behind the glass. It tints both themes.'),
     field('Suggestions', dietBox),
     field('Glass size (ml)', fGlass),
 

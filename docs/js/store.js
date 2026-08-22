@@ -56,12 +56,14 @@ const EMPTY = () => ({
   meals: {},
   supplementsTaken: [],     // which supplement ids the user actually takes
   favourites: [],           // food ids starred for the top of the list
+  hidden: [],               // refs you never want suggested again
   blood: {},                // blood panels, keyed by id
   goal: null,               // { startKg, targetKg, startDate, byDate }
   recipes: {},
   cache: {},
   whoop: { rows: {}, importedAt: null },
   settings: {
+    orb: 'amber',          // hue of the ambient background circle
     units: 'metric',
     diet: 'all',
     waterUnit: 'ml',
@@ -115,16 +117,41 @@ function load() {
 }
 
 let saveTimer = null;
+
+function writeNow() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    return true;
+  } catch (e) {
+    // Quota is the only realistic failure here. Say so plainly.
+    emit('error', 'Storage is full. Export a backup from Settings, then clear old barcode cache.');
+    return false;
+  }
+}
+
 function persist() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state));
-    } catch (e) {
-      // Quota is the only realistic failure here. Say so plainly.
-      emit('error', 'Storage is full. Export a backup from Settings, then clear old barcode cache.');
-    }
-  }, 120);
+  saveTimer = setTimeout(writeNow, 120);
+}
+
+/*
+ * Write immediately, discarding the debounce.
+ *
+ * The debounce exists so that dragging a portion slider does not hammer
+ * localStorage, but it opened a 120 ms window in which the app could be
+ * suspended with a logged meal still only in memory. iOS freezes a
+ * backgrounded PWA quickly and without warning, so a food logged and
+ * immediately switched away from was genuinely lost.
+ *
+ * pagehide and visibilitychange are the only events mobile reliably
+ * delivers — beforeunload is not fired when the system kills a suspended
+ * tab, so it cannot be the safety net.
+ */
+export function flush() {
+  if (saveTimer === null) return false;
+  return writeNow();
 }
 
 function emit(evt, payload) {
@@ -389,6 +416,51 @@ export function isFavourite(id) {
 
 export function favouriteIds() { return [...(state.favourites || [])]; }
 
+/*
+ * Hiding a suggestion.
+ *
+ * "Most eaten" and "Recent" are computed from your log, so there is
+ * nothing to delete — the history is real and should stay. What you can
+ * say is "stop offering me this", which is a different claim and the one
+ * actually wanted: a food logged once by mistake should not sit at the
+ * top of the grid forever, and not everything you ate is something you
+ * want on screen when someone is looking over your shoulder.
+ */
+export function toggleHidden(ref) {
+  if (!ref) return;
+  commit(s => {
+    s.hidden = s.hidden || [];
+    const i = s.hidden.indexOf(ref);
+    if (i >= 0) s.hidden.splice(i, 1);
+    else s.hidden.push(ref);
+  }, 'hidden');
+}
+
+export function isHidden(ref) { return !!(state.hidden || []).includes(ref); }
+
+/* Favourites, resolved to something the grid can render. */
+export function favouriteFoods() {
+  const want = new Set(state.favourites || []);
+  if (!want.size) return [];
+  const found = new Map();
+
+  for (const id of want) {
+    const lib = state.library[id];
+    if (lib) found.set(id, { ...lib, ref: id });
+  }
+  // anything starred that lives in the reference database or only in the log
+  for (const k in state.days) {
+    for (const e of state.days[k].entries) {
+      const rid = e.ref || e.name;
+      if (want.has(rid) && !found.has(rid)) {
+        found.set(rid, { name: e.name, brand: e.brand, per100: e.per100, grade: e.grade,
+                         ref: e.ref, grams: e.grams, method: e.method, serv: e.serv || [] });
+      }
+    }
+  }
+  return [...found.values()];
+}
+
 /* ── Supplements ────────────────────────────────────────────────────── */
 
 /* Which supplements this person actually takes — the shortlist that shows
@@ -449,23 +521,41 @@ export function renameMeal(id, name) {
   commit(s => { if (s.meals[id]) s.meals[id].name = name.trim(); }, 'meals');
 }
 
-/* Log every item, stamped now, into whichever sitting you're in. */
-export function logMeal(key, id, targetMeal) {
+/*
+ * Log a saved meal.
+ *
+ * You almost never eat exactly what you saved. `scale` multiplies the whole
+ * meal — half a portion, a double serving — and `grams` overrides single
+ * items, for the evening you took 250 g of rice instead of 200. Each
+ * logging gets its own `mealGroup` so the day can show "Fried rice" as one
+ * line that opens into its parts, rather than scattering five ingredients
+ * through the log with no sign they were one plate.
+ */
+export function logMeal(key, id, opts = {}) {
   const m = state.meals[id];
   if (!m) return 0;
-  const when = targetMeal || m.meal || mealForNow();
+
+  // Callers used to pass the sitting as a bare third argument.
+  const o = typeof opts === 'string' ? { targetMeal: opts } : (opts || {});
+  const when = o.targetMeal || m.meal || mealForNow();
+  const scale = o.scale > 0 ? o.scale : 1;
+  const grams = o.grams || {};
+  const group = 'mg:' + uid();
+
   commit(s => {
     const d = day(key);
-    for (const it of m.items) {
+    m.items.forEach((it, i) => {
+      const g = grams[i] != null ? grams[i] : (it.grams || 0) * scale;
+      if (!(g > 0)) return;                 // an item scaled to nothing is not eaten
       d.entries.push({
         id: uid(), ts: Date.now(), meal: when,
         name: it.name, brand: it.brand, ref: it.ref, barcode: it.barcode,
-        per100: it.per100, serv: it.serv, grams: it.grams,
+        per100: it.per100, serv: it.serv, grams: g,
         method: it.method, grade: it.grade,
         ...(it.dish ? { dish: it.dish } : {}),
-        fromMeal: id,
+        fromMeal: id, mealGroup: group, mealName: m.name,
       });
-    }
+    });
     s.meals[id].lastUsed = Date.now();
     s.meals[id].uses = (s.meals[id].uses || 0) + 1;
   }, 'entry:add');
@@ -475,6 +565,29 @@ export function logMeal(key, id, targetMeal) {
 export function mealsList() {
   return Object.values(state.meals)
     .sort((a, b) => (b.uses || 0) - (a.uses || 0) || (b.lastUsed || 0) - (a.lastUsed || 0));
+}
+
+/*
+ * A day's entries, with the ones that came from a saved meal folded into a
+ * single group. The log should read the way you ate: one line for the meal
+ * you made, opening into what went in it.
+ */
+export function groupedEntries(key) {
+  const list = peekDay(key)?.entries || [];
+  const out = [];
+  const groups = new Map();
+  for (const e of list) {
+    if (!e.mealGroup) { out.push({ kind: 'entry', entry: e }); continue; }
+    let g = groups.get(e.mealGroup);
+    if (!g) {
+      g = { kind: 'meal', id: e.mealGroup, mealId: e.fromMeal,
+            name: e.mealName || 'Meal', meal: e.meal, items: [] };
+      groups.set(e.mealGroup, g);
+      out.push(g);
+    }
+    g.items.push(e);
+  }
+  return out;
 }
 
 /* What a saved meal comes to, using current numbers. */
@@ -507,10 +620,12 @@ export function cacheFood(food) {
 
 export function recentFoods(n = 24) {
   const seen = new Map();
+  const hide = new Set(state.hidden || []);
   const keys = Object.keys(state.days).sort().reverse();
   for (const k of keys) {
     for (const e of [...state.days[k].entries].reverse()) {
       const rid = e.ref || e.name;
+      if (hide.has(rid)) continue;
       if (!seen.has(rid)) {
         seen.set(rid, { name: e.name, brand: e.brand, per100: e.per100, grade: e.grade,
                         ref: e.ref, grams: e.grams, method: e.method, serv: e.serv || [] });
@@ -538,7 +653,11 @@ export function frequentFoods(limit = 12) {
                             method: e.method, serv: e.serv || [] });
     }
   }
-  return [...count.values()].sort((a, b) => b.times - a.times).slice(0, limit);
+  const hide = new Set(state.hidden || []);
+  return [...count.values()]
+    .filter(f => !hide.has(f.ref || f.name))
+    .sort((a, b) => b.times - a.times)
+    .slice(0, limit);
 }
 
 /* ── Backup ─────────────────────────────────────────────────────────── */

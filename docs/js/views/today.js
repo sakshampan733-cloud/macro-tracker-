@@ -11,7 +11,7 @@ import {
 } from '../ui.js';
 import {
   get, commit, day, totals, byMeal, MEALS, METHODS, dayKey, shiftDay,
-  removeEntry, addWater, undoWater, entryMacros, setWeight, saveMeal,
+  removeEntry, addWater, undoWater, entryMacros, setWeight, saveMeal, peekDay,
 } from '../store.js';
 import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
 import { dayFactor } from '../whoop.js';
@@ -364,33 +364,49 @@ function ceilingRow(name, value, limit, unit) {
 
 /* ── Water ──────────────────────────────────────────────────────────── */
 
+/*
+ * Water.
+ *
+ * Adding a glass used to call ctx.refresh(), which rebuilds the entire
+ * screen and throws you back to the top of it — a whole-page repaint to
+ * change one number. Only the glasses and the readout can possibly have
+ * changed, so only those are redrawn, and the page stays where it was.
+ */
 function waterTile(t, targets, key, ctx) {
   const s = get();
   const goal = targets.water;
   const glassMl = s.settings.glassMl || 250;
   const glasses = Math.ceil(goal / glassMl);
-  const full = Math.floor(t.water / glassMl);
-  const partial = (t.water % glassMl) / glassMl;
 
   const grid = el('div.water-grid');
-  for (let i = 0; i < glasses; i++) {
-    const cls = i < full ? 'glass full' : (i === full && partial > 0.05 ? 'glass part' : 'glass');
-    const node = el('div', { class: cls, 'aria-hidden': 'true' });
-    if (i === full && partial > 0.05) node.style.setProperty('--lvl', Math.round(partial * 100) + '%');
-    grid.append(node);
+  const readoutEl = el('span.num', { style: { fontSize: '13px' } });
+
+  function repaint() {
+    const water = (peekDay(key)?.water || []).reduce((a, w) => a + (w.ml || w || 0), 0);
+    const full = Math.floor(water / glassMl);
+    const partial = (water % glassMl) / glassMl;
+
+    grid.replaceChildren();
+    for (let i = 0; i < glasses; i++) {
+      const cls = i < full ? 'glass full' : (i === full && partial > 0.05 ? 'glass part' : 'glass');
+      const node = el('div', { class: cls, 'aria-hidden': 'true' });
+      if (i === full && partial > 0.05) node.style.setProperty('--lvl', Math.round(partial * 100) + '%');
+      grid.append(node);
+    }
+    readoutEl.textContent = `${(water / 1000).toFixed(2)} / ${(goal / 1000).toFixed(1)} L`;
   }
+  repaint();
 
   return el('div.tile', {},
     el('div.tile-head', {},
       el('div.flex', {}, icon('drop', 16), el('h3', {}, 'Water')),
-      el('span.num', { style: { fontSize: '13px' } },
-        `${(t.water / 1000).toFixed(2)} / ${(goal / 1000).toFixed(1)} L`)),
+      readoutEl),
     grid,
     el('div.btn-row', {},
-      el('button.btn.sm', { onclick: () => { addWater(key, glassMl); ctx.refresh(); } }, `+ ${glassMl} ml`),
-      el('button.btn.sm', { onclick: () => { addWater(key, 500); ctx.refresh(); } }, '+ 500 ml'),
+      el('button.btn.sm', { onclick: () => { addWater(key, glassMl); repaint(); } }, `+ ${glassMl} ml`),
+      el('button.btn.sm', { onclick: () => { addWater(key, 500); repaint(); } }, '+ 500 ml'),
       el('button.btn.sm.ghost', {
-        onclick: () => { undoWater(key); ctx.refresh(); },
+        onclick: () => { undoWater(key); repaint(); },
         'aria-label': 'Undo last water entry',
       }, 'Undo')),
   );

@@ -1,5 +1,5 @@
 /*
- * Blood work.
+ * Panel.
  *
  * Records what the report said, tracks it over time, and — the only thing
  * here a lab cannot do — puts each marker next to what you were actually
@@ -57,7 +57,7 @@ export function bloodTile(s, ctx) {
 
   if (!latest) {
     return el('div', {},
-      el('div.section-label', {}, el('span.micro', {}, 'Blood work')),
+      el('div.section-label', {}, el('span.micro', {}, 'Panel')),
       el('div.tile', {},
         el('div', { style: { fontSize: '13.5px', color: 'var(--text-2)', lineHeight: '1.55' } },
           'Nothing recorded yet.'),
@@ -73,7 +73,7 @@ export function bloodTile(s, ctx) {
   const outOf = vals.filter(([k, v]) => statusOf(k, v) !== 'in');
 
   return el('div', {},
-    el('div.section-label', {}, el('span.micro', {}, 'Blood work')),
+    el('div.section-label', {}, el('span.micro', {}, 'Panel')),
     el('div.tile', {},
       el('div.tile-head', {},
         el('h3', {}, 'Latest panel'),

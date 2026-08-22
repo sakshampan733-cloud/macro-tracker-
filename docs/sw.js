@@ -6,12 +6,14 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.08.22-touch';
+const CACHE = 'basal-2026.08.22-meals';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js',
-  'js/feedback.js', 'js/store.js', 'js/nutrition.js', 'js/whoop.js', 'js/coach.js',
+  'js/feedback.js',
+  'js/boot.js',
+  'js/theme.js', 'js/store.js', 'js/nutrition.js', 'js/whoop.js', 'js/coach.js',
   'js/off.js', 'js/scanner.js', 'js/ui.js', 'js/data/foods.js',
   'js/views/today.js', 'js/views/add.js', 'js/views/plan.js',
   'js/views/body.js', 'js/views/foods.js', 'js/views/setup.js', 'js/views/portion.js',
@@ -49,6 +51,17 @@ self.addEventListener('activate', e => {
    app code you may well edit tonight, so it goes to the network first and
    falls back to cache only when there isn't one. */
 const IMMUTABLE = /\/(fonts|icons|vendor)\//;
+
+/* The page asks which build this worker is serving, so a mixed set of
+   modules can be detected before it crashes on a missing export. */
+self.addEventListener('message', e => {
+  if (e.data === 'version') {
+    e.source && e.source.postMessage({ type: 'sw-version', cache: CACHE });
+  }
+  if (e.data === 'skip-waiting') self.skipWaiting();
+});
+
+const VERSION_QUERY = 1;
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);

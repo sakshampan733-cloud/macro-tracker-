@@ -5,10 +5,10 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.22-touch';
+export const VERSION = '2026.08.22-meals';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
-import { get, subscribe, dayKey, pushBackup, setDishDensities } from './store.js';
+import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
 import { solveDensities } from './dishes.js';
 import { bestTDEE } from './nutrition.js';
 import { renderToday } from './views/today.js';
@@ -20,6 +20,8 @@ import { renderFoods } from './views/foods.js';
 import { renderOnboarding, renderSettings } from './views/setup.js';
 import { autoSyncWhoop } from './views/body.js';
 import { installFeedback } from './feedback.js';
+import { applyOrb } from './theme.js';
+import { guard } from './boot.js';
 import { captureFromUrl, isConnected, relayUrl, syncWhoop } from './whooprelay.js';
 
 /*
@@ -117,6 +119,7 @@ function applyTheme(pref) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dark ? '#000000' : '#F4F4F6');
   root.style.colorScheme = pref === 'auto' ? 'light dark' : pref;
+  applyOrb(get().settings?.orb || 'amber', pref);
 }
 
 /* React to the system flipping while the app is open, on 'auto'. */
@@ -186,8 +189,12 @@ subscribe((evt, payload) => {
 });
 
 window.addEventListener('hashchange', () => {
-  const r = location.hash.slice(1);
-  if (r && ROUTES[r] && r !== ctx.route) { ctx.route = r; draw(); }
+  /* Home is the empty hash — ctx.go writes '' for it so the address bar
+     stays clean. Requiring a non-empty route here meant the back button
+     and any link to '#' silently did nothing, leaving you on whatever
+     screen you were already on. */
+  const r = location.hash.slice(1) || 'home';
+  if (ROUTES[r] && r !== ctx.route) { ctx.route = r; draw(); }
 });
 
 /* The day rolls over while the app sits open on a phone overnight. */
@@ -251,6 +258,16 @@ if (get().profile) {
 }
 
 const initial = location.hash.slice(1);
+/*
+ * Persist before the system can suspend us. Both events, because Safari
+ * fires pagehide on navigation and visibilitychange on backgrounding, and
+ * neither one alone covers being swiped away mid-log.
+ */
+guard(VERSION);
+
+addEventListener('pagehide', flush);
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+
 installFeedback();
 
 if (initial && ROUTES[initial]) ctx.route = initial;

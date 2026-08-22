@@ -405,8 +405,8 @@ function vitalsSection(s, ctx) {
       onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, 'recovery', ctx); } },
     },
       el('div.between', { style: { marginBottom: '10px' } },
-        el('h3', {}, 'Last fortnight', icon('chevron', 14)),
-        el('span.micro', {}, `avg ${Math.round(rec.recent.mean)}%`)),
+        el('h3', {}, 'Recovery', icon('chevron', 14)),
+        el('span.micro', {}, `last 14 days · avg ${Math.round(rec.recent.mean)}%`)),
       healthBars(recentRec.map(p => ({ v: p.v, label: `${p.date}: ${Math.round(p.v)}%` })), {
         h: 132, unit: '%', dp: 0, colourFor: recoveryColour,
       }),

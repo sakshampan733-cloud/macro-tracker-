@@ -128,10 +128,20 @@ export const CARB_CLASS = {
 /* ── Derivation ─────────────────────────────────────────────────────── */
 
 import { QUALITY } from './quality-map.js';
+import { inferClass } from './classify.js';
 
-export function classOf(foodId) {
+/*
+ * The curated class if we have one, an inferred class otherwise.
+ *
+ * `food` is optional and only used for inference — passing it is what
+ * makes a scanned packet or a hand-built food carry the same depth as a
+ * database entry, which it should, since the label is right there.
+ */
+export function classOf(foodId, food = null) {
   const id = String(foodId || '').replace(/^off:|^my:|^dish:/, '');
-  return QUALITY[id] || null;
+  const known = QUALITY[id];
+  if (known) return known;
+  return food ? inferClass(food) : null;
 }
 
 /*
@@ -140,7 +150,9 @@ export function classOf(foodId) {
  * can say so instead of quietly reporting zeros.
  */
 export function qualityFor(entry, macros) {
-  const cls = classOf(entry.ref);
+  /* The entry itself carries everything the inference needs — its name and
+     its per-100 g panel — so a food with no id still gets classified. */
+  const cls = classOf(entry.ref, entry);
   if (!cls) return null;
 
   const P = PROTEIN_CLASS[cls.p] || PROTEIN_CLASS.none;
@@ -156,10 +168,15 @@ export function qualityFor(entry, macros) {
   const fib = macros.fib || 0;
 
   return {
+    inferred: !!cls.inferred,
+    basis: cls.basis || null,
     protein: {
       g: protein,
       leucine: protein * P.leu,
-      complete: P.complete,
+      /* Unknown is not the same as incomplete. Reporting "incomplete" for
+         a food we simply could not classify reads as a verdict on it. */
+      complete: cls.p ? P.complete : null,
+      classified: !!cls.p,
       classLabel: P.label,
       note: P.short || null,
       limiting: P.limiting || null,

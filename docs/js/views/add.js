@@ -20,6 +20,7 @@ import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
 import { openPot } from './pot.js';
 import { openMealBuilder } from './meal.js';
+import { openMealLogger } from './meallog.js';
 import { dayTargets } from './today.js';
 
 /*
@@ -318,11 +319,7 @@ function mealsTile(meals, ctx) {
     tile.append(el('div.row', {},
       el('button', {
         class: 'grow', style: { textAlign: 'left', padding: 0 },
-        onclick: () => {
-          const n = logMeal(ctx.date || dayKey(), m.id);
-          toast(`${m.name} logged — ${n} items, ${kcal(t.kcal)} kcal.`);
-          ctx.go('today');
-        },
+        onclick: () => openMealLogger(m, { dateKey: ctx.date || dayKey(), onSaved: ctx.refresh }),
       },
         el('div.title', {}, m.name),
         el('div.sub', {},

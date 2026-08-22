@@ -12,7 +12,7 @@
  */
 
 import {
-  el, sheet, kcal, g, grams, icon, segmented, explain, dateLabel,
+  el, sheet, kcal, g, grams, icon, segmented, explain, dateLabel, field,
 } from '../ui.js';
 import { healthLine } from '../charts.js';
 import { get, totals, byMeal, dayKey, shiftDay, entryMacros } from '../store.js';
@@ -291,10 +291,13 @@ const PRESETS = [
   { label: '90 days', days: 90 },
 ];
 
+const spanDays = (from, to) =>
+  Math.max(1, Math.round((new Date(to + 'T12:00:00') - new Date(from + 'T12:00:00')) / 86400000) + 1);
+
 export function openReport(ctx, initialDays = 7) {
   const store = get();
   let days = initialDays;
-  let customFrom = null, customTo = null;
+  let customFrom = null, customTo = null, customOpen = false;
 
   const body = el('div');
 
@@ -307,12 +310,53 @@ export function openReport(ctx, initialDays = 7) {
     const vsTarget = t ? Math.round(r.mean.kcal - t.kcal) : null;
 
     body.replaceChildren(
-      el('div.seg', { style: { marginBottom: '14px' } },
+      el('div.seg', { style: { marginBottom: '10px' } },
         ...PRESETS.map(p => el('button', {
           type: 'button',
           'aria-pressed': String(!customFrom && days === p.days),
           onclick: () => { days = p.days; customFrom = customTo = null; render(); },
-        }, p.label))),
+        }, p.label)),
+        el('button', {
+          type: 'button',
+          'aria-pressed': String(!!customFrom),
+          onclick: () => { customOpen = !customOpen; render(); },
+        }, 'Custom')),
+
+      /*
+       * Arbitrary ranges.
+       *
+       * The presets answer "how was my week"; a custom range answers the
+       * questions you actually ask of a two-year log — how did the eight
+       * weeks before that trip go, what did last December look like. The
+       * machinery was already here and simply had no way to be reached.
+       */
+      customOpen ? el('div.tile', { style: { marginBottom: '12px' } },
+        el('div.field-2', {},
+          field('From', el('input', {
+            type: 'date', value: r.from, max: dayKey(),
+            onchange: e => {
+              customFrom = e.target.value || null;
+              if (customFrom && !customTo) customTo = dayKey();
+              if (customFrom && customTo && customFrom > customTo) customTo = customFrom;
+              render();
+            },
+          })),
+          field('To', el('input', {
+            type: 'date', value: r.to, max: dayKey(),
+            onchange: e => {
+              customTo = e.target.value || null;
+              if (customTo && !customFrom) customFrom = shiftDay(customTo, -6);
+              if (customFrom && customTo && customTo < customFrom) customFrom = customTo;
+              render();
+            },
+          }))),
+        el('div.fine', { style: { marginTop: '8px' } },
+          spanDays(r.from, r.to) + ' days selected.'
+          + (customFrom ? '' : ' Pick a start date to begin.')),
+        customFrom ? el('button.btn.sm.ghost', {
+          style: { marginTop: '10px' },
+          onclick: () => { customFrom = customTo = null; render(); },
+        }, 'Back to presets') : null) : null,
 
       el('div.micro', { style: { marginBottom: '10px' } }, `${r.from} to ${r.to}`),
 

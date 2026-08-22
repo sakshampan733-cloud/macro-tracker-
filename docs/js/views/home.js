@@ -11,11 +11,14 @@
  * than adding your first.
  */
 
-import { el, clear, icon, kcal, toast } from '../ui.js';
+import { el, clear, icon, kcal, toast, sheet, confirmSheet } from '../ui.js';
 import { flyToTotals, haptic } from '../feedback.js';
+import { openMealLogger } from './meallog.js';
+import { openMealBuilder } from './meal.js';
 import {
-  get, totals, dayKey, byMeal, MEALS, removeEntry, entryMacros, frequentFoods,
-  recentFoods, mealsList, mealTotals, logMeal,
+  get, totals, dayKey, MEALS, removeEntry, entryMacros, frequentFoods,
+  recentFoods, mealsList, mealTotals, groupedEntries,
+  favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood,
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
@@ -94,13 +97,22 @@ function readout(t, targets, ctx) {
   );
 }
 
+/*
+ * Four things you actually start from.
+ *
+ * "Make a meal" was reachable only from a tab that no longer exists, which
+ * made the single most common action — combining ingredients you already
+ * have into a dish you eat weekly — effectively undiscoverable. It gets a
+ * button. The Indian dish estimator moved behind "Food", where it belongs:
+ * it is a way of describing one thing you ate, not a way of building.
+ */
 function actions(ctx) {
   return el('div.home-actions', {},
     el('button.chip', { onclick: () => openScanner(ctx) }, icon('scan', 17), 'Scan'),
+    el('button.chip', { onclick: () => openMealBuilder({ onSaved: ctx.refresh }) },
+      icon('pot', 17), 'Meal'),
+    el('button.chip', { onclick: () => openBuilder({ onSaved: ctx.refresh }) }, icon('plus', 17), 'Food'),
     el('button.chip', { onclick: () => openQuickAdd(ctx) }, icon('bolt', 17), 'Quick'),
-    el('button.chip', { onclick: () => openDish({ dateKey: ctx.date || dayKey(), onSaved: ctx.refresh }) },
-      icon('pot', 17), 'Dish'),
-    el('button.chip', { onclick: () => openBuilder({ onSaved: ctx.refresh }) }, icon('plus', 17), 'New'),
   );
 }
 
@@ -136,11 +148,14 @@ function picker(s, ctx, key) {
     const g = el('div.food-grid');
     for (const f of items) {
       const per = f.per100 || {};
-      g.append(el('button.food-cell', {
+      const ref = f.id || f.ref || f.n;
+      const cell = el('button.food-cell' + (isFavourite(ref) ? '.is-fav' : ''), {
         onclick: () => openPortion(f, { dateKey: key, onSaved: ctx.refresh }),
       },
         el('span.fc-name', {}, f.n),
-        el('span.fc-kcal', {}, `${Math.round(per.kcal || 0)} · ${Math.round(per.p || 0)}P`)));
+        el('span.fc-kcal', {}, `${Math.round(per.kcal || 0)} · ${Math.round(per.p || 0)}P`));
+      attachHold(cell, () => openFoodActions(f, ref, ctx));
+      g.append(cell);
     }
     return g;
   }
@@ -214,19 +229,18 @@ function picker(s, ctx, key) {
       for (const m of meals.slice(0, 6)) {
         const mt = mealTotals(m);
         g.append(el('button.food-cell.is-meal', {
-          onclick: e => {
-            flyToTotals(e.currentTarget);
-            logMeal(key, m.id);
-            haptic('success');
-            toast(`${m.name} logged.`);
-            ctx.refresh();
-          },
+          /* Opens rather than logs: you almost never eat exactly the
+             portion you saved, and silently assuming you did was wrong. */
+          onclick: () => openMealLogger(m, { dateKey: key, onSaved: ctx.refresh }),
         },
           el('span.fc-name', {}, m.name),
           el('span.fc-kcal', {}, `${Math.round(mt.kcal || 0)} · ${m.items.length} items`)));
       }
       grid.append(g);
     }
+
+    const favs = favouriteFoods().map(toItem);
+    if (favs.length) grid.append(label('Favourites'), cells(favs));
 
     const freq = frequentFoods(18).map(toItem);
     if (freq.length) grid.append(label('Most eaten'), cells(freq));
@@ -247,28 +261,192 @@ function picker(s, ctx, key) {
   return wrap;
 }
 
-/* The log, compact. It answers "did I already add that?" and nothing more;
-   the detail tab carries the version with methods and error bars. */
+/*
+ * The log.
+ *
+ * A meal you cooked is one thing you ate, so it is one line — the five
+ * ingredients that went into it scattered through the list told you what
+ * the app stored, not what you had. Tapping the line opens the parts.
+ */
 export function miniLog(key, ctx) {
-  const groups = byMeal(key);
-  const any = MEALS.some(m => groups[m] && groups[m].length);
-  if (!any) return null;
+  const rows = groupedEntries(key);
+  if (!rows.length) return null;
+
+  const bySitting = new Map(MEALS.map(m => [m, []]));
+  for (const r of rows) {
+    const sitting = r.kind === 'meal' ? r.meal : r.entry.meal;
+    (bySitting.get(sitting) || bySitting.get('snack')).push(r);
+  }
 
   const wrap = el('div.tile.flush');
   for (const m of MEALS) {
-    const list = groups[m] || [];
+    const list = bySitting.get(m) || [];
     if (!list.length) continue;
     wrap.append(el('div.mini-head', {}, MEAL_LABELS[m]));
-    for (const e of list) {
-      const mm = entryMacros(e);
-      wrap.append(el('div.mini-row', {},
-        el('span.grow', {}, e.name),
-        el('span.num', {}, kcal(mm.kcal)),
-        el('button.mini-x', {
-          'aria-label': 'Remove ' + e.name,
-          onclick: () => { removeEntry(key, e.id); toast('Removed.'); ctx.refresh(); },
-        }, '×')));
+
+    for (const r of list) {
+      if (r.kind === 'entry') {
+        const mm = entryMacros(r.entry);
+        wrap.append(entryRow(r.entry.name, mm.kcal, () => {
+          removeEntry(key, r.entry.id); toast('Removed.'); ctx.refresh();
+        }, () => openEntryDetail(r.entry, key, ctx)));
+        continue;
+      }
+
+      const total = r.items.reduce((a, e) => a + (entryMacros(e).kcal || 0), 0);
+      wrap.append(entryRow(r.name, total, () => {
+        for (const e of r.items) removeEntry(key, e.id);
+        toast(`${r.name} removed.`); ctx.refresh();
+      }, () => openMealGroup(r, key, ctx), r.items.length));
     }
   }
   return wrap;
 }
+
+function entryRow(name, kcalValue, onRemove, onOpen, count = 0) {
+  return el('div.mini-row', {},
+    el('button.grow.mini-open', { onclick: onOpen },
+      el('span', {}, name),
+      count ? el('span.mini-count', {}, `${count} items`) : null,
+      icon('chevron', 13)),
+    el('span.num', {}, kcal(kcalValue)),
+    el('button.mini-x', { 'aria-label': 'Remove ' + name, onclick: onRemove }, '\u00d7'));
+}
+
+/* What actually went on the plate, and the chance to correct it. */
+function openMealGroup(group, key, ctx) {
+  const body = el('div');
+  const list = el('div.tile.flush');
+  for (const e of group.items) {
+    const mm = entryMacros(e);
+    list.append(el('div.mini-row', {},
+      el('button.grow.mini-open', { onclick: () => { sh.close(); openEntryDetail(e, key, ctx); } },
+        el('span', {}, e.name),
+        el('span.mini-count', {}, `${Math.round(e.grams)} g`),
+        icon('chevron', 13)),
+      el('span.num', {}, kcal(mm.kcal)),
+      el('button.mini-x', {
+        'aria-label': 'Remove ' + e.name,
+        onclick: () => {
+          removeEntry(key, e.id);
+          toast('Removed.');
+          sh.close(); ctx.refresh();
+        },
+      }, '\u00d7')));
+  }
+
+  const t = group.items.reduce((a, e) => {
+    const m = entryMacros(e);
+    a.kcal += m.kcal || 0; a.p += m.p || 0; a.c += m.c || 0; a.f += m.f || 0;
+    return a;
+  }, { kcal: 0, p: 0, c: 0, f: 0 });
+
+  body.append(
+    el('div.tile.tile-hero', {},
+      el('div.readout', {},
+        el('div', {},
+          el('div.micro', {}, MEAL_LABELS[group.meal] || 'Logged'),
+          el('div.readout-main', { style: { fontSize: '34px' } }, Math.round(t.kcal))),
+        el('div.readout-side', {},
+          el('div.micro', {}, 'P · C · F'),
+          el('div.v', {}, `${Math.round(t.p)} · ${Math.round(t.c)} · ${Math.round(t.f)}`)))),
+    el('div.section-label', {}, el('span.micro', {}, 'What went in')),
+    list,
+    el('div.fine', { style: { marginTop: '8px' } },
+      'Tap an ingredient to change how much of it you had.'));
+
+  const sh = sheet({ title: group.name, body });
+  return sh;
+}
+
+function openEntryDetail(entry, key, ctx) {
+  openPortion({ n: entry.name, brand: entry.brand, per100: entry.per100, serv: entry.serv,
+                barcode: entry.barcode, id: entry.ref },
+    { dateKey: key, entry, onSaved: ctx.refresh });
+}
+
+/*
+ * Press and hold.
+ *
+ * A grid cell has one obvious job — log this — so the second action has
+ * nowhere to live without adding a button to every tile and making the
+ * grid busier than the list it replaced. Hold is the iOS convention for
+ * "more about this thing", and it costs nothing until used.
+ *
+ * The tricky part is that a hold must not also fire the tap, and must not
+ * fire while you are scrolling the grid with your finger down.
+ */
+const HOLD_MS = 420;
+const HOLD_SLOP = 10;
+
+function attachHold(node, onHold) {
+  let timer = null, sx = 0, sy = 0, fired = false;
+
+  const cancel = () => { clearTimeout(timer); timer = null; };
+
+  node.addEventListener('pointerdown', e => {
+    if (e.button != null && e.button !== 0) return;
+    fired = false; sx = e.clientX; sy = e.clientY;
+    timer = setTimeout(() => {
+      fired = true;
+      haptic('select');
+      onHold();
+    }, HOLD_MS);
+  });
+
+  node.addEventListener('pointermove', e => {
+    if (!timer) return;
+    if (Math.abs(e.clientX - sx) > HOLD_SLOP || Math.abs(e.clientY - sy) > HOLD_SLOP) cancel();
+  });
+
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) {
+    node.addEventListener(ev, cancel);
+  }
+
+  /* Swallow the click that follows a completed hold, in the capture phase,
+     so the portion sheet does not open behind the menu. */
+  node.addEventListener('click', e => {
+    if (fired) { e.preventDefault(); e.stopImmediatePropagation(); fired = false; }
+  }, true);
+
+  node.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+function openFoodActions(food, ref, ctx) {
+  const fav = isFavourite(ref);
+  const s = get();
+  const isMine = !!(s.library && s.library[ref]);
+
+  const sh = sheet({
+    title: food.n,
+    body: el('div', {},
+      el('div.tile.flush', {},
+        action(fav ? 'Remove from favourites' : 'Add to favourites', 'star', () => {
+          toggleFavourite(ref);
+          toast(fav ? 'Removed from favourites.' : 'Added to favourites.');
+          sh.close(); ctx.refresh();
+        }),
+        action('Hide from suggestions', 'eye', () => {
+          toggleHidden(ref);
+          toast('Hidden. Your log is unchanged.');
+          sh.close(); ctx.refresh();
+        }),
+        isMine ? action('Delete this food', 'trash', async () => {
+          if (!(await confirmSheet({
+            title: 'Delete ' + food.n + '?',
+            message: 'It goes from your library. Days you already logged it on keep their numbers.',
+            confirmLabel: 'Delete', danger: true,
+          }))) return;
+          deleteFood(ref);
+          toast('Deleted.');
+          sh.close(); ctx.refresh();
+        }, true) : null),
+      el('div.fine', { style: { marginTop: '10px' } },
+        'Hiding only stops this being suggested. Nothing you have already logged changes.')),
+  });
+  return sh;
+}
+
+const action = (label, ic, onclick, danger = false) =>
+  el('button.row' + (danger ? '.is-danger' : ''), { onclick },
+    icon(ic, 17), el('span.grow', {}, label), icon('chevron', 14));
