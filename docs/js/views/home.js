@@ -23,7 +23,8 @@ import {
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
-import { openScanner, openQuickAdd, openBuilder, searchLocal, searchMeals, toItem } from './add.js';
+import { openScanner, openQuickAdd, openBuilder } from './add.js';
+import { searchLocal, searchMeals, toItem } from '../search.js';
 import { searchProducts, resolveBarcode, validEAN } from '../off.js';
 import { openDish } from './dish.js';
 

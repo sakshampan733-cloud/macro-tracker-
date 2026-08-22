@@ -16,6 +16,7 @@ import {
   el, sheet, toast, kcal, grams, g, icon, field, segmented, confirmSheet, replaceKids } from '../ui.js';
 import { get, saveMeal, updateMeal, MEALS, METHODS, macrosFor, dayKey, logMeal } from '../store.js';
 import { FOODS, BY_ID } from '../data/foods.js';
+import { searchLocal } from '../search.js';
 import { STYLES, per100For, densityFor } from '../dishes.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
@@ -208,7 +209,17 @@ export function openMealBuilder({ meal = null, onSaved = () => {} } = {}) {
     const lib = Object.values(store.library);
     if (q.length >= 2) {
       const n = q.toLowerCase();
-      const pool = [...lib, ...FOODS].filter(f => (f.n || '').toLowerCase().includes(n)).slice(0, 14);
+      /*
+       * The same ranked search the rest of the app uses.
+       *
+       * This had its own substring filter, so building a meal out of
+       * something you scanned meant typing enough of its name to hit an
+       * exact substring — no ownership ranking, no partial matching, and
+       * a stock entry could outrank your own copy of the same food. There
+       * is no reason for search to behave differently depending on which
+       * screen you are on.
+       */
+      const pool = searchLocal(q).slice(0, 14);
       pool.forEach(f => hits.append(el('button.chip', { type: 'button', onclick: () => addFood(f) }, f.n)));
       Object.keys(STYLES).filter(k => STYLES[k].label.toLowerCase().includes(n))
         .forEach(k => hits.append(el('button.chip', { type: 'button', onclick: () => addDish(k) },

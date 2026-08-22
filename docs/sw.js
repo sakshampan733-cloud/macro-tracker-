@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.08.22-macrocolour';
+const CACHE = 'basal-2026.08.22-mealsearch';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -15,6 +15,7 @@ const SHELL = [
   'js/boot.js',
   'js/theme.js',
   'js/swipe.js',
+  'js/search.js',
   'js/views/guide.js', 'js/store.js', 'js/nutrition.js', 'js/whoop.js', 'js/coach.js',
   'js/off.js', 'js/scanner.js', 'js/ui.js', 'js/data/foods.js',
   'js/views/today.js', 'js/views/add.js', 'js/views/plan.js',
