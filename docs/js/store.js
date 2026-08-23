@@ -66,6 +66,8 @@ const EMPTY = () => ({
     orb: 'red',            // hue of the ambient background circle
     openGroups: [],        // which settings categories are expanded
     guideSeen: false,      // the first-run walkthrough has been shown
+    healthKey: null,       // ties an iPhone Shortcut to this app
+    healthSyncedAt: null,
     units: 'metric',
     diet: 'all',
     waterUnit: 'ml',

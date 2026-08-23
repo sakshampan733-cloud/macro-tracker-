@@ -16,6 +16,7 @@ import { generateDemo } from '../demo.js';
 import { ORBS, applyOrb } from '../theme.js';
 import { goalTile } from './goal.js';
 import { openGuide } from './guide.js';
+import { openAppleHealth } from './apple.js';
 import { VERSION } from '../app.js';
 
 /* ── Onboarding ─────────────────────────────────────────────────────── */
@@ -313,7 +314,15 @@ export function renderSettings(root, ctx) {
       field('Glass size (ml)', fGlass)),
 
     group(ctx, 'whoop', 'Whoop',
-      'The strap this app leans on.',
+      'Whoop, or Apple Health from an iPhone.',
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', { style: { flex: '1', paddingRight: '12px' } },
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Apple Health'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              'For an Apple Watch instead of a Whoop. Apple has no web API, so your '
+              + 'phone pushes the data on a schedule.')),
+          el('button.btn.sm', { onclick: () => openAppleHealth(ctx) }, 'Set up'))),
       el('div.tile', {},
         el('div.between', {},
           el('div', {},

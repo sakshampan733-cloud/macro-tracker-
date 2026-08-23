@@ -79,6 +79,25 @@ function page(title, body) {
     { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
+/*
+ * Only the fields the app knows how to read, and only as numbers.
+ *
+ * A Shortcut is easy to mis-wire, and a string where a number belongs
+ * propagates silently into averages and charts. Anything unrecognised or
+ * non-finite is dropped here rather than stored and puzzled over later.
+ */
+const FIELDS = ['rhr', 'hrv', 'sleepH', 'remH', 'swsH', 'deepH',
+                'kcal', 'activeKcal', 'steps', 'weightKg', 'vo2max'];
+
+function clean(row) {
+  const out = {};
+  for (const f of FIELDS) {
+    const v = Number(row[f]);
+    if (Number.isFinite(v) && v >= 0) out[f] = v;
+  }
+  return out;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -99,15 +118,85 @@ export default {
     const CLIENT_ID = (env.WHOOP_CLIENT_ID || '').trim();
     const CLIENT_SECRET = (env.WHOOP_CLIENT_SECRET || '').trim();
 
+    /* Somewhere to point the app at to confirm the relay is alive. */
+    if (path === '/' || path === '/health') {
+      return json({ ok: true, service: 'basal-relay',
+                    whoop: !!(CLIENT_ID && CLIENT_SECRET),
+                    apple: !!env.HEALTH,
+                    redirect_uri: `${url.origin}/callback` }, request, env);
+    }
+
+    /* ── Apple Health ─────────────────────────────────────────────────
+     *
+     * Apple has no web API — HealthKit lives on the phone and no server
+     * can reach it. So the phone pushes instead: a Shortcuts automation
+     * reads the day's samples and POSTs them here, and the app collects
+     * them later.
+     *
+     * A key the user generates is the whole authentication story. There
+     * are no accounts to have, and the alternative — a real login — would
+     * mean this relay holding identities, which is a much worse thing to
+     * be responsible for than a bucket of heart rates behind a random
+     * 32-character string.
+     */
+    if (path.startsWith('/apple/')) {
+      if (!env.HEALTH) {
+        return json({ error: 'The relay has no HEALTH KV namespace bound. '
+          + 'Create one in Cloudflare and bind it as HEALTH.' }, request, env, 500);
+      }
+      const key = (request.headers.get('x-basal-key')
+        || url.searchParams.get('key') || '').trim();
+      if (!/^[a-zA-Z0-9_-]{24,64}$/.test(key)) {
+        return json({ error: 'Missing or malformed key.' }, request, env, 401);
+      }
+
+      if (path === '/apple/push' && request.method === 'POST') {
+        let body;
+        try { body = await request.json(); }
+        catch { return json({ error: 'Body must be JSON.' }, request, env, 400); }
+
+        const rows = Array.isArray(body) ? body : [body];
+        let written = 0;
+        for (const row of rows) {
+          const date = String(row.date || '').slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+          /* Merge rather than replace: a Shortcut that only sends sleep
+             must not wipe the heart rate an earlier one sent. */
+          const prevRaw = await env.HEALTH.get(`${key}:${date}`);
+          const prev = prevRaw ? JSON.parse(prevRaw) : {};
+          const merged = { ...prev, ...clean(row), date, src: 'apple',
+                           updatedAt: new Date().toISOString() };
+          await env.HEALTH.put(`${key}:${date}`, JSON.stringify(merged),
+            { expirationTtl: 60 * 60 * 24 * 400 });   // a year and a bit
+          written++;
+        }
+        return json({ ok: true, written }, request, env);
+      }
+
+      if (path === '/apple/pull') {
+        const list = await env.HEALTH.list({ prefix: `${key}:`, limit: 400 });
+        const out = [];
+        for (const k of list.keys) {
+          const v = await env.HEALTH.get(k.name);
+          if (v) out.push(JSON.parse(v));
+        }
+        out.sort((a, b) => a.date.localeCompare(b.date));
+        return json({ ok: true, days: out.length, rows: out }, request, env);
+      }
+
+      if (path === '/apple/clear' && request.method === 'POST') {
+        const list = await env.HEALTH.list({ prefix: `${key}:`, limit: 1000 });
+        for (const k of list.keys) await env.HEALTH.delete(k.name);
+        return json({ ok: true, cleared: list.keys.length }, request, env);
+      }
+
+      return json({ error: 'Unknown Apple Health route.' }, request, env, 404);
+    }
+
+    /* Everything below is Whoop, and only Whoop needs the credentials. */
     if (!CLIENT_ID || !CLIENT_SECRET) {
       return json({ error: 'The relay is deployed but has no Whoop credentials set. '
         + 'Add WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET as secrets.' }, request, env, 500);
-    }
-
-    /* Somewhere to point the app at to confirm the relay is alive. */
-    if (path === '/' || path === '/health') {
-      return json({ ok: true, service: 'basal-whoop-relay',
-                    redirect_uri: `${url.origin}/callback` }, request, env);
     }
 
     /*
