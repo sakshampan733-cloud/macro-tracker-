@@ -107,22 +107,67 @@ function header(key, ctx) {
 }
 
 /*
- * Recovery, appended to the greeting.
+ * One strap figure beside the greeting, chosen by the hour.
  *
- * The smallest honest way to show the strap is connected: one figure,
- * inside text already on the screen, with no furniture of its own.
+ * A fixed metric is wrong two thirds of the day. What you want to know
+ * changes: in the morning it is how the night went, by the middle of the
+ * day it is what you have to spend, and by the evening it is what you
+ * actually did with it.
  *
- * Deliberately not the calorie attribution as well — Detail already
- * explains why Whoop moved today's target, and saying the same thing on
- * two screens makes neither worth reading. This is the glance; that is
- * the explanation.
+ * Strain is the clearest case — it accumulates as the day goes on, so a
+ * strain figure at eight in the morning is a number about nothing. Sleep
+ * is the opposite: settled the moment you wake and stale by dinner.
+ *
+ * If the hour's own metric is missing the others stand in, because a true
+ * figure of a different kind beats an empty greeting — the label always
+ * says which one you are looking at.
  */
-function recoveryNote(key) {
-  const v = get().whoop?.rows?.[key]?.recovery;
-  if (v == null || !Number.isFinite(v)) return null;
-  const colour = v >= 67 ? 'var(--good)' : v >= 34 ? 'var(--caution)' : 'var(--warn)';
-  return el('span.hh-rec', { style: { color: colour } },
-    ' · recovery ' + Math.round(v) + '%');
+const STRAP_METRICS = {
+  sleep: {
+    read: r => (r.sleepH != null && Number.isFinite(r.sleepH)) ? r.sleepH : null,
+    text: v => `slept ${v.toFixed(1)}h`,
+    colour: (v, r) => {
+      const p = r.sleepPerf;
+      if (p == null) return 'var(--text-2)';
+      return p >= 85 ? 'var(--good)' : p >= 70 ? 'var(--caution)' : 'var(--warn)';
+    },
+  },
+  recovery: {
+    read: r => (r.recovery != null && Number.isFinite(r.recovery)) ? r.recovery : null,
+    text: v => `recovery ${Math.round(v)}%`,
+    colour: v => v >= 67 ? 'var(--good)' : v >= 34 ? 'var(--caution)' : 'var(--warn)',
+  },
+  strain: {
+    read: r => (r.strain != null && Number.isFinite(r.strain)) ? r.strain : null,
+    text: v => `strain ${v.toFixed(1)}`,
+    colour: () => 'var(--m-p)',
+  },
+};
+
+/* Which one the hour calls for, then the others as fallbacks. */
+function strapOrder(hour) {
+  if (hour < 11) return ['sleep', 'recovery', 'strain'];
+  if (hour < 18) return ['recovery', 'strain', 'sleep'];
+  return ['strain', 'recovery', 'sleep'];
+}
+
+function recoveryNote(key, now = new Date()) {
+  const row = get().whoop?.rows?.[key];
+  if (!row) return null;
+
+  /* On a past day the hour you happen to be reading it makes no odds —
+     the day is over, so show what it came to. */
+  const past = key !== dayKey();
+  const order = past ? ['strain', 'recovery', 'sleep'] : strapOrder(now.getHours());
+
+  for (const name of order) {
+    const m = STRAP_METRICS[name];
+    const v = m.read(row);
+    if (v == null) continue;
+    return el('span.hh-rec', { style: { color: m.colour(v, row) } },
+      ' \u00b7 ' + m.text(v));
+  }
+  return null;
 }
 
 /* Enough of a nod to the time of day to feel present, without pretending
