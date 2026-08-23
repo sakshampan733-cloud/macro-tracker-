@@ -367,14 +367,25 @@ function vitalsSection(s, ctx) {
      */
     const base = stats(pts.map(p => p.v));
     if (!base) return null;
+    /*
+     * The parameter here is `key`; this called openMetric with `metric`,
+     * which exists nowhere in scope. The tile therefore never became
+     * tappable and the chevron beside the label pointed at nothing — an
+     * arrow promising a detail view that could not open.
+     *
+     * The label is an h3 like every other openable panel, too. The old
+     * .micro rendered it grey, which was a visible signal that these
+     * panels were built differently, and the only honest reading of that
+     * difference was the bug.
+     */
     return el('div.tile.tappable', {
       role: 'button', tabIndex: 0,
-      onclick: () => openMetric(s, metric, ctx),
-      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, metric, ctx); } },
+      onclick: () => openMetric(s, key, ctx),
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, key, ctx); } },
     },
       el('div.between', { style: { marginBottom: '8px' } },
         el('div', {},
-          el('div.micro', {}, info.label, icon('chevron', 12)),
+          el('h3', {}, info.label, icon('chevron', 13)),
           el('div.num', { style: { fontSize: '19px', marginTop: '2px', color: colour } },
             info.latest.v.toFixed(info.dp) + (info.unit ? ' ' + info.unit : ''))),
         el('div', { style: { textAlign: 'right' } },
@@ -390,10 +401,31 @@ function vitalsSection(s, ctx) {
     );
   };
 
-  const hrvTrend = trendFor('hrv', 'var(--m-p)');
-  const rhrTrend = trendFor('rhr', 'var(--accent)');
-  if (hrvTrend) wrap.append(hrvTrend);
-  if (rhrTrend) wrap.append(rhrTrend);
+  /*
+   * Everything Whoop actually sends.
+   *
+   * Only HRV and resting heart rate were ever drawn, so blood oxygen,
+   * skin temperature, respiratory rate, strain and energy burned were
+   * downloaded, stored, given labels and units — and then never shown.
+   * The data was there the whole time; nothing rendered it.
+   *
+   * Driven off the metric table rather than a hand-written pair, so a
+   * metric added to the importer appears here without being wired up
+   * twice.
+   */
+  const TRENDS = [
+    ['hrv',    'var(--m-p)'],
+    ['rhr',    'var(--accent)'],
+    ['strain', 'var(--m-f)'],
+    ['spo2',   'var(--m-fib)'],
+    ['resp',   'var(--m-water)'],
+    ['temp',   'var(--m-c)'],
+    ['kcal',   'var(--m-c-ink)'],
+  ];
+  for (const [key, colour] of TRENDS) {
+    const pane = trendFor(key, colour);
+    if (pane) wrap.append(pane);
+  }
 
   /* ── the fortnight, at a glance ── */
   const recentRec = seriesFor(s.whoop, 'recovery', 14);
