@@ -439,7 +439,7 @@ function sideStat(label, value, unit, dp, store, key, ctx) {
     el('div.d.micro', {}, place ? `${place.pct}th` : ''));
 }
 
-function openMetric(s, metric, ctx) {
+export function openMetric(s, metric, ctx) {
   const info = METRICS[metric];
   const series = seriesFor(s.whoop, metric);
   const latest = series[series.length - 1];

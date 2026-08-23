@@ -2177,3 +2177,14 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 .hh-date .hh-arrow:first-child { margin-right: 4px; }
 
 .hh-back { margin-top: 12px; }
+
+
+
+/* The date row now carries the rings, so it has to make room for them. */
+
+/* Below a narrow phone the date and three rings stop fitting on one line. */
+
+/* Recovery beside the greeting — inside text already on the screen, not a
+   block of its own. The calorie attribution stays on Detail; saying it in
+   both places would make neither worth reading. */
+.hh-rec { font-variant-numeric: tabular-nums; font-weight: 500; }

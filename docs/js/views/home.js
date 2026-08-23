@@ -85,7 +85,7 @@ function header(key, ctx) {
 
   return el('div.home-head', {},
     el('div.hh-top', {},
-      el('span.hh-greet', {}, greeting()),
+      el('span.hh-greet', {}, greeting(), recoveryNote(key)),
       el('button.x-btn', {
         'aria-label': 'Settings',
         onclick: () => ctx.go('settings'),
@@ -104,6 +104,25 @@ function header(key, ctx) {
     isToday ? null : el('button.btn.sm.hh-back', {
       onclick: () => ctx.go('home', { date: today }),
     }, 'Back to today'));
+}
+
+/*
+ * Recovery, appended to the greeting.
+ *
+ * The smallest honest way to show the strap is connected: one figure,
+ * inside text already on the screen, with no furniture of its own.
+ *
+ * Deliberately not the calorie attribution as well — Detail already
+ * explains why Whoop moved today's target, and saying the same thing on
+ * two screens makes neither worth reading. This is the glance; that is
+ * the explanation.
+ */
+function recoveryNote(key) {
+  const v = get().whoop?.rows?.[key]?.recovery;
+  if (v == null || !Number.isFinite(v)) return null;
+  const colour = v >= 67 ? 'var(--good)' : v >= 34 ? 'var(--caution)' : 'var(--warn)';
+  return el('span.hh-rec', { style: { color: colour } },
+    ' · recovery ' + Math.round(v) + '%');
 }
 
 /* Enough of a nod to the time of day to feel present, without pretending
