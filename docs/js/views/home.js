@@ -254,6 +254,35 @@ function readout(t, targets, ctx) {
  * worth saying.
  */
 function coachCard(store, targets, key, ctx) {
+  /*
+   * The card restates itself on a timer.
+   *
+   * Its advice is a function of the clock — how long you have been awake,
+   * how long since you ate, how much evening is left — so a card rendered
+   * at breakfast is wrong by lunchtime. Redrawing only this element keeps
+   * it true without rebuilding the screen, which is what made the app
+   * jump back to the top every time anything changed.
+   */
+  const host = el('div.coach-host');
+  let timer = null;
+
+  const paint = ({ first = false } = {}) => {
+    /* The connectivity check is how the timer learns the screen is gone.
+       It must not run on the first paint, because the host is built here
+       and attached by the caller a moment later — guarding that pass made
+       the card return empty every time and stop its own timer. */
+    if (!first && !host.isConnected) { clearInterval(timer); return; }
+    const next = buildCoach(get(), dayTargets(get(), key), key, ctx);
+    host.replaceChildren();
+    if (next) host.append(next);
+  };
+
+  paint({ first: true });
+  if (key === dayKey()) timer = setInterval(paint, 4 * 60 * 1000);
+  return host;
+}
+
+function buildCoach(store, targets, key, ctx) {
   let advice = null;
   try { advice = topWhoopAdvice(store, targets, key); }
   catch { return null; }

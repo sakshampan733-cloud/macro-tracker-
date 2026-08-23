@@ -104,16 +104,61 @@ export function suggestFoods(gap, { want = 'protein', limit = 3 } = {}) {
 /* ── The advice ──────────────────────────────────────────────────────── */
 
 /*
+ * Where you are in your own day.
+ *
+ * Clock time is nearly useless on its own — 8am is two hours into the day
+ * for one person and pre-dawn for another, and the same person differs by
+ * two hours between a Tuesday and a Sunday. Whoop knows when you actually
+ * woke, so everything here is measured from that instead.
+ */
+function dayShape(store, key, now) {
+  const rows = store.whoop?.rows || {};
+  const today = rows[key];
+
+  const wakeHour = today?.wakeHour ?? (() => {
+    const past = Object.entries(rows).sort().slice(-14)
+      .map(([, r]) => r.wakeHour).filter(h => h != null);
+    return past.length >= 3 ? past.reduce((a, b) => a + b, 0) / past.length : null;
+  })();
+
+  /* Their own bedtime, not a rule of thumb: wake hour minus however long
+     they actually slept, averaged over the fortnight. */
+  const sleeps = Object.entries(rows).sort().slice(-14)
+    .map(([, r]) => r.sleepH).filter(v => v > 0);
+  const typicalSleep = sleeps.length
+    ? sleeps.reduce((a, b) => a + b, 0) / sleeps.length : 7.5;
+
+  const hour = now.getHours() + now.getMinutes() / 60;
+  const awake = wakeHour == null ? null
+    : (hour >= wakeHour ? hour - wakeHour : hour + 24 - wakeHour);
+
+  /* Bed is a wake time away from tomorrow, minus a night's sleep. */
+  const bedHour = wakeHour == null ? null : (wakeHour + 24 - typicalSleep) % 24;
+  const toBed = bedHour == null ? null
+    : (bedHour >= hour ? bedHour - hour : bedHour + 24 - hour);
+
+  return { hour, wakeHour, awake, bedHour, toBed, typicalSleep };
+}
+
+function fmtClock(h) {
+  if (h == null) return '';
+  const hh = Math.floor(h) % 24;
+  const mm = Math.round((h - Math.floor(h)) * 60);
+  return `${hh}:${String(mm).padStart(2, '0')}`;
+}
+
+/*
  * Returns scored cards, highest urgency first. The caller shows as many
  * as it has room for — usually one.
  */
 export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
   const w = strainPicture(store, key);
-  if (!w) return [];                       // no strap data: say nothing
+  const row = store.whoop?.rows?.[key];
+  if (!w && !row) return [];              // no strap data: say nothing
 
   const t = totals(key);
   const tm = timing(key, now);
-  const h = tm.hour;
+  const d = dayShape(store, key, now);
   const out = [];
   const add = (urgency, tone, headline, body, action = null) =>
     out.push({ urgency, tone, headline, body, action, source: 'whoop' });
@@ -123,9 +168,27 @@ export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
     p: Math.round((targets.p || 0) - (t.p || 0)),
     c: Math.round((targets.c || 0) - (t.c || 0)),
   };
+  const ate = (t.kcal || 0) > 50;
 
-  /* ── a hard day, and the food to match it ── */
-  if (w.ratio && w.ratio >= HARD) {
+  /* ── you have just woken up ───────────────────────────────────────── */
+  if (d.awake != null && d.awake < 2 && !ate) {
+    const rec = row?.recovery;
+    const slept = row?.sleepH;
+    const bits = [];
+    if (slept != null) bits.push(`${slept.toFixed(1)} h of sleep`);
+    if (rec != null) bits.push(`${Math.round(rec)}% recovery`);
+
+    add(94, rec != null && rec < 34 ? 'warn' : 'good',
+      `Awake since ${fmtClock(d.wakeHour)}`,
+      (bits.length ? bits.join(', ') + '. ' : '')
+      + (rec != null && rec < 34
+        ? 'On a red morning the first meal matters more than usual — protein and carbohydrate together, and do not skip it to save calories.'
+        : 'Something with protein in the next hour or so sets up the rest of the day; the longer the first meal is delayed the harder the evening gets.'),
+      { kind: 'foods', label: 'Quick first meal', picks: suggestFoods(left, { want: 'protein' }) });
+  }
+
+  /* ── a hard session, and the food to match it ─────────────────────── */
+  if (w && w.ratio && w.ratio >= HARD) {
     const extra = w.extra;
     if (left.kcal > 120) {
       const picks = suggestFoods(left, { want: left.p > 25 ? 'protein' : 'carb' });
@@ -137,14 +200,14 @@ export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
         + `. Eat it rather than banking it — training hard and then under-eating is how a good session turns into a bad week.`,
         picks.length ? { kind: 'foods', label: 'Good options right now', picks } : null);
     } else {
-      add(60, 'good',
-        `Hard day — ${w.burn} kcal burned`,
+      add(60, 'good', `Hard day — ${w.burn} kcal burned`,
         `About ${extra} kcal above your average, and you have already eaten to the adjusted target. Nothing more needed.`);
     }
   }
 
-  /* ── the post-session window ── */
-  if (w.strainHigh && tm.sinceH != null && tm.sinceH > 1.5 && left.p > 20 && h > 8 && h < 22) {
+  /* ── the post-session window ──────────────────────────────────────── */
+  if (w && w.strainHigh && tm.sinceH != null && tm.sinceH > 1.5 && left.p > 20
+      && d.awake != null && d.awake > 1) {
     const picks = suggestFoods(left, { want: 'protein' });
     add(84, 'warn',
       'Strain is high and it has been a while since you ate',
@@ -154,38 +217,97 @@ export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
       picks.length ? { kind: 'foods', label: 'Protein you already eat', picks } : null);
   }
 
-  /* ── recovery reframes the deficit ── */
-  if (w.recovery != null && h < 20) {
-    if (w.recovery < 34 && left.kcal > 200) {
+  /* ── recovery reframes the deficit ────────────────────────────────── */
+  if (row?.recovery != null && d.toBed != null && d.toBed > 4) {
+    if (row.recovery < 34 && left.kcal > 200) {
       add(80, 'warn',
-        `Recovery ${Math.round(w.recovery)}% — do not run a deficit today`,
+        `Recovery ${Math.round(row.recovery)}% — do not run a deficit today`,
         `Red recovery with ${left.kcal} kcal still available. Eat to maintenance and take the deficit tomorrow. `
         + `Under-eating on a red day is the reliable way to turn one poor night into a poor week.`,
         left.c > 40 ? { kind: 'foods', label: 'Carbohydrate helps here',
                         picks: suggestFoods(left, { want: 'carb' }) } : null);
-    } else if (w.recovery >= 67 && h >= 6 && h < 16) {
+    } else if (row.recovery >= 67 && d.awake != null && d.awake < 8) {
       add(44, 'good',
-        `Recovery ${Math.round(w.recovery)}% — good day to train`,
+        `Recovery ${Math.round(row.recovery)}% — good day to train`,
         `Put most of today's carbohydrate around the session rather than spreading it evenly. `
         + (left.c > 0 ? `You have ${left.c} g of carbohydrate left to place.` : ''));
     }
   }
 
-  /* ── an easy day, spent as if it were hard ── */
-  if (w.ratio && w.ratio <= EASY && left.kcal < -100) {
+  /* ── water, paced against how long you have been up ───────────────── */
+  if (targets.water > 0 && d.awake != null && d.awake > 2) {
+    /* Spread across waking hours rather than the clock: someone up at
+       five is four hours further into their day at nine than someone who
+       woke at nine, and the same glass count means different things. */
+    const wakingHours = Math.max(8, 24 - d.typicalSleep);
+    const expected = targets.water * Math.min(1, d.awake / wakingHours);
+    const behind = expected - (t.water || 0);
+    if (behind > 500) {
+      add(58, 'info',
+        `Water is ${(behind / 1000).toFixed(1)} L behind`,
+        `${d.awake.toFixed(0)} hours awake and ${((t.water || 0) / 1000).toFixed(1)} L in, against `
+        + `${(targets.water / 1000).toFixed(1)} L for the day. Catching up in one go mostly leaves the body; `
+        + `spread it across the afternoon instead.`);
+    }
+  }
+
+  /* ── the evening is running out ───────────────────────────────────── */
+  if (d.toBed != null && d.toBed < 3.5 && d.toBed > 0) {
+    if (left.p > 25) {
+      add(76, 'warn',
+        `About ${d.toBed.toFixed(1)} h before you normally sleep`,
+        `${left.p} g of protein still to find and not much evening left. A slower protein now — dairy, `
+        + `casein, eggs — is the one that is still being used while you sleep.`,
+        { kind: 'foods', label: 'Something slow', picks: suggestFoods(left, { want: 'protein' }) });
+    } else if (d.toBed < 1.5 && ate) {
+      add(50, 'info',
+        `Bed in about ${d.toBed.toFixed(1)} h`,
+        `Eating close to sleep costs you sleep quality more than it costs you fat — Whoop usually sees it as `
+        + `a lower recovery the next morning rather than as anything on the scale.`);
+    }
+  }
+
+  /* ── an easy day, spent as if it were hard ────────────────────────── */
+  if (w && w.ratio && w.ratio <= EASY && left.kcal < -100) {
     add(66, 'warn',
       `Quiet day — ${w.burn} kcal against your usual ${w.meanBurn}`,
       `You burned about ${Math.abs(w.extra)} kcal less than average and are ${Math.abs(left.kcal)} kcal over the adjusted target. `
       + `One day does not matter; the pattern does, and rest days are where most surpluses are actually built.`);
   }
 
-  /* ── short sleep changes what to reach for ── */
-  if (w.sleepH != null && w.sleepH < 6 && h < 15 && left.kcal > 200) {
+  /* ── short sleep changes what to reach for ────────────────────────── */
+  if (row?.sleepH != null && row.sleepH < 6 && d.awake != null && d.awake < 10 && left.kcal > 200) {
     add(52, 'warn',
-      `${w.sleepH.toFixed(1)} h of sleep — appetite will lie to you today`,
+      `${row.sleepH.toFixed(1)} h of sleep — appetite will lie to you today`,
       'Short sleep raises ghrelin and blunts leptin, so hunger runs ahead of need and reaches for fast carbohydrate. '
       + 'Anchor each meal on protein and the drift usually does not happen.',
       { kind: 'foods', label: 'Protein first today', picks: suggestFoods(left, { want: 'protein' }) });
+  }
+
+  /*
+   * Nothing at all yet.
+   *
+   * The gap rule below measures from your last meal, so a day with no
+   * meals had nothing to measure from and said nothing — silent on
+   * precisely the day most worth speaking up about. This measures from
+   * waking instead.
+   */
+  if (!ate && d.awake != null && d.awake >= 5 && d.toBed != null && d.toBed > 1) {
+    add(82, 'warn',
+      `${d.awake.toFixed(0)} hours awake, nothing logged`,
+      `Either today has not been logged or it has not been eaten. If it is the second, `
+      + `${left.kcal} kcal in the ${d.toBed.toFixed(0)} hours before bed is a lot to ask of one evening, `
+      + `and it is usually the protein target that gives way.`,
+      { kind: 'foods', label: 'Something now', picks: suggestFoods(left, { want: 'protein' }) });
+  }
+
+  /* ── a long gap, regardless of strain ─────────────────────────────── */
+  if (tm.sinceH != null && tm.sinceH > 5 && d.awake != null && d.awake > 3
+      && d.toBed != null && d.toBed > 2 && left.kcal > 300) {
+    add(46, 'info',
+      `${tm.sinceH.toFixed(0)} hours since you last ate`,
+      `${left.kcal} kcal still to go and the day is shortening. Long gaps are not harmful in themselves, `
+      + `but they tend to be repaid in one large evening meal, which is where the protein target usually gets missed.`);
   }
 
   return out.sort((a, b) => b.urgency - a.urgency);

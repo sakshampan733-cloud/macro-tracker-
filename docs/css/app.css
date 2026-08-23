@@ -2188,3 +2188,7 @@ ol.steps li b { color: var(--text); font-weight: 600; }
    block of its own. The calorie attribution stays on Detail; saying it in
    both places would make neither worth reading. */
 .hh-rec { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+/* The coach host is only a mount point; it must not add space when the
+   card inside it has nothing to say. */
+.coach-host:empty { display: none; }
