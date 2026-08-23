@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.22-applehealth';
+export const VERSION = '2026.08.23-homehead';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
@@ -51,6 +51,10 @@ ROUTES.today = renderToday;  // old bookmarks land on Detail
    so two sticky bars never fight for the same few pixels. */
 const STICKY_ROUTES = new Set(['add', 'home']);
 
+/* Home draws its own header — a date you can change — so the wordmark bar
+   would only repeat the gear and take the best strip of the screen. */
+const OWN_HEADER = new Set(['home']);
+
 const ctx = {
   route: 'home',
   date: dayKey(),
@@ -93,6 +97,7 @@ function drawNav() {
 
 function drawHeader() {
   const s = get();
+  if (OWN_HEADER.has(ctx.route)) return null;
   return el('div.topbar', {},
     el('div.brand', {}, 'BAS', el('span', {}, 'AL')),
     el('div.grow'),
@@ -184,7 +189,8 @@ function draw() {
   main.classList.toggle('has-sticky', STICKY_ROUTES.has(ctx.route));
   /* Lets CSS react to which screen you are on — the orb only beats on Body. */
   document.documentElement.setAttribute('data-route', ctx.route);
-  main.append(drawHeader());
+  const head = drawHeader();
+  if (head) main.append(head);   /* null on screens that draw their own */
 
   const view = el('div');
   main.append(view);

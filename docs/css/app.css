@@ -2134,3 +2134,46 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
 ol.steps { margin: 0; padding-left: 20px; }
 ol.steps li { font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin-bottom: 8px; }
 ol.steps li b { color: var(--text); font-weight: 600; }
+
+/* ── Home header ──────────────────────────────────────────────────────
+   Replaces the wordmark bar. Says what day it is, lets you change it, and
+   gives the top of the screen something to be other than a logo.      */
+.home-head { padding: 6px 0 16px; }
+
+.hh-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.hh-greet {
+  font-size: 12.5px; letter-spacing: .06em;
+  color: var(--muted); text-transform: none;
+}
+
+.hh-date { display: flex; align-items: center; gap: 6px; }
+.hh-when { flex: 1; min-width: 0; }
+.hh-day {
+  font-size: 30px; font-weight: 300; letter-spacing: -.03em;
+  line-height: 1.05; color: var(--text);
+}
+.hh-sub {
+  font-size: 12.5px; color: var(--muted); margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hh-arrow {
+  flex: none; width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--text-2); cursor: pointer;
+  transition: transform .18s cubic-bezier(.34,1.56,.64,1),
+              background .18s ease, opacity .18s ease;
+}
+.hh-arrow:active { transform: scale(.9); }
+.hh-arrow:hover { background: var(--raised); }
+.hh-arrow.is-off { opacity: .28; pointer-events: none; }
+
+/* The left arrow sits before the date, the right after — so the date is
+   the thing in the middle rather than the buttons framing empty space. */
+.hh-date .hh-arrow:first-child { margin-right: 4px; }
+
+.hh-back { margin-top: 12px; }

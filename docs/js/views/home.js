@@ -17,7 +17,7 @@ import { openMealLogger } from './meallog.js';
 import { openMealBuilder } from './meal.js';
 import { topWhoopAdvice } from '../coachwhoop.js';
 import {
-  get, totals, dayKey, MEALS, removeEntry, entryMacros, frequentFoods,
+  get, totals, dayKey, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
   scannedFoods, builtFoods,
@@ -42,12 +42,79 @@ export function renderHome(root, ctx) {
      a literal "null" ended up sitting under the readout whenever Whoop
      had nothing to say. */
   append(root,
+    header(key, ctx),
     readout(t, targets, ctx),
     coachCard(s, targets, key, ctx),
     actions(ctx),
     picker(s, ctx, key),
     logSection(key, ctx),
   );
+}
+
+/*
+ * The header.
+ *
+ * The wordmark bar was a logo, a spacer and a gear — three things none of
+ * which you need while logging lunch, taking the most valuable strip of
+ * the screen to tell you which app you already knew you had opened.
+ *
+ * This says what day it is and lets you change it, which matters because
+ * Home could not reach yesterday at all: you had to go to Detail to log
+ * something you forgot. The greeting is there because the top of a home
+ * screen reading as a blank shelf was the actual complaint, and a line
+ * that changes through the day makes it feel occupied rather than
+ * decorated.
+ */
+function header(key, ctx) {
+  const today = dayKey();
+  const isToday = key === today;
+  const d = new Date(key + 'T12:00:00');
+
+  const label = isToday
+    ? 'Today'
+    : (key === shiftDay(today, -1) ? 'Yesterday'
+      : d.toLocaleDateString(undefined, { weekday: 'long' }));
+
+  const sub = d.toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+
+  const step = n => {
+    const next = shiftDay(key, n);
+    if (next > today) return;
+    ctx.go('home', { date: next });
+  };
+
+  return el('div.home-head', {},
+    el('div.hh-top', {},
+      el('span.hh-greet', {}, greeting()),
+      el('button.x-btn', {
+        'aria-label': 'Settings',
+        onclick: () => ctx.go('settings'),
+      }, icon('gear', 17))),
+
+    el('div.hh-date', {},
+      el('button.hh-arrow', { 'aria-label': 'Previous day', onclick: () => step(-1) },
+        icon('chevron-left', 18)),
+      el('div.hh-when', {},
+        el('div.hh-day', {}, label),
+        el('div.hh-sub', {}, sub)),
+      el('button.hh-arrow' + (isToday ? '.is-off' : ''), {
+        'aria-label': 'Next day', disabled: isToday, onclick: () => step(1),
+      }, icon('chevron', 18))),
+
+    isToday ? null : el('button.btn.sm.hh-back', {
+      onclick: () => ctx.go('home', { date: today }),
+    }, 'Back to today'));
+}
+
+/* Enough of a nod to the time of day to feel present, without pretending
+   to know anything about how it is going. */
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5)  return 'Late one';
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  if (h < 22) return 'Good evening';
+  return 'Good night';
 }
 
 /*
