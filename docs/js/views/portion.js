@@ -23,9 +23,10 @@ import {
 import { haptic } from '../feedback.js';
 import {
   METHODS, GRADE_MULT, macrosFor, addEntry, updateEntry, MEALS,
-  mealForNow, dayKey, toggleFavourite, isFavourite, saveFood, get,
+  mealForNow, dayKey, toggleFavourite, isFavourite, saveFood, get, commit,
 } from '../store.js';
 import { atwater, BY_ID } from '../data/foods.js';
+import { qualityFor, LEUCINE_THRESHOLD_G } from '../data/quality.js';
 
 const MEAL_META = {
   breakfast: { label: 'Breakfast', glyph: '☕' },
@@ -135,6 +136,7 @@ export function openPortion(food, {
   const readout = el('div');
   const amountBox = el('div');
   const methodChip = el('div');
+  const depth = el('div');
 
   const inferMethod = () => {
     if (state.manualMethod) return;
@@ -170,7 +172,87 @@ export function openPortion(food, {
         onclick: cycleMethod,
       }, `${meth.short} · ±${Math.round(meth.sigma * (GRADE_MULT[grade] || 1.3) * 100)}%`),
     );
+
+    drawDepth(m, gr);
   };
+
+  /*
+   * What this food actually is, before you commit to it.
+   *
+   * The breakdown existed only after logging — you had to eat a thing,
+   * open Detail and read back that its protein was incomplete, which is
+   * an answer arriving after the decision it was meant to inform. It is
+   * the same computation either way, so it belongs here too.
+   *
+   * Folded by default: most logging is a two-tap job and this would be in
+   * the way of it. Open once and it stays open, because someone who wants
+   * this wants it every time.
+   */
+  function drawDepth(m, gr) {
+    const q = qualityFor({ ref: foodId, n: food.n || food.name, per100: food.per100 }, m);
+    const open = get().settings?.portionDepth === true;
+
+    const head = el('button.sec-head', {
+      'aria-expanded': String(open),
+      onclick: () => {
+        commit(st => { st.settings.portionDepth = !open; }, 'settings');
+        haptic('tap');
+        render();
+      },
+    },
+      el('span.micro', {}, 'What this is made of'),
+      el('span.sec-caret', {}, open ? '\u25BE' : '\u25B8'));
+
+    if (!open) { depth.replaceChildren(head); return; }
+
+    if (!q) {
+      depth.replaceChildren(head, el('div.fine', { style: { padding: '4px 2px 10px' } },
+        'No quality profile for this one — it was built by hand, so the app will not '
+        + 'guess what its protein or fat are made of.'));
+      return;
+    }
+
+    const row = (k, v, sub) => el('div.caff-row', {},
+      el('span.grow', {}, el('div', {}, k), sub ? el('div.micro', {}, sub) : null),
+      el('span.num', {}, v));
+
+    const leu = q.protein.leucine;
+    const hitsLeucine = leu >= LEUCINE_THRESHOLD_G;
+
+    depth.replaceChildren(head, el('div.tile', { style: { marginBottom: '10px' } },
+      /* Protein first: it is the question people actually open this for. */
+      row('Protein',
+        q.protein.classified
+          ? (q.protein.complete ? 'Complete' : 'Incomplete')
+          : 'Unclassified',
+        q.protein.classified
+          ? q.protein.classLabel + (q.protein.limiting ? ` · low in ${q.protein.limiting}` : '')
+          : null),
+
+      q.protein.classified && !q.protein.complete && q.protein.pairsWith
+        ? el('div.fine', { style: { padding: '2px 0 8px' } },
+            `Pair it with ${q.protein.pairsWith} and the two together are complete.`)
+        : null,
+
+      row('Leucine', `${leu.toFixed(1)} g`,
+        hitsLeucine
+          ? `past the ${LEUCINE_THRESHOLD_G} g that triggers muscle protein synthesis`
+          : `${(LEUCINE_THRESHOLD_G - leu).toFixed(1)} g short of the ${LEUCINE_THRESHOLD_G} g trigger`),
+
+      row('Carbohydrate', q.carb.classLabel,
+        `${Math.round(q.carb.sugar)} g sugar · ${Math.round(q.carb.starch)} g starch · `
+        + `${Math.round(q.carb.fibre)} g fibre`),
+
+      row('Fat', q.fat.classLabel,
+        `${q.fat.sat.toFixed(1)} g saturated · ${q.fat.mufa.toFixed(1)} g mono · `
+        + `${q.fat.pufa.toFixed(1)} g poly`),
+
+      q.inferred
+        ? el('div.fine', { style: { marginTop: '8px' } },
+            'Classified from the name and the panel rather than from a known food, '
+            + 'so treat these as indicative.')
+        : null));
+  }
 
   const macroPill = (name, v, hue) =>
     el('div', { style: { textAlign: 'center' } },
@@ -299,6 +381,7 @@ export function openPortion(food, {
       mealRow,
       el('div', { style: { height: '12px' } }),
       amountCard,
+      depth,
       el('div.between', { style: { marginTop: '10px' } },
         methodChip,
         el('button.btn.sm.ghost', {

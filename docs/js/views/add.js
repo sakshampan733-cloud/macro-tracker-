@@ -126,7 +126,7 @@ export function foodSurface(ctx) {
     clear(results);
 
     /* Places first here too, so the two search boxes behave the same. */
-    const places = searchRestaurants(q);
+    const places = searchRestaurants(q, get().settings?.diet);
     if (places.length) {
       results.append(sectionLabel('Places'));
       const pg = el('div.rest-list');

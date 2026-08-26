@@ -584,7 +584,7 @@ function picker(s, ctx, key) {
          separate KFC items you have to read through — and typing a dish
          you half remember still lands on the counter that sells it,
          because the aliases carry the dish names too. */
-      const places = searchRestaurants(q);
+      const places = searchRestaurants(q, s.settings?.diet);
       if (places.length) {
         grid.append(label('Places'));
         const pg = el('div.rest-list');

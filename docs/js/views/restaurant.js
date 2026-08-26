@@ -8,7 +8,7 @@
  */
 
 import { el, clear, sheet, icon, replaceKids, append } from '../ui.js';
-import { dayKey } from '../store.js';
+import { dayKey, get } from '../store.js';
 import { RESTAURANTS, menuOf } from '../data/restaurants.js';
 import { DRINK_LIST, defaultBuild, buildMacros } from '../data/starbucks.js';
 import { openPortion } from './portion.js';
@@ -104,7 +104,7 @@ export function openRestaurant(brandId, ctx, { dateKey = null } = {}) {
       return;
     }
 
-    let items = menuOf(brandId);
+    let items = menuOf(brandId, get().settings?.diet);
     if (needle.length >= 2) {
       items = items.filter(f => (f.n + ' ' + (f.alt || '')).toLowerCase().includes(needle));
       results.append(items.length

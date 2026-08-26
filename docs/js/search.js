@@ -9,7 +9,7 @@
  */
 
 import { get, frequentFoods, mealsList } from './store.js';
-import { FOODS } from './data/foods.js';
+import { FOODS, dietAllows } from './data/foods.js';
 
 /*
  * A food from any source, in the shape the rest of the app expects.
@@ -26,6 +26,10 @@ export function toItem(f) {
     per100: f.per100,
     serv: (f.serv || []).map(x => Array.isArray(x) ? { l: x[0], g: x[1] } : x),
     grade: f.grade || (f.src === 'openfoodfacts' || f.barcode ? 'B' : 'C'),
+    /* Alternate names: "kadi", "pakodi", "soybean". The data has carried
+       these all along and search discarded them, so a food could hold the
+       exact word somebody typed and still not be found by it. */
+    alt: f.alt || '',
     grp: f.grp || '',
     basis: f.basis,
     barcode: f.barcode,
@@ -152,6 +156,9 @@ export function searchLocal(q) {
     const base = Math.max(
       matchScore(item.n, needle),
       matchScore(item.brand || '', needle) * 0.6,
+      /* Scored below the real name so a food actually called "Kadhi"
+         still outranks one that merely lists it as another name. */
+      matchScore(item.alt || '', needle) * 0.85,
     );
     if (!base) return;
     const seen = uses.get(item.id) || uses.get(item.n) || 0;
@@ -161,7 +168,11 @@ export function searchLocal(q) {
   /* 2000 clears the whole match-tier range, so anything of yours outranks
      anything stock, however well the stock entry happens to match. */
   for (const f of Object.values(s.library)) consider(toItem(f), 2000);
-  for (const f of FOODS) consider(toItem(f), 0);
+
+  /* A vegetarian asked not to be shown meat, so do not show them meat.
+     Foods you saved yourself are never filtered — you put them there. */
+  const diet = s.settings?.diet;
+  for (const f of FOODS) { if (dietAllows(f, diet)) consider(toItem(f), 0); }
 
   /*
    * Ties break towards the shorter name.

@@ -16,7 +16,7 @@
  * them, so nothing here duplicates the food data — it indexes it.
  */
 
-import { FOODS } from './foods.js';
+import { FOODS, dietAllows } from './foods.js';
 import { DRINK_LIST } from './starbucks.js';
 
 /*
@@ -140,6 +140,7 @@ export const RESTAURANTS = {
           'paneer-tikka-masala', 'malai-kofta', 'navratan-korma', 'palak-paneer',
           'dum-aloo', 'jeera-aloo', 'aloo-gobi', 'bhindi-masala', 'mix-veg',
           'sarson-saag', 'dal-fry', 'dal-makhani', 'dal-tadka', 'kadhi-pakora',
+          'kadhi-chawal', 'kadhi-plain', 'pakoda-besan',
           'chole', 'rajma', 'butter-chicken', 'chicken-tikka-masala', 'kadai-chicken',
           'chicken-curry', 'chicken-korma', 'rogan-josh', 'mutton-curry', 'egg-curry',
           'tandoori-chicken', 'paneer-tikka', 'seekh-kebab', 'hara-bhara-kabab',
@@ -172,24 +173,25 @@ export const RESTAURANTS = {
 };
 
 /* Items on one brand's menu, resolved against the food data. */
-export function menuOf(id) {
+export function menuOf(id, diet = null) {
   const r = RESTAURANTS[id];
   if (!r) return [];
-  if (r.prefix) return FOODS.filter(f => f.id.startsWith(r.prefix));
+  const ok = f => dietAllows(f, diet);
+  if (r.prefix) return FOODS.filter(f => f.id.startsWith(r.prefix) && ok(f));
   if (r.ids) {
     const want = new Set(r.ids);
     /* Keep the declared order — it reads like a menu rather than like a
        database dump. */
     const byId = new Map(FOODS.filter(f => want.has(f.id)).map(f => [f.id, f]));
-    return r.ids.map(x => byId.get(x)).filter(Boolean);
+    return r.ids.map(x => byId.get(x)).filter(f => f && ok(f));
   }
   return [];
 }
 
-export function itemCount(id) {
+export function itemCount(id, diet = null) {
   const r = RESTAURANTS[id];
   if (!r) return 0;
-  return r.drinks ? DRINK_LIST.length : menuOf(id).length;
+  return r.drinks ? DRINK_LIST.length : menuOf(id, diet).length;
 }
 
 /*
@@ -199,7 +201,7 @@ export function itemCount(id) {
  * "golgappa" finds the chaat counter — someone who types a dish they half
  * remember still lands somewhere useful rather than on an empty result.
  */
-export function searchRestaurants(q) {
+export function searchRestaurants(q, diet = null) {
   const needle = String(q || '').trim().toLowerCase();
   if (needle.length < 2) return [];
 
@@ -217,7 +219,7 @@ export function searchRestaurants(q) {
       const words = (r.alias || '').split(/\s+/);
       if (words.some(w => w.startsWith(needle))) score = 45;
     }
-    if (score) scored.push({ id, score, ...r, count: itemCount(id) });
+    if (score) scored.push({ id, score, ...r, count: itemCount(id, diet) });
   }
   return scored.sort((a, b) => b.score - a.score || b.count - a.count);
 }

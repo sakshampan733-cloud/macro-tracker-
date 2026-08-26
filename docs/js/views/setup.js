@@ -347,7 +347,7 @@ export function renderSettings(root, ctx) {
   const dietBox = el('div');
   dietBox.append(segmented([
     { value: 'all', label: 'Everything' }, { value: 'egg', label: 'No meat' }, { value: 'veg', label: 'Vegetarian' },
-  ], s.settings.diet, v => { commit(st => { st.settings.diet = v; }); toast('Suggestions updated.'); }));
+  ], s.settings.diet, v => { commit(st => { st.settings.diet = v; }); toast('Filter applied.'); ctx.refresh(); }));
 
   const tdeeBox = el('div');
   tdeeBox.append(segmented([
@@ -431,7 +431,9 @@ export function renderSettings(root, ctx) {
             el('div.fine', { style: { marginTop: '3px' } },
               'Everything you have built, scanned or saved.')),
           el('button.btn.sm', { onclick: () => ctx.go('foods') }, 'Open'))),
-      field('Suggestions', dietBox),
+      field('Show me', dietBox,
+      'Hides what you do not eat from search, menus and suggestions. Foods you '
+      + 'saved yourself always stay visible.'),
       field('Glass size (ml)', fGlass)),
 
     /*

@@ -431,6 +431,124 @@ export const FOODS = [
   F('protein-shake-rtd','Protein shake, ready to drink','Supplements','veg','as-served','B',
     65,10,3,1,0.5,1,0.5,80,[['1 bottle (330 ml)',330]]),
 
+  /* ── California Burrito ───────────────────────────────────────────
+     The chain publishes no nutrition data, so these are built from
+     their components — tortilla, cilantro rice, beans, protein,
+     cheese, salsa — rather than copied off a label. Grade C says so,
+     and the app widens the error bars on them accordingly. */
+  F('calburrito-veg','California Burrito, veg','Eating out','veg','as-served','C',
+    158.3,4.6,22.9,5.0,2.9,1.2,1.9,302,[['1 burrito (480 g)',480]],
+    'cal burrito vegetarian'),
+  F('calburrito-paneer','California Burrito, paneer','Eating out','veg','as-served','C',
+    176.0,6.4,21.6,6.8,2.6,1.3,3.0,310,[['1 burrito (500 g)',500]],
+    'cottage cheese'),
+  F('calburrito-chicken','California Burrito, chicken','Eating out','meat','as-served','C',
+    181.0,10.2,22.2,5.2,2.2,1.2,2.2,320,[['1 burrito (500 g)',500]],
+    'grilled chicken'),
+  F('calburrito-chipotle-chicken','California Burrito, chipotle chicken','Eating out','meat','as-served','C',
+    184.3,10.2,22.2,5.7,2.2,1.5,2.4,343,[['1 burrito (510 g)',510]],
+    'spicy'),
+  F('calburrito-double-chicken','California Burrito, double chicken','Eating out','meat','as-served','C',
+    179.5,13.2,19.1,5.1,1.9,1.0,2.1,316,[['1 burrito (585 g)',585]],
+    'extra protein'),
+  F('calburrito-beans-cheese','California Burrito, beans and cheese','Eating out','veg','as-served','C',
+    155.6,5.3,22.7,4.4,3.3,1.1,2.2,311,[['1 burrito (450 g)',450]],
+    'rajma frijoles'),
+  F('calburrito-bowl','Burrito bowl, veg','Eating out','veg','as-served','C',
+    112.5,3.5,15.5,4.0,3.0,1.4,1.5,262,[['1 bowl (400 g)',400]],
+    'rice bowl no tortilla'),
+  F('calburrito-bowl-paneer','Burrito bowl, paneer','Eating out','veg','as-served','C',
+    135.7,5.7,14.3,6.2,2.6,1.4,2.9,274,[['1 bowl (420 g)',420]],
+    'cottage cheese bowl'),
+  F('calburrito-bowl-chicken','Burrito bowl, chicken','Eating out','meat','as-served','C',
+    141.7,10.2,15.0,4.3,2.4,1.3,1.9,286,[['1 bowl (420 g)',420]],
+    'grilled chicken bowl'),
+  F('calburrito-bowl-keto','Burrito bowl, no rice','Eating out','meat','as-served','C',
+    126.5,11.8,7.1,5.6,2.6,1.5,2.4,324,[['1 bowl (340 g)',340]],
+    'low carb keto salad bowl'),
+  F('calburrito-quesa-cheese','Quesadilla, cheese','Eating out','veg','as-served','C',
+    290.5,11.4,24.8,16.2,1.9,1.4,8.6,548,[['1 quesadilla (210 g)',210]],
+    'cheese quesadilla'),
+  F('calburrito-quesa-paneer','Quesadilla, paneer','Eating out','veg','as-served','C',
+    280.0,12.4,21.6,16.4,1.8,1.4,8.4,500,[['1 quesadilla (250 g)',250]],
+    'paneer quesadilla'),
+  F('calburrito-quesa-chicken','Quesadilla, chicken','Eating out','meat','as-served','C',
+    276.0,16.8,21.2,13.6,1.6,1.2,7.2,520,[['1 quesadilla (250 g)',250]],
+    'chicken quesadilla'),
+  F('calburrito-tacos-veg','Tacos, veg, 3 pc','Eating out','veg','as-served','C',
+    173.3,5.0,22.7,6.7,3.3,1.7,2.3,327,[['3 tacos (300 g)',300]],
+    'soft corn crispy'),
+  F('calburrito-tacos-paneer','Tacos, paneer, 3 pc','Eating out','veg','as-served','C',
+    190.6,7.8,20.6,8.8,3.0,1.6,3.8,338,[['3 tacos (320 g)',320]],
+    'paneer tacos'),
+  F('calburrito-tacos-chicken','Tacos, chicken, 3 pc','Eating out','meat','as-served','C',
+    195.3,11.9,20.9,6.6,2.8,1.4,2.5,359,[['3 tacos (320 g)',320]],
+    'chicken tacos'),
+  F('calburrito-nachos-queso','Nachos with queso','Eating out','veg','as-served','C',
+    313.6,7.7,29.1,18.2,3.2,1.4,6.8,545,[['1 portion (220 g)',220]],
+    'corn chips liquid cheese'),
+  F('calburrito-nachos-loaded-veg','Loaded nachos, veg','Eating out','veg','as-served','C',
+    246.9,6.9,25.6,13.1,3.4,1.6,5.0,438,[['1 portion (320 g)',320]],
+    'loaded nachos'),
+  F('calburrito-nachos-loaded-chicken','Loaded nachos, chicken','Eating out','meat','as-served','C',
+    250.0,11.2,24.4,12.1,3.1,1.5,4.7,441,[['1 portion (340 g)',340]],
+    'loaded nachos chicken'),
+  F('calburrito-chips-salsa','Tortilla chips and salsa','Eating out','veg','as-served','C',
+    400.0,5.8,48.3,20.0,5.0,3.3,3.3,517,[['1 portion (120 g)',120]],
+    'corn chips'),
+  F('calburrito-guacamole','Guacamole, side','Eating out','veg','as-served','B',
+    162.5,2.0,8.8,14.4,6.2,1.0,2.1,362,[['1 side (80 g)',80]],
+    'avocado guac'),
+  F('calburrito-queso-side','Queso, side','Eating out','veg','as-served','C',
+    250.0,10.7,7.1,20.0,0.4,3.6,12.1,800,[['1 side (70 g)',70]],
+    'liquid cheese dip'),
+  F('calburrito-sourcream','Sour cream, side','Eating out','veg','as-served','B',
+    191.7,3.0,4.3,18.3,0.0,4.0,11.3,75,[['1 side (60 g)',60]],
+    'cream dip'),
+  F('calburrito-churros','Churros','Eating out','veg','as-served','C',
+    390.9,4.5,47.3,20.0,1.8,20.0,8.2,291,[['1 portion (110 g)',110]],
+    'dessert cinnamon'),
+
+  /* ── Kadhi, and the plate it is eaten on ───────────────────────────
+     Yogurt soured with gram flour. The regional versions are different
+     dishes rather than the same one cooked differently: Punjabi is thick
+     and carries fried pakodi, Gujarati is thin and sweetened, and Sindhi
+     uses no yogurt at all — it is besan and tomato with vegetables. */
+  F('kadhi-chawal','Kadhi chawal, plate','Prepared','veg','as-served','D',
+    130,3.7,17.5,4.8,0.9,1.3,1.9,300,
+    [['1 plate (350 g)',350],['1 large plate (450 g)',450]],
+    'kadi chaval kadhi rice curry chawal punjabi'),
+  F('kadhi-plain','Kadhi, no pakoda','Prepared','veg','as-served','C',
+    84,3.5,6.5,5.0,0.6,3.0,2.2,400,[['1 katori (150 g)',150]],
+    'kadi karhi plain dahi besan curry'),
+  F('kadhi-gujarati','Kadhi, Gujarati','Prepared','veg','as-served','C',
+    70,3.0,7.5,3.2,0.4,4.5,1.8,380,[['1 katori (150 g)',150]],
+    'kadi gujrati sweet thin curry'),
+  F('kadhi-sindhi','Kadhi, Sindhi','Prepared','veg','as-served','C',
+    93,3.2,10.0,5.0,2.5,3.0,1.2,400,[['1 katori (150 g)',150]],
+    'kadi sindhi besan tomato vegetable curry no yogurt'),
+  F('pakoda-besan','Pakoda, besan','Snacks & Sweets','veg','as-served','D',
+    312,9.0,28.0,19.0,3.5,1.5,5.0,480,
+    [['1 pakoda (25 g)',25],['1 plate (100 g)',100]],
+    'pakora pakodi bhajji bhaji fritter besan gram flour'),
+
+  /* ── Edamame and whole soy ─────────────────────────────────────────
+     The one plant protein that is complete on its own, which is why it
+     is classed as 'soy' rather than 'legume' — the legume class carries a
+     methionine limit that does not apply here. */
+  F('edamame','Edamame, shelled, cooked','Legumes','veg','cooked','A',
+    121,11.9,8.9,5.2,5.2,2.2,0.6,6,[['1 katori (100 g)',100],['1 cup (155 g)',155]],'soybean green soya beans'),
+  F('edamame-pods','Edamame in pods, cooked','Legumes','veg','cooked','A',
+    121,11.9,8.9,5.2,5.2,2.2,0.6,6,[['1 bowl, pods weighed as eaten (90 g)',90]],'soybean pods'),
+  F('edamame-frozen','Edamame, frozen, shelled','Legumes','veg','raw','A',
+    109,10.9,8.1,4.7,4.8,2.0,0.5,5,[['1 katori (100 g)',100]],'soya beans frozen'),
+  F('edamame-salted','Edamame, steamed and salted','Eating out','veg','as-served','B',
+    128,11.9,9.0,5.6,5.2,2.2,0.7,320,[['1 bowl (150 g)',150]],'restaurant edamame'),
+  F('soybean-boiled','Soybeans, boiled','Legumes','veg','cooked','A',
+    172,18.2,8.4,9.0,6.0,3.0,1.3,2,[['1 katori (100 g)',100]],'bhat soya'),
+  F('soy-chunks-ckd','Soya chunks, cooked','Legumes','veg','cooked','A',
+    95,15.0,9.0,0.6,3.5,1.5,0.1,10,[['1 katori (100 g)',100]],'nutrela meal maker'),
+
   /* ── Off the shelf in India ───────────────────────────────────────
      Open Food Facts is contributor-built and thin on Indian products,
      so an ordinary packet of namkeen often will not scan. These are
@@ -850,8 +968,9 @@ export const FOODS = [
     90,3.5,7.0,6.0,3.5,1.5,2.6,350,[['1 katori (150 g)',150]]),
   F('dal-fry','Dal fry','Prepared','veg','as-served','C',
     130,5.5,14.0,6.5,3.5,1.2,2.6,420,[['1 katori (150 g)',150]]),
-  F('kadhi-pakora','Kadhi pakora','Prepared','veg','as-served','D',
-    120,4.5,9.0,7.5,1.2,2.5,3.0,430,[['1 katori (150 g)',150]]),
+  F('kadhi-pakora','Kadhi pakora, Punjabi','Prepared','veg','as-served','D',
+    120,4.5,9.0,7.5,1.2,2.5,3.0,430,[['1 katori (150 g)',150]],
+    'kadhi kadi karhi punjabi besan pakodi pakoda dahi curry'),
 
   F('chicken-tikka-masala','Chicken tikka masala','Prepared','meat','as-served','D',
     190,13.5,6.5,12.5,1.2,3.5,5.0,500,[['1 katori (150 g)',150]]),
@@ -1004,12 +1123,6 @@ export const FOODS = [
     152,5.1,24,4.2,2.2,4.6,1.6,440,[['1 plate (~300 g)',300]]),
 
   /* California Burrito — the Indian chain, not the San Diego dish. */
-  F('calburrito-veg','California Burrito, veg','Eating out','veg','as-served','D',
-    198,6.4,28,6.8,3.4,2.6,2.4,520,[['1 burrito (~400 g)',400],['half',200]]),
-  F('calburrito-chicken','California Burrito, chicken','Eating out','meat','as-served','D',
-    212,11.8,26,7.1,3.1,2.4,2.6,560,[['1 burrito (~420 g)',420]]),
-  F('calburrito-bowl','California Burrito, bowl','Eating out','veg','as-served','D',
-    142,6.1,18,5.2,3.6,2.2,1.8,470,[['1 bowl (~450 g)',450]]),
   F('cheese-fries','Cheese fries','Eating out','veg','as-served','D',
     324,6.8,34,18.2,3.1,1.4,6.2,580,[['1 portion (~180 g)',180]]),
 
@@ -1063,6 +1176,25 @@ for (const f of FOODS) {
 }
 
 /* Fast lookup by id. */
+/*
+ * What a diet setting allows.
+ *
+ * The setting existed and was read by nothing, so choosing "Vegetarian"
+ * changed the wording of one toast and then went on showing chicken in
+ * every search. Filtering happens at the point of listing rather than by
+ * removing anything from the data: a vegetarian household still needs the
+ * meat entries to exist, because somebody else's plate might be on the
+ * table and a shared log has to be able to record it.
+ */
+export function dietAllows(food, diet) {
+  if (!diet || diet === 'all') return true;
+  const d = food?.diet;
+  if (!d) return true;
+  if (diet === 'veg') return d === 'veg';
+  if (diet === 'egg') return d === 'veg' || d === 'egg';
+  return true;
+}
+
 export const BY_ID = Object.fromEntries(FOODS.map(f => [f.id, f]));
 
 /*

@@ -18,6 +18,7 @@
  */
 
 import { dayKey, peekDay, totals, byMeal, entryMacros, frequentFoods, get } from './store.js';
+import { BY_ID, dietAllows } from './data/foods.js';
 
 const HARD = 1.18;      // today's burn against your own average
 const EASY = 0.92;
@@ -77,7 +78,14 @@ function timing(key, now) {
  * lean protein".
  */
 export function suggestFoods(gap, { want = 'protein', limit = 3 } = {}) {
-  const pool = frequentFoods(40);
+  /* Suggestions come from what you already eat, but somebody who has just
+     switched to vegetarian does not want last month's chicken offered
+     back to them. */
+  const diet = get().settings?.diet;
+  const pool = frequentFoods(40).filter(f => {
+    const ref = BY_ID[String(f.ref || f.id || '').replace(/^off:|^my:|^dish:/, '')];
+    return !ref || dietAllows(ref, diet);
+  });
   if (!pool.length) return [];
 
   const scored = pool.map(f => {
