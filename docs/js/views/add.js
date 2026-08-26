@@ -563,6 +563,34 @@ export function openScanner(ctx) {
      * someone to type eight numbers off the back was the real failure;
      * reading the label is the same job with the typing removed.
      */
+    const nameHits = el('div');
+    const byName = el('input', {
+      type: 'search', placeholder: 'Search by name — Kurkure, Lays, Parle-G…',
+      autocomplete: 'off',
+      oninput: e => {
+        const q = e.target.value.trim();
+        clear(nameHits);
+        if (q.length < 2) return;
+        const hits = searchLocal(q).slice(0, 6).map(toItem);
+        if (!hits.length) { nameHits.append(el('div.fine', {}, 'Nothing by that name either.')); return; }
+        const g = el('div.food-grid');
+        for (const f of hits) {
+          g.append(el('button.food-cell', {
+            onclick: () => {
+              /* Bind the packet to this barcode on the way through. */
+              const saved = saveFood({ ...f, barcode: code });
+              sh.close();
+              openPortion(toItem(saved), { dateKey: ctx.date || dayKey(), onSaved: ctx.refresh });
+              toast('Saved against that barcode — it will scan next time.');
+            },
+          },
+            el('span.fc-name', {}, f.n),
+            el('span.fc-kcal', {}, `${Math.round(f.per100?.kcal || 0)} · ${Math.round(f.per100?.p || 0)}P`)));
+        }
+        nameHits.append(g);
+      },
+    });
+
     const sh = sheet({
       title: 'Not in the database',
       body: el('div', {},
@@ -570,7 +598,13 @@ export function openScanner(ctx) {
           `Barcode ${code}`, isIndian(code) ? ' is an Indian product code' : '',
           ' but Open Food Facts has no entry for it — its Indian coverage is thin. '
           + 'Capture the label once and the packet is yours permanently.'),
-        el('button.btn.primary.block', {
+        /* Search by name first — most Indian packets that fail to scan are
+           in the app under their own name, and one tap beats reading a
+           label off the back. Whatever route is taken, the food is saved
+           against this barcode, so the packet scans instantly ever after. */
+        el('div.field', { style: { marginTop: '4px' } }, byName),
+        nameHits,
+        el('button.btn.primary.block', { style: { marginTop: '10px' },
           onclick: () => { sh.close(); openLabelScan(ctx, { barcode: code }); },
         }, icon('scan', 16), 'Read the label'),
         el('button.btn.block', { style: { marginTop: '9px' },

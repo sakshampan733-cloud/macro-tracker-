@@ -69,7 +69,49 @@ export const RESTAURANTS = {
     prefix: 'calburrito-',
   },
 
+  pizzahut: {
+    name: 'Pizza Hut', kind: 'Pizza',
+    alias: 'pizza pan margherita veggie supreme paneer vega chicken supreme cheesy bites wings',
+    prefix: 'ph-',
+  },
+  wowmomo: {
+    name: 'Wow! Momo', kind: 'Momos',
+    alias: 'wow momo moburg steamed pan fried dumpling',
+    prefix: 'wow-',
+  },
+  bikanervala: {
+    name: 'Bikanervala', kind: 'Sweets & chaat',
+    alias: 'bikano bikaner samosa chole bhature rajma chawal thali mithai',
+    prefix: 'bikanervala-',
+  },
+  burgersingh: {
+    name: 'Burger Singh', kind: 'Fast food',
+    alias: 'burger singh desi burger',
+    prefix: 'burger-singh-',
+  },
+  ccd: {
+    name: 'Cafe Coffee Day', kind: 'Cafe',
+    alias: 'ccd coffee day cappuccino cold coffee',
+    prefix: 'ccd-',
+  },
+  chaayos: {
+    name: 'Chaayos', kind: 'Chai',
+    alias: 'chaayos chai masala tea',
+    prefix: 'chaayos-',
+  },
+  keventers: {
+    name: 'Keventers', kind: 'Shakes',
+    alias: 'keventers milkshake shake',
+    prefix: 'keventers-',
+  },
+
   /* ── Counters rather than companies ── */
+  pizza: {
+    name: 'Pizza, any', kind: 'By the slice',
+    alias: 'pizza slice cheese margherita thin crust personal',
+    ids: ['pizza-cheese-slice', 'pizza-veg-slice', 'pizza-paneer-slice',
+          'pizza-chicken-slice', 'pizza-thin-crust-slice', 'pizza-personal-veg'],
+  },
   momos: {
     name: 'Momo stall', kind: 'Street',
     alias: 'momo momos dumpling steamed fried kurkure tandoori chutney',
