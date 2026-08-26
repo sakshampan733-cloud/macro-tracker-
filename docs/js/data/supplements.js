@@ -71,7 +71,18 @@ export const SUPPLEMENTS = {
   'creatine': {
     label: 'Creatine monohydrate', dose: '5 g', tag: 'training',
     provides: {},
-    note: 'No calories. Timing does not matter; daily consistency does.',
+    /*
+     * Creatine pulls water into muscle cells, which is most of why it
+     * works and all of why the scale jumps in the first fortnight. Both
+     * facts matter to the app: the water target goes up, and a weight
+     * gain of a kilo or two early on is water, not fat — which the
+     * trend line would otherwise read as a diet going wrong.
+     */
+    waterMl: 500,
+    scaleBump: true,
+    note: 'No calories. Timing does not matter; daily consistency does. '
+        + 'Draws water into muscle, so drink more and expect the scale to '
+        + 'rise a kilo or so in the first two weeks — that is water.',
   },
   'whey': {
     label: 'Whey protein', dose: '1 scoop', tag: 'training',
@@ -81,11 +92,13 @@ export const SUPPLEMENTS = {
   'caffeine': {
     label: 'Caffeine', dose: '200 mg', tag: 'training', caffeine: 200,
     provides: {},
+    waterMl: 250,
     note: 'Half of it is still in you five hours later. Watch it against your sleep.',
   },
   'pre-workout': {
     label: 'Pre-workout', dose: '1 scoop', tag: 'training', caffeine: 200,
     provides: {},
+    waterMl: 250,
     note: 'Most scoops sit between 150 and 300 mg of caffeine. Counted against the daily total.',
   },
   'electrolytes': {
@@ -100,6 +113,29 @@ export const SUPPLEMENT_TAGS = { general: 'Everyday', training: 'Training' };
  * What the day's taken supplements add to micronutrient totals.
  * Returns the same shape as a food's micro block so it can simply be added.
  */
+/*
+ * What the supplements you take do to the day's targets.
+ *
+ * Only where the effect is real and well established. Creatine is the
+ * clear case — it is osmotically active in muscle, and every credible
+ * source that recommends it also recommends drinking more.
+ */
+export function supplementTargetShift(takenIds, store) {
+  let waterMl = 0;
+  const reasons = [];
+  let scaleBump = false;
+  for (const id of takenIds || []) {
+    const sup = SUPPLEMENTS[id] || store?.supplementsCustom?.[id];
+    if (!sup) continue;
+    if (sup.waterMl) {
+      waterMl += sup.waterMl;
+      reasons.push(sup.label);
+    }
+    if (sup.scaleBump) scaleBump = true;
+  }
+  return { waterMl, reasons, scaleBump };
+}
+
 export function supplementMicros(takenIds, store) {
   const out = {};
   let omega3 = 0;

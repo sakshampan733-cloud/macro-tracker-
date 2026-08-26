@@ -25,6 +25,7 @@ import { haptic } from '../feedback.js';
 import { openReport } from './report.js';
 import { openAppleHealth } from './apple.js';
 import { sleepTile, sleepSchedule, sleepHours } from './sleep.js';
+import { weightUnit, kgToLb, lbToKg, showWeight } from '../units.js';
 import { existingSource, sourceForMetric, healthSource, setHealthSource } from '../applehealth.js';
 import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
@@ -134,10 +135,17 @@ function weightTile(ctx) {
   const series = weightSeries();
   const withTrend = trendWeight(series);
 
+  /* Kilograms are what gets stored; the unit is only how it is typed and
+     read back. Weighing in is the most repeated numeric entry in the app,
+     so it is the one place a forced conversion is most annoying. */
+  const wu = weightUnit(s);
+  const toDisp = kg => (wu === 'lb' ? kgToLb(kg) : kg);
+  const fromDisp = v => (wu === 'lb' ? lbToKg(v) : v);
+
   const input = el('input.num-in', {
     type: 'number', inputmode: 'decimal', step: '0.1', min: '20',
-    placeholder: s.profile?.weightKg ? String(s.profile.weightKg) : 'kg',
-    value: today ? String(today) : '',
+    placeholder: s.profile?.weightKg ? toDisp(s.profile.weightKg).toFixed(1) : wu,
+    value: today ? toDisp(today).toFixed(1) : '',
   });
 
   const latest = withTrend[withTrend.length - 1];
@@ -149,9 +157,9 @@ function weightTile(ctx) {
   const recent = withTrend.slice(-90);
   const chart = withTrend.length > 2
     ? healthLine(
-        recent.map(p => ({ v: p.trend, label: `${p.date}: ${p.kg.toFixed(1)} kg` })),
-        { h: 146, colour: 'var(--accent)', unit: ' kg', dp: 1,
-          raw: recent.map(p => ({ v: p.kg })) })
+        recent.map(p => ({ v: toDisp(p.trend), label: `${p.date}: ${toDisp(p.kg).toFixed(1)} ${wu}` })),
+        { h: 146, colour: 'var(--accent)', unit: ' ' + wu, dp: 1,
+          raw: recent.map(p => ({ v: toDisp(p.kg) })) })
     : null;
 
   return el('div.tile', {},
@@ -164,8 +172,8 @@ function weightTile(ctx) {
       el('button.btn.primary', {
         style: { flex: 'none' },
         onclick: () => {
-          const kg = +input.value;
-          if (!(kg > 20 && kg < 400)) { toast('That does not look like a weight in kg.', 'err'); return; }
+          const kg = fromDisp(+input.value);
+          if (!(kg > 20 && kg < 400)) { toast(`That does not look like a weight in ${wu}.`, 'err'); return; }
           setWeight(key, kg);
           commit(st => { if (st.profile) st.profile.weightKg = kg; });
           toast('Logged.');
@@ -177,13 +185,13 @@ function weightTile(ctx) {
       el('div.between', {},
         el('div', {},
           el('div.micro', {}, 'Trend weight'),
-          el('div.num', { style: { fontSize: '26px', marginTop: '2px' } }, latest.trend.toFixed(1),
-            el('span', { style: { fontSize: '12px', color: 'var(--muted)', marginLeft: '3px' } }, 'kg'))),
+          el('div.num', { style: { fontSize: '26px', marginTop: '2px' } }, toDisp(latest.trend).toFixed(1),
+            el('span', { style: { fontSize: '12px', color: 'var(--muted)', marginLeft: '3px' } }, wu))),
         el('div', { style: { textAlign: 'right' } },
           el('div.micro', {}, 'Since ' + dateLabel(first.date)),
           el('div.num', {
             style: { fontSize: '18px', marginTop: '2px', color: change < 0 ? 'var(--good)' : change > 0 ? 'var(--m-c-ink)' : 'var(--text)' },
-          }, (change >= 0 ? '+' : '') + change.toFixed(1) + ' kg'))),
+          }, (change >= 0 ? '+' : '') + toDisp(change).toFixed(1) + ' ' + wu))),
       chart,
       el('div.fine', { style: { marginTop: '6px' } },
         'Thin line is the scale. Thick line is the ten-day trend — that is the one that means anything.'))

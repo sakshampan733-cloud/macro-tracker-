@@ -34,10 +34,29 @@ export const ACTIVITY = {
   athlete:    { f: 1.90, label: 'Very high',   hint: 'Twice a day, or physical job' },
 };
 
+/*
+ * `rate` is the weight change aimed for, in kg a week. `protein` overrides
+ * the default protein rule where a goal needs one — recomposition is the
+ * case that motivated it, since it is not defined by a rate at all.
+ */
 export const GOALS = {
   cut:      { label: 'Lose fat',      rate: -0.5, hint: 'Deficit, protein held high' },
   lean:     { label: 'Lean slowly',   rate: -0.25, hint: 'Small deficit, keeps training quality' },
-  maintain: { label: 'Maintain',      rate: 0,    hint: 'Hold weight, recomposition' },
+  maintain: { label: 'Maintain',      rate: 0,    hint: 'Hold weight, no particular push' },
+  /*
+   * Build muscle without the scale moving.
+   *
+   * The common request that no rate can express: "I am happy with my
+   * weight, I want more muscle." That is recomposition — calories at
+   * maintenance so weight holds, protein pushed high enough to build on,
+   * and the progress read from the mirror, the tape and your lifts rather
+   * than from the scale, which by design will not move.
+   *
+   * It works best for people newer to training or carrying some fat to
+   * spend; it is slow for everyone, and honest about that.
+   */
+  recomp:   { label: 'Recomposition', rate: 0, protein: 2.4, recomp: true,
+              hint: 'Hold weight, build muscle — the scale stays put on purpose' },
   gain:     { label: 'Build',         rate: 0.25, hint: 'Slow surplus, minimal fat gain' },
   bulk:     { label: 'Gain fast',     rate: 0.5,  hint: 'Larger surplus' },
 };
@@ -288,8 +307,12 @@ export function macroTargets(profile, tdeeKcal) {
     : null;
 
   const cutting = rateKgPerWeek < 0;
-  const perKg = cutting ? 2.2 : 1.8;
-  const proteinG = Math.round((lean ? lean * (cutting ? 2.6 : 2.2) : profile.weightKg * perKg));
+  /* A goal may set its own protein rule. Recomposition does, because
+     building at maintenance calories depends on protein far more than a
+     surplus does — it is the only lever left once energy is fixed. */
+  const perKg = goal.protein ?? (cutting ? 2.2 : 1.8);
+  const leanPerKg = goal.protein ? goal.protein * 1.15 : (cutting ? 2.6 : 2.2);
+  const proteinG = Math.round(lean ? lean * leanPerKg : profile.weightKg * perKg);
 
   const fatFloor = Math.round(profile.weightKg * 0.8);
   const fatFromPct = Math.round((kcal * 0.27) / 9);
@@ -304,7 +327,7 @@ export function macroTargets(profile, tdeeKcal) {
     c: carbG,
     f: fatG,
     fib: Math.round(Math.min(45, Math.max(25, kcal / 1000 * 14))),
-    water: waterTarget(profile),
+    water: waterTarget(profile, profile.suppShift),
 
     /*
      * Ceilings, not goals.
@@ -328,10 +351,19 @@ export function macroTargets(profile, tdeeKcal) {
 }
 
 /* 35 ml per kg, plus a litre on hard training days. */
-export function waterTarget(profile) {
+/*
+ * Water.
+ *
+ * 35 ml per kilo, more if you train hard — and more again for what you
+ * take. Creatine is the one that matters here: it draws water into muscle,
+ * which is most of how it works, and the standard advice alongside it is
+ * to drink more. An app that tracks both and never connected them was
+ * leaving the obvious on the table.
+ */
+export function waterTarget(profile, shift = null) {
   const base = Math.round(profile.weightKg * 35 / 50) * 50;
   const bump = ['high', 'athlete'].includes(profile.activity) ? 500 : 0;
-  return base + bump;
+  return base + bump + (shift?.waterMl || 0);
 }
 
 /* What's left of each target for the rest of the day. */

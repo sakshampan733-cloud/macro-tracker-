@@ -473,10 +473,16 @@ function waterStrip(key, targets) {
 
   const add = ml => { addWater(key, ml); haptic('tap'); repaint(); };
 
+  /* A target that moved should say what moved it, or it looks arbitrary. */
+  const why = targets.suppShift?.waterMl
+    ? `+${targets.suppShift.waterMl} ml for ${targets.suppShift.reasons.join(' and ').toLowerCase()}`
+    : null;
+
   return el('div.tile.water-tile', {},
     el('div.between', { style: { marginBottom: '9px' } },
       el('div.flex', { style: { gap: '7px' } }, icon('drop', 15), el('span.micro', {}, 'Water')),
       readoutEl),
+    why ? el('div.fine', { style: { marginTop: '-3px', marginBottom: '8px' } }, why) : null,
     grid,
     el('div.btn-row', { style: { marginTop: '10px' } },
       el('button.btn.sm', { onclick: () => add(glassMl) }, `+ ${glassMl}`),

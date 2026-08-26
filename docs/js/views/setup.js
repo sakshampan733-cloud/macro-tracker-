@@ -19,6 +19,10 @@ import { goalTile } from './goal.js';
 import { openGuide } from './guide.js';
 import { openAppleHealth } from './apple.js';
 import { VERSION } from '../app.js';
+import {
+  HEIGHT_UNITS, WEIGHT_UNITS, cmToFtIn, ftInToCm, kgToLb, lbToKg,
+} from '../units.js';
+import { SUPPLEMENTS, SUPPLEMENT_TAGS, supplementTargetShift } from '../data/supplements.js';
 
 /* ── Onboarding ─────────────────────────────────────────────────────── */
 
@@ -37,8 +41,73 @@ export function renderOnboarding(root, ctx) {
     type: 'number', inputmode: 'decimal', step, value: String(val),
   });
 
+  /*
+   * Height and weight each get their own unit, because plenty of people
+   * think in feet and kilos, or centimetres and pounds. Tying both to one
+   * switch guarantees one of the two is always being converted in
+   * somebody's head.
+   */
+  const units = { height: 'cm', weight: 'kg' };
+  draft.supplements = [];
+
   const fHeight = num(draft.heightCm);
+  const fFt = num(5); const fIn = num(9);
+  const ftInBox = el('div.field-2', { style: { display: 'none' } },
+    field('Feet', fFt), field('Inches', fIn));
+  const cmBox = el('div', {}, field('Height', fHeight));
+
+  const heightUnitBox = el('div');
+  heightUnitBox.append(segmented(
+    Object.entries(HEIGHT_UNITS).map(([k, v]) => ({ value: k, label: v.label })),
+    units.height,
+    v => {
+      /* Carry the value across rather than resetting it — switching units
+         is a change of notation, not of height. */
+      if (v === 'ftin') {
+        const { ft, in: inch } = cmToFtIn(+fHeight.value || 175);
+        fFt.value = String(ft); fIn.value = String(inch);
+        ftInBox.style.display = ''; cmBox.style.display = 'none';
+      } else {
+        fHeight.value = String(Math.round(ftInToCm(fFt.value, fIn.value)));
+        ftInBox.style.display = 'none'; cmBox.style.display = '';
+      }
+      units.height = v;
+      update();
+    }));
+
   const fWeight = num(draft.weightKg, '0.1');
+  const weightUnitBox = el('div');
+  weightUnitBox.append(segmented(
+    Object.entries(WEIGHT_UNITS).map(([k, v]) => ({ value: k, label: v.label })),
+    units.weight,
+    v => {
+      const kg = units.weight === 'lb' ? lbToKg(+fWeight.value) : +fWeight.value;
+      fWeight.value = (v === 'lb' ? kgToLb(kg) : kg).toFixed(1);
+      units.weight = v;
+      update();
+    }));
+
+  /*
+   * Supplements, asked at the start.
+   *
+   * Not for completeness — because some of them change the targets. The
+   * one that prompted this: creatine draws water into muscle, so it needs
+   * more water alongside it, and the app knew both halves without ever
+   * joining them.
+   */
+  const suppBox = el('div.chips');
+  for (const [id, sup] of Object.entries(SUPPLEMENTS)) {
+    suppBox.append(el('button.chip', {
+      type: 'button', 'aria-pressed': 'false',
+      onclick: e => {
+        const on = draft.supplements.includes(id);
+        draft.supplements = on ? draft.supplements.filter(x => x !== id) : [...draft.supplements, id];
+        e.currentTarget.setAttribute('aria-pressed', String(!on));
+        update();
+      },
+    }, sup.label));
+  }
+  const suppNote = el('div.fine');
   const fBf = num('', '0.1');
   const fYear = num(draft.birthYear);
   const fName = el('input', { type: 'text', placeholder: 'What should the app call you?' });
@@ -59,8 +128,13 @@ export function renderOnboarding(root, ctx) {
     draft.goal, v => { draft.goal = v; update(); }, { wrap: true }));
 
   const read = () => {
-    draft.heightCm = +fHeight.value || 175;
-    draft.weightKg = +fWeight.value || 70;
+    draft.heightCm = units.height === 'ftin'
+      ? Math.round(ftInToCm(fFt.value, fIn.value))
+      : (+fHeight.value || 175);
+    draft.weightKg = units.weight === 'lb'
+      ? +lbToKg(+fWeight.value).toFixed(1)
+      : (+fWeight.value || 70);
+    draft.suppShift = supplementTargetShift(draft.supplements, null);
     draft.bodyFatPct = +fBf.value || 0;
     draft.birthYear = +fYear.value || 2000;
     draft.name = fName.value.trim();
@@ -73,6 +147,14 @@ export function renderOnboarding(root, ctx) {
     const bmr = bmrFor(p);
     const tdee = predictedTDEE(p);
     const t = macroTargets(p, tdee.kcal);
+
+    /* Say what the supplements did, at the moment they do it. */
+    const shift = p.suppShift;
+    suppNote.textContent = shift?.waterMl
+      ? `${shift.reasons.join(' and ')} raises your water target by `
+        + `${shift.waterMl} ml a day — creatine pulls water into muscle, which is `
+        + 'most of how it works.'
+      : '';
 
     preview.replaceChildren(
       el('div.micro', {}, 'Your starting numbers'),
@@ -95,7 +177,7 @@ export function renderOnboarding(root, ctx) {
     );
   }
 
-  [fHeight, fWeight, fBf, fYear, fName].forEach(i => i.addEventListener('input', update));
+  [fHeight, fFt, fIn, fWeight, fBf, fYear, fName].forEach(i => i.addEventListener('input', update));
 
   root.append(
     el('div', { style: { padding: '30px 0 18px' } },
@@ -105,7 +187,10 @@ export function renderOnboarding(root, ctx) {
         'Six answers and you are logging. Every one of them is used in a calculation you can see.')),
 
     field('Name', fName),
-    el('div.field-2', {}, field('Height (cm)', fHeight), field('Weight (kg)', fWeight)),
+    field('Height in', heightUnitBox),
+    cmBox, ftInBox,
+    field('Weight in', weightUnitBox),
+    el('div', {}, field('Weight', fWeight)),
     el('div.field-2', {}, field('Born', fYear), field('Body fat %', fBf)),
     el('div.field', {}, el('div.help', { style: { marginTop: '-6px' } },
       'Body fat is optional. If you know it, the app uses Katch-McArdle instead of Mifflin-St Jeor, which is more accurate because it works off lean mass.')),
@@ -113,6 +198,9 @@ export function renderOnboarding(root, ctx) {
     field('Sex', sexBox, 'Used by the resting-metabolism equation.'),
     field('Training', actBox),
     field('Goal', goalBox),
+    field('Anything you take', suppBox,
+      'Optional, and changeable later. Some of these move your targets.'),
+    suppNote,
 
     preview,
 
@@ -125,6 +213,9 @@ export function renderOnboarding(root, ctx) {
         commit(s => {
           s.profile = p;
           s.targets = macroTargets(p, tdee.kcal);
+          s.supplementsTaken = [...draft.supplements];
+          s.settings.heightUnit = units.height;
+          s.settings.weightUnit = units.weight;
         }, 'profile');
         toast('Ready.');
         ctx.go('today');
@@ -218,8 +309,28 @@ export function renderSettings(root, ctx) {
 
   const num = (val, step = '1') => el('input.num-in', { type: 'number', inputmode: 'decimal', step, value: String(val ?? '') });
 
-  const fHeight = num(p.heightCm);
-  const fWeight = num(p.weightKg, '0.1');
+  const hUnit = HEIGHT_UNITS[s.settings.heightUnit] ? s.settings.heightUnit : 'cm';
+  const wUnit = WEIGHT_UNITS[s.settings.weightUnit] ? s.settings.weightUnit : 'kg';
+
+  const fHeight = num(hUnit === 'ftin' ? '' : p.heightCm);
+  const hFt = num(cmToFtIn(p.heightCm).ft);
+  const hIn = num(cmToFtIn(p.heightCm).in);
+  const fWeight = num(wUnit === 'lb' ? +kgToLb(p.weightKg).toFixed(1) : p.weightKg, '0.1');
+
+  const hUnitBox = el('div');
+  hUnitBox.append(segmented(
+    Object.entries(HEIGHT_UNITS).map(([k, v]) => ({ value: k, label: v.label })),
+    hUnit, v => { commit(st => { st.settings.heightUnit = v; }); ctx.refresh(); }, {}));
+
+  const wUnitBox = el('div');
+  wUnitBox.append(segmented(
+    Object.entries(WEIGHT_UNITS).map(([k, v]) => ({ value: k, label: v.label })),
+    wUnit, v => { commit(st => { st.settings.weightUnit = v; }); ctx.refresh(); }, {}));
+
+  /* Writing back always converts to the stored unit, never the other way:
+     centimetres and kilograms are what the app keeps. */
+  hFt.addEventListener('change', () => save({ heightCm: Math.round(ftInToCm(hFt.value, hIn.value)) }));
+  hIn.addEventListener('change', () => save({ heightCm: Math.round(ftInToCm(hFt.value, hIn.value)) }));
   const fBf = num(p.bodyFatPct || '', '0.1');
   const fYear = num(p.birthYear);
   const fRate = num(p.rate ?? GOALS[p.goal].rate, '0.05');
@@ -258,8 +369,14 @@ export function renderSettings(root, ctx) {
 
   const applyBody = () => {
     save({
-      heightCm: +fHeight.value || p.heightCm,
-      weightKg: +fWeight.value || p.weightKg,
+      heightCm: hUnit === 'ftin'
+        ? Math.round(ftInToCm(hFt.value, hIn.value))
+        : (+fHeight.value || p.heightCm),
+      /* Typed in pounds, stored in kilos. The unit is a display choice;
+         the stored number never changes meaning. */
+      weightKg: wUnit === 'lb'
+        ? +lbToKg(+fWeight.value || kgToLb(p.weightKg)).toFixed(1)
+        : (+fWeight.value || p.weightKg),
       bodyFatPct: +fBf.value || 0,
       birthYear: +fYear.value || p.birthYear,
       rate: +fRate.value,
@@ -286,7 +403,10 @@ export function renderSettings(root, ctx) {
 
     group(ctx, 'body', 'Body and goal',
       'Height, weight, training, and the goal everything is measured against.',
-      el('div.field-2', {}, field('Height (cm)', fHeight), field('Weight (kg)', fWeight)),
+      el('div.field-2', {}, field(`Height (${hUnit === 'ftin' ? 'ft, in' : 'cm'})`,
+        hUnit === 'ftin' ? el('div.field-2', {}, field('Feet', hFt), field('Inches', hIn)) : fHeight),
+      field(`Weight (${wUnit})`, fWeight)),
+    el('div.field-2', {}, field('Show height in', hUnitBox), field('Show weight in', wUnitBox)),
       el('div.field-2', {}, field('Born', fYear), field('Body fat %', fBf)),
       field('Training', actBox),
       field('Goal', goalBox),

@@ -15,6 +15,7 @@ import {
   subscribe,
 } from '../store.js';
 import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
+import { supplementTargetShift } from '../data/supplements.js';
 import { dayFactor } from '../whoop.js';
 import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
@@ -68,14 +69,18 @@ export function renderToday(root, ctx) {
  */
 export function dayTargets(s, key) {
   const tdee = bestTDEE(s, s.profile);
-  const base = macroTargets(s.profile, tdee.kcal);
+  /* What you take changes what you need — creatine raises the water
+     target, and the profile carries that through to macroTargets. */
+  const suppShift = supplementTargetShift(s.supplementsTaken || [], s);
+  const profile = { ...s.profile, suppShift };
+  const base = macroTargets(profile, tdee.kcal);
   const day = dayFactor(s, key);
 
   if (day && s.settings.tdeeSource !== 'predicted') {
-    const adjusted = macroTargets(s.profile, tdee.kcal * day.factor);
-    return { ...adjusted, source: 'whoop-day', tdee, day, base };
+    const adjusted = macroTargets(profile, tdee.kcal * day.factor);
+    return { ...adjusted, source: 'whoop-day', tdee, day, base, suppShift };
   }
-  return { ...base, source: tdee.source, tdee, base };
+  return { ...base, source: tdee.source, tdee, base, suppShift };
 }
 
 function dateStrip(key, ctx) {
