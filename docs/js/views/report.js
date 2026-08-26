@@ -21,6 +21,8 @@ import {
 import { caffeineDay, DAILY_CEILING_MG } from '../data/caffeine.js';
 import { medicationById } from '../data/medications.js';
 import { SUPPLEMENTS } from '../data/supplements.js';
+import { atwater, BY_ID } from '../data/foods.js';
+import { METHODS } from '../store.js';
 import { sourceForMetric } from '../applehealth.js';
 import { macroTargets, bestTDEE } from '../nutrition.js';
 import { dayQuality, leucineByMeal, LEUCINE_THRESHOLD_G } from '../data/quality.js';
@@ -74,6 +76,28 @@ export function buildReport(store, from, to) {
   let wakeSum = 0, wakeDays = 0, firstMealSum = 0, firstMealDays = 0;
   const manualSleep = [];
 
+  /*
+   * How much of this log can be checked by somebody who did not write it.
+   *
+   * A report is only worth as much as its inputs, and every input here is
+   * self-reported. That is not an accusation — it is the nature of food
+   * logging — but the difference between a scanned barcode and a number
+   * somebody typed into a custom food is enormous, and a report that
+   * presents both as "1,850 kcal" hides exactly the thing a reader needs.
+   *
+   * So the report says where its numbers came from. Everything below is a
+   * fact about the data, never a verdict about the person.
+   */
+  const prov = {
+    entries: 0, kcalTotal: 0,
+    byOrigin: { reference: 0, scanned: 0, custom: 0, quick: 0, dish: 0 },
+    byMethod: {},
+    atwaterOff: new Map(),   /* stated kcal disagrees with its own macros */
+    customMade: new Map(),   /* custom foods and what they contributed */
+    backfilled: 0, sameDay: 0,
+    roundKcal: 0,
+  };
+
   for (const key of days) {
     const d = store.days[key];
     const t = totals(key);
@@ -123,6 +147,63 @@ export function buildReport(store, from, to) {
 
     const groups = byMeal(key);
     const entries = Object.values(groups).flat();
+
+    /* ── provenance, entry by entry ── */
+    const dayStart = new Date(key + 'T00:00:00').getTime();
+    for (const e of entries) {
+      const m = entryMacros(e);
+      prov.entries++;
+      prov.kcalTotal += m.kcal || 0;
+
+      const ref = String(e.ref || '');
+      const origin = e.dish ? 'dish'
+        : ref.startsWith('my:') ? 'custom'
+        : (e.barcode || ref.startsWith('off:')) ? 'scanned'
+        : BY_ID[ref] ? 'reference'
+        : 'quick';
+      prov.byOrigin[origin] = (prov.byOrigin[origin] || 0) + (m.kcal || 0);
+
+      const meth = e.method || 'portion';
+      prov.byMethod[meth] = (prov.byMethod[meth] || 0) + (m.kcal || 0);
+
+      /* A panel whose calories disagree with its own protein, carbohydrate
+         and fat did not come off a real label. */
+      if (e.per100) {
+        const chk = atwater(e.per100);
+        if (chk.off) {
+          /* Grouped by food, not by entry. The same invented panel logged
+             seven times is one problem repeated, and listing it seven
+             times buries the other foods underneath it. */
+          const k = e.name || 'unnamed';
+          const prev = prov.atwaterOff.get(k);
+          if (prev) { prev.times++; }
+          else {
+            prov.atwaterOff.set(k, {
+              name: k, times: 1, first: key,
+              stated: chk.stated, derived: chk.derived,
+              pct: Math.round(Math.abs(chk.delta) * 100),
+            });
+          }
+        }
+      }
+
+      if (origin === 'custom' || origin === 'quick') {
+        const k = e.name || 'unnamed';
+        const rec = prov.customMade.get(k) || { kcal: 0, times: 0 };
+        rec.kcal += m.kcal || 0; rec.times++;
+        prov.customMade.set(k, rec);
+      }
+
+      /* Logged on the day, or filled in afterwards. */
+      if (e.ts) {
+        if (e.ts > dayStart + 36 * 3600e3) prov.backfilled++;
+        else prov.sameDay++;
+      }
+
+      /* Round numbers cluster when people type rather than measure. */
+      const kc = Math.round(m.kcal || 0);
+      if (kc >= 100 && kc % 50 === 0) prov.roundKcal++;
+    }
 
     /* ── caffeine: one total, whatever it arrived as ── */
     const cd = caffeineDay(entries);
@@ -214,6 +295,35 @@ export function buildReport(store, from, to) {
       ...caff, meanMg: caff.totalMg / caff.days,
     } : null,
     plan: plan.planned || plan.followed ? plan : null,
+    provenance: (() => {
+      const t = prov.kcalTotal || 1;
+      const pct = v => Math.round((v / t) * 100);
+      const checkable = prov.byOrigin.reference + prov.byOrigin.scanned;
+      return {
+        entries: prov.entries,
+        checkablePct: pct(checkable),
+        origin: {
+          reference: pct(prov.byOrigin.reference),
+          scanned: pct(prov.byOrigin.scanned),
+          custom: pct(prov.byOrigin.custom),
+          quick: pct(prov.byOrigin.quick),
+          dish: pct(prov.byOrigin.dish),
+        },
+        method: Object.fromEntries(
+          Object.entries(prov.byMethod).map(([k, v]) => [k, pct(v)])),
+        atwaterOff: [...prov.atwaterOff.values()]
+          .sort((a, b) => b.times - a.times).slice(0, 6),
+        atwaterCount: prov.atwaterOff.size,
+        topCustom: [...prov.customMade.entries()]
+          .sort((a, b) => b[1].kcal - a[1].kcal).slice(0, 5)
+          .map(([name, r]) => ({ name, kcal: Math.round(r.kcal), times: r.times,
+                                 share: pct(r.kcal) })),
+        backfilled: prov.backfilled,
+        sameDay: prov.sameDay,
+        backfilledPct: prov.entries ? Math.round((prov.backfilled / prov.entries) * 100) : 0,
+        roundPct: prov.entries ? Math.round((prov.roundKcal / prov.entries) * 100) : 0,
+      };
+    })(),
     sleepGoal: store.settings?.sleepGoal || null,
     manualSleep: manualSleep.length ? {
       mean: manualSleep.reduce((a, b) => a + b, 0) / manualSleep.length,
@@ -440,6 +550,94 @@ function planBlock(r) {
  * and Apple's SDNN are different measures, so the source belongs in the
  * report as much as the number does.
  */
+/*
+ * Where these numbers came from.
+ *
+ * Every figure in this report is self-reported, and the report is worth
+ * exactly what its inputs are worth. A scanned barcode and a number
+ * somebody typed into a food they invented are not the same evidence, and
+ * showing both as plain calories hides the one thing a reader needs.
+ *
+ * This section states facts about the data and draws no conclusion about
+ * the person. "Sixty per cent of these calories came from foods you
+ * created yourself" is true of a careful home cook weighing their own dal
+ * and equally true of someone inventing numbers; it is the reader's job to
+ * know which they are looking at, and this gives them what they need to.
+ *
+ * It is also shown to whoever generates the report, not hidden from them.
+ * A section that appeared only in somebody else's copy would be a trap.
+ */
+function provenanceBlock(r) {
+  const p = r.provenance;
+  if (!p || !p.entries) return null;
+
+  const originRows = [
+    ['Reference foods', p.origin.reference, 'from the built-in database'],
+    ['Scanned packets', p.origin.scanned, 'barcode or packaged product'],
+    ['Foods you built', p.origin.custom, 'panel entered by hand'],
+    ['Quick-added', p.origin.quick, 'calories typed with no food behind them'],
+    ['Home dishes', p.origin.dish, 'your own recipes, density learned'],
+  ].filter(x => x[1] > 0);
+
+  const methodRows = Object.entries(p.method)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => [METHODS[k]?.label || k, v]);
+
+  return el('div', {},
+    el('div.section-label', {}, el('span.micro', {}, 'Where these numbers came from')),
+    el('div.tile', {},
+      el('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
+        statLine('Independently checkable', `${p.checkablePct}%`,
+          'scanned or from the database'),
+        statLine('Entries', String(p.entries), ''),
+        p.backfilledPct > 0
+          ? statLine('Filled in later', `${p.backfilledPct}%`, 'logged over a day afterwards')
+          : null),
+
+      el('div', { style: { marginTop: '14px' } },
+        ...originRows.map(([label, pct, sub]) => el('div.caff-row', {},
+          el('span.grow', {}, el('div', {}, label), el('div.micro', {}, sub)),
+          el('span.num', {}, pct + '%')))),
+
+      methodRows.length ? el('div', { style: { marginTop: '12px' } },
+        el('div.micro', { style: { marginBottom: '4px' } }, 'How the amounts were set'),
+        ...methodRows.map(([label, pct]) => el('div.caff-row', {},
+          el('span.grow', {}, label),
+          el('span.num', {}, pct + '%')))) : null,
+
+      el('div.fine', { style: { marginTop: '10px' } },
+        'A high share of hand-built foods is normal for someone who cooks — it is '
+        + 'not evidence of anything on its own. It does mean the calories rest on '
+        + 'what was typed rather than on a label somebody else printed.')),
+
+    /* The one genuinely objective check available: a panel has to agree
+       with its own macros, because the arithmetic is fixed. */
+    p.atwaterCount ? el('div', {},
+      el('div.section-label', {}, el('span.micro', {}, "Panels that don't add up")),
+      el('div.tile', {},
+        el('div.fine', { style: { marginBottom: '10px' } },
+          `${p.atwaterCount} food${p.atwaterCount === 1 ? '' : 's'} in this log state calories that `
+          + 'disagree with their own protein, carbohydrate and fat. Protein and carbohydrate '
+          + 'yield about 4 kcal per gram and fat about 9 — that arithmetic is fixed, so a real '
+          + 'label agrees with itself. A packet can be out by a few per cent from rounding; '
+          + 'a large gap usually means the number was typed rather than read.'),
+        ...p.atwaterOff.map(a => el('div.caff-row', {},
+          el('span.grow', {},
+            el('div', {}, a.name),
+            el('div.micro', {}, `logged ${a.times}\u00d7 · macros give ${a.derived} kcal`)),
+          el('span.num', { style: { color: 'var(--caution)' } },
+            `${a.stated} stated · ${a.pct}% out`))))) : null,
+
+    p.topCustom.length ? el('div', {},
+      el('div.section-label', {}, el('span.micro', {}, 'Biggest hand-entered items')),
+      el('div.tile', {},
+        ...p.topCustom.map(c => el('div.caff-row', {},
+          el('span.grow', {},
+            el('div', {}, c.name),
+            el('div.micro', {}, `logged ${c.times}\u00d7 · ${c.share}% of all calories`)),
+          el('span.num', {}, `${c.kcal} kcal`))))) : null);
+}
+
 /* Sleep, for someone without a band. */
 function sleepBlock(r) {
   if (!r.manualSleep && !r.sleepGoal) return null;
@@ -609,6 +807,42 @@ export function reportText(r, name = '') {
     L.push('');
   }
 
+  if (r.provenance && r.provenance.entries) {
+    const p = r.provenance;
+    L.push('WHERE THESE NUMBERS CAME FROM');
+    L.push(`  ${p.checkablePct}% of the calories are independently checkable`);
+    L.push('    (scanned packets or the built-in database)');
+    const bits = [
+      ['reference foods', p.origin.reference], ['scanned packets', p.origin.scanned],
+      ['foods built by hand', p.origin.custom], ['quick-added calories', p.origin.quick],
+      ['home dishes', p.origin.dish],
+    ].filter(x => x[1] > 0);
+    for (const [label, pct] of bits) L.push(`  ${String(pct + '%').padStart(4)}  ${label}`);
+    if (p.backfilledPct > 0) {
+      L.push(`  ${p.backfilledPct}% of entries were filled in more than a day afterwards`);
+    }
+    if (p.atwaterCount) {
+      L.push('');
+      L.push(`  ${p.atwaterCount} food(s) state calories that disagree with their own macros:`);
+      for (const a of p.atwaterOff) {
+        L.push(`    ${a.name} — logged ${a.times}x: says ${a.stated} kcal, macros give ${a.derived} (${a.pct}% out)`);
+      }
+      L.push('    Protein and carbs yield ~4 kcal/g and fat ~9. A real label agrees');
+      L.push('    with itself; a large gap means the number was typed, not read.');
+    }
+    if (p.topCustom.length) {
+      L.push('');
+      L.push('  Largest hand-entered items:');
+      for (const c of p.topCustom) {
+        L.push(`    ${c.name} — ${c.kcal} kcal across ${c.times} entries (${c.share}% of all calories)`);
+      }
+    }
+    L.push('');
+    L.push('  Hand-built foods are normal for anyone who cooks. It only means these');
+    L.push('  calories rest on what was typed rather than on a printed label.');
+    L.push('');
+  }
+
   if (r.manualSleep || r.sleepGoal) {
     const goalH = r.sleepGoal ? ((r.sleepGoal.wake - r.sleepGoal.bed) + 24) % 24 : null;
     L.push('SLEEP');
@@ -769,6 +1003,7 @@ export function openReport(ctx, initialDays = 7) {
         planBlock(r),
         medsBlock(r),
         caffeineBlock(r),
+        provenanceBlock(r),
         sleepBlock(r),
         vitalsBlock(r),
         microBlock(r, store),
