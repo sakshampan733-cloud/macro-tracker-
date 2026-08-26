@@ -2524,3 +2524,19 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 .fine.is-good { color: var(--good); }
 .fine.is-plain { color: var(--muted); }
 .caff-row .micro { margin-top: 2px; }
+
+/* A supplement row: tap the name to tick it, the mark to read about it. */
+.supp-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-bottom: 1px solid var(--line);
+}
+.supp-row:last-child { border-bottom: 0; }
+.supp-row.is-on { background: color-mix(in srgb, var(--good) 7%, transparent); }
+.supp-pick { background: none; border: 0; padding: 0; text-align: left; color: inherit; }
+.supp-info {
+  flex: none; width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: none; color: var(--muted);
+}
+.supp-info:hover { color: var(--accent); border-color: var(--accent); }

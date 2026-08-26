@@ -334,17 +334,23 @@ export function openSupplementPicker(ctx) {
                 const gives = Object.entries(sup.provides || {})
                   .map(([k, v]) => `${NUTRIENTS[k]?.label || k} ${g(v, NUTRIENTS[k]?.dp ?? 0)}${NUTRIENTS[k]?.unit || ''}`)
                   .slice(0, 3).join(' · ');
-                return el('button.row', {
-                  onclick: () => {
-                    chosen = on ? chosen.filter(x => x !== id) : [...chosen, id];
-                    setSupplementList(chosen);
-                    render();
+                return el('div.supp-row' + (on ? '.is-on' : ''), {},
+                  el('button.grow.supp-pick', {
+                    onclick: () => {
+                      chosen = on ? chosen.filter(x => x !== id) : [...chosen, id];
+                      setSupplementList(chosen);
+                      render();
+                    },
                   },
-                },
-                  el('span.grow', {},
-                    el('div.title', {}, (on ? '✓ ' : '') + sup.label),
-                    el('div.sub', {}, [sup.dose, gives].filter(Boolean).join(' · ') || '—'),
+                    el('div.title', {}, (on ? '\u2713 ' : '') + sup.label),
+                    el('div.sub', {}, [sup.dose, gives].filter(Boolean).join(' \u00b7 ') || '\u2014'),
                     sup.note ? el('div.fine', { style: { marginTop: '3px' } }, sup.note) : null),
+                  /* How to take it is the question people actually have, and
+                     it was sitting in the data with nowhere to appear. */
+                  sup.how ? el('button.supp-info', {
+                    'aria-label': `How to take ${sup.label}`,
+                    onclick: e => { e.stopPropagation(); openSupplementGuide(id, sup); },
+                  }, icon('info', 15)) : null,
                   on ? el('span.conf.weighed', {}, 'ON') : null);
               })))),
 
@@ -415,4 +421,53 @@ export function caffeineNote(key, now = new Date()) {
     }
   }
   return null;
+}
+
+/*
+ * How to take one supplement.
+ *
+ * Half of these have a rule that decides whether they work at all — iron
+ * with tea, calcium above 500 mg, D3 without fat — and the app knew every
+ * one of them while showing none. A tick list that tells you what a pill
+ * contains but not when to swallow it is answering the easier question.
+ */
+export function openSupplementGuide(id, sup) {
+  const gives = Object.entries(sup.provides || {})
+    .map(([k, v]) => el('div.caff-row', {},
+      el('span.grow', {}, NUTRIENTS[k]?.label || k),
+      el('span.num', {}, `${g(v, NUTRIENTS[k]?.dp ?? 0)}${NUTRIENTS[k]?.unit || ''}`)));
+
+  return sheet({
+    title: sup.label,
+    body: el('div', {},
+      el('div.tile.tile-hero', {},
+        el('div.micro', {}, 'Typical dose'),
+        el('div.readout-main', { style: { fontSize: '28px' } }, sup.dose || '—')),
+
+      sup.how ? el('div', {},
+        el('div.section-label', {}, el('span.micro', {}, 'How to take it')),
+        el('div.tile', {}, el('div', { style: { fontSize: '14.5px', lineHeight: '1.5' } }, sup.how))) : null,
+
+      sup.why ? el('div', {},
+        el('div.section-label', {}, el('span.micro', {}, 'Why that way')),
+        el('div.tile', {}, el('div.fine', { style: { lineHeight: '1.6' } }, sup.why))) : null,
+
+      gives.length ? el('div', {},
+        el('div.section-label', {}, el('span.micro', {}, 'What it provides')),
+        el('div.tile', {}, ...gives)) : null,
+
+      sup.waterMl ? el('div.note', {}, el('div', {},
+        `Raises your water target by ${sup.waterMl} ml a day.`)) : null,
+
+      sup.isFood ? el('div.note.warn', {}, el('div', {},
+        el('b', {}, 'Log this as food'),
+        el('div.fine', { style: { marginTop: '3px' } },
+          'It carries real calories and protein. Ticking it here as well would '
+          + 'count it twice.'))) : null,
+
+      el('div.fine', { style: { marginTop: '14px', opacity: '.75' } },
+        'General information about the supplement, not advice for your situation. '
+        + 'Check with a doctor before starting anything alongside prescribed '
+        + 'medication or in pregnancy.')),
+  });
 }
