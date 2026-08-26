@@ -85,6 +85,51 @@ export function setHealthSource(v) {
  * night produces numbers that differ by a factor of two or more. A trend
  * built from both is not a noisy trend, it is a meaningless one.
  */
+/*
+ * What each band can actually measure.
+ *
+ * The app should not mention hardware you do not own. Someone with an
+ * Apple Watch has no Recovery score and never will — it is Whoop's own
+ * calculation, not a measurement — so showing them an empty Recovery row,
+ * or the word "Whoop" at all, is the app talking about somebody else's
+ * wrist. Equally, a Whoop user has no step count, because Whoop's API
+ * withholds it, and a blank Steps row would look like a fault.
+ *
+ * So capability is declared once here and every screen asks rather than
+ * assuming.
+ */
+export const CAPABILITY = {
+  whoop: ['recovery', 'strain', 'hrv', 'rhr', 'sleepH', 'remH', 'swsH',
+          'kcal', 'spo2', 'resp', 'temp', 'sleepPerf', 'debtH'],
+  apple: ['steps', 'hrv', 'rhr', 'sleepH', 'remH', 'swsH', 'kcal',
+          'spo2', 'resp', 'temp', 'vo2max', 'weightKg'],
+};
+
+/* Which metrics the setup you declared can produce at all. */
+export function canMeasure(metric, mode = null) {
+  const m = mode || healthSource();
+  if (m === 'both') {
+    return CAPABILITY.whoop.includes(metric) || CAPABILITY.apple.includes(metric);
+  }
+  if (m === 'whoop') return CAPABILITY.whoop.includes(metric);
+  if (m === 'apple') return CAPABILITY.apple.includes(metric);
+  /* Nothing declared: fall back to permissive, since hiding a row someone
+     already has data for is worse than showing one they do not. */
+  return true;
+}
+
+/*
+ * What to call the band on screen. An Apple-only user should never read
+ * the word Whoop, and vice versa.
+ */
+export function bandName(mode = null) {
+  const m = mode || healthSource();
+  if (m === 'apple') return 'Apple Health';
+  if (m === 'whoop') return 'Whoop';
+  if (m === 'both') return 'your bands';
+  return 'your band';
+}
+
 export const APPLE_GAP_FIELDS = ['steps', 'standH', 'exerciseMin'];
 
 /*
@@ -178,9 +223,8 @@ export async function syncApple({ relay, key } = {}) {
         by[field] = 'apple';
       };
 
+      /* Steps are the gap Whoop leaves, so they come across in every mode. */
       put('steps', r.steps);
-      put('standH', r.standH);
-      put('exerciseMin', r.exerciseMin);
 
       if (!gapsOnly) {
         put('rhr', r.rhr);
@@ -189,6 +233,14 @@ export async function syncApple({ relay, key } = {}) {
         put('remH', r.remH);
         put('swsH', r.swsH ?? r.deepH);
         put('kcal', kcal);
+        /* An Apple Watch measures these too — Series 6 upwards for blood
+           oxygen, Series 8 upwards for wrist temperature, and respiratory
+           rate overnight. Without them an Apple-only Body tab was three
+           rows emptier than it needed to be. */
+        put('spo2', r.spo2);
+        put('resp', r.resp);
+        put('temp', r.temp);
+        put('vo2max', r.vo2max);
       }
 
       s.whoop.rows[r.date] = {
@@ -198,6 +250,17 @@ export async function syncApple({ relay, key } = {}) {
         by,
         ...take,
       };
+
+      /* A weigh-in is not a vital sign — it belongs on the day, where the
+         trend line and the adaptive TDEE read it from. Never overwrite a
+         weight already entered by hand. */
+      if (r.weightKg > 20 && r.weightKg < 400) {
+        s.days = s.days || {};
+        const d = s.days[r.date] || (s.days[r.date] =
+          { entries: [], water: [], weight: null, note: '', supps: [] });
+        if (d.weight == null) d.weight = +Number(r.weightKg).toFixed(1);
+      }
+
       added++;
     }
     s.whoop.importedAt = Date.now();

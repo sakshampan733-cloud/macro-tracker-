@@ -18,6 +18,7 @@ import { openMealBuilder } from './meal.js';
 import { whoopAdvice } from '../coachwhoop.js';
 import { overdueNote } from '../reminders.js';
 import { caffeineNote } from './supplements.js';
+import { bandName } from '../applehealth.js';
 import {
   get, totals, dayKey, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
@@ -387,7 +388,8 @@ function buildCoach(store, targets, key, ctx) {
   const card = el('div.tile.coach-card.no-swipe.' + (advice.tone === 'warn' ? 'is-warn' : 'is-good'), {},
     el('div.coach-top', {},
       el('span.coach-tag', {}, advice.source === 'meds' ? 'MEDS'
-        : advice.source === 'caffeine' ? 'CAFFEINE' : 'WHOOP'),
+        : advice.source === 'caffeine' ? 'CAFFEINE'
+        : bandName().toUpperCase()),
       el('div.coach-head', {}, advice.headline),
       /* Swipe is the gesture, but a gesture nobody can see is a secret.
          The button does the same thing and announces that it is possible. */

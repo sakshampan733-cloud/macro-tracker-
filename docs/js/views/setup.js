@@ -18,6 +18,8 @@ import { ORBS, applyOrb } from '../theme.js';
 import { goalTile } from './goal.js';
 import { openGuide } from './guide.js';
 import { openAppleHealth } from './apple.js';
+import { openHealthSetup } from './body.js';
+import { healthSource } from '../applehealth.js';
 import { VERSION } from '../app.js';
 import {
   HEIGHT_UNITS, WEIGHT_UNITS, cmToFtIn, ftInToCm, kgToLb, lbToKg,
@@ -309,6 +311,7 @@ export function renderSettings(root, ctx) {
 
   const num = (val, step = '1') => el('input.num-in', { type: 'number', inputmode: 'decimal', step, value: String(val ?? '') });
 
+  const mode = healthSource();
   const hUnit = HEIGHT_UNITS[s.settings.heightUnit] ? s.settings.heightUnit : 'cm';
   const wUnit = WEIGHT_UNITS[s.settings.weightUnit] ? s.settings.weightUnit : 'kg';
 
@@ -457,25 +460,52 @@ export function renderSettings(root, ctx) {
           el('button.btn.sm', { onclick: () => openSleepGoal(ctx) },
             sleepSchedule() ? 'Change' : 'Set it')))),
 
-    group(ctx, 'whoop', 'Whoop',
-      'Whoop, or Apple Health from an iPhone.',
+    /*
+     * Named for what it is rather than for one brand. Somebody with an
+     * Apple Watch should not have to open a section called "Whoop" to set
+     * their watch up, and the choice of band belongs at the top of it
+     * rather than buried in the Body tab.
+     */
+    group(ctx, 'wearable', 'Wearable',
+      mode === 'apple' ? 'Your Apple Watch.'
+        : mode === 'whoop' ? 'Your Whoop band.'
+        : mode === 'both' ? 'Your Whoop band and your Apple Watch.'
+        : 'Whether you wear anything, and what.',
+
       el('div.tile', {},
         el('div.between', {},
           el('div', { style: { flex: '1', paddingRight: '12px' } },
-            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Apple Health'),
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'What you wear'),
             el('div.fine', { style: { marginTop: '3px' } },
-              'For an Apple Watch instead of a Whoop. Apple has no web API, so your '
-              + 'phone pushes the data on a schedule.')),
-          el('button.btn.sm', { onclick: () => openAppleHealth(ctx) }, 'Set up'))),
-      el('div.tile', {},
-        el('div.between', {},
-          el('div', {},
-            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Whoop data'),
-            el('div.micro', { style: { marginTop: '3px' } },
-              Object.keys(s.whoop.rows || {}).length
-                ? `${Object.keys(s.whoop.rows).length} days imported`
-                : 'Not imported')),
-          el('button.btn.sm', { onclick: () => openWhoopConnect(ctx) }, 'Set up')))),
+              mode === 'apple' ? 'Apple Watch. The app shows only what your watch can measure.'
+                : mode === 'whoop' ? 'Whoop. The app shows only what your band can measure.'
+                : mode === 'both' ? 'Whoop and Apple Watch. Apple fills the step count Whoop withholds.'
+                : mode === 'none' ? 'Nothing. Weight, intake and the adaptive TDEE do the work.'
+                : 'Not set — the app cannot tell which readings to offer you.')),
+          el('button.btn.sm', { onclick: () => openHealthSetup(ctx) },
+            mode ? 'Change' : 'Choose'))),
+
+      mode === 'apple' || mode === 'both'
+        ? el('div.tile', {},
+            el('div.between', {},
+              el('div', { style: { flex: '1', paddingRight: '12px' } },
+                el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Apple Health'),
+                el('div.fine', { style: { marginTop: '3px' } },
+                  'Apple has no web API, so your phone pushes the data on a schedule '
+                  + 'through a Shortcut.')),
+              el('button.btn.sm', { onclick: () => openAppleHealth(ctx) }, 'Set up')))
+        : null,
+      mode === 'whoop' || mode === 'both' || !mode
+        ? el('div.tile', {},
+            el('div.between', {},
+              el('div', {},
+                el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Whoop data'),
+                el('div.micro', { style: { marginTop: '3px' } },
+                  Object.keys(s.whoop.rows || {}).length
+                    ? `${Object.keys(s.whoop.rows).length} days imported`
+                    : 'Not imported')),
+              el('button.btn.sm', { onclick: () => openWhoopConnect(ctx) }, 'Set up')))
+        : null),
 
     group(ctx, 'look', 'Appearance',
       'Theme and the glow behind the glass.',

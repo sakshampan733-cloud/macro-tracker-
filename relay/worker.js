@@ -86,8 +86,15 @@ function page(title, body) {
  * propagates silently into averages and charts. Anything unrecognised or
  * non-finite is dropped here rather than stored and puzzled over later.
  */
+/*
+ * Everything an Apple Watch can actually measure that the app has a use
+ * for. Anything not on this list is dropped, so the list has to be
+ * complete before people build their Shortcuts — a field added here later
+ * does not reach a phone that was never told to collect it.
+ */
 const FIELDS = ['rhr', 'hrv', 'sleepH', 'remH', 'swsH', 'deepH',
-                'kcal', 'activeKcal', 'steps', 'weightKg', 'vo2max'];
+                'kcal', 'activeKcal', 'steps', 'weightKg', 'vo2max',
+                'spo2', 'resp', 'temp'];
 
 function clean(row) {
   const out = {};

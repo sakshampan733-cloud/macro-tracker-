@@ -16,6 +16,7 @@ import {
 } from '../store.js';
 import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
 import { supplementTargetShift } from '../data/supplements.js';
+import { bandName } from '../applehealth.js';
 import { dayFactor } from '../whoop.js';
 import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
@@ -266,8 +267,8 @@ function targetBasis(targets, s, key) {
       el('div', {},
         el('div', { style: { fontSize: '13px' } },
           pct === 0
-            ? 'An average day by Whoop, so the usual target stands.'
-            : `Whoop rates today ${Math.abs(pct)}% ${harder ? 'harder' : 'easier'} than your 28-day average`
+            ? `An average day by ${bandName()}, so the usual target stands.`
+            : `${bandName()} rates today ${Math.abs(pct)}% ${harder ? 'harder' : 'easier'} than your 28-day average`
               + `${d.strain != null ? `, strain ${d.strain.toFixed(1)}` : ''}, so the target moved `
               + `${harder ? 'up' : 'down'} to match.`),
         el('div.fine', { style: { marginTop: '3px' } },
@@ -276,7 +277,7 @@ function targetBasis(targets, s, key) {
           + (d.clamped ? ' Capped — a single day is not allowed to swing the target further.' : '')))));
   } else {
     const tdee = targets.tdee;
-    const label = { adaptive: 'Adaptive', whoop: 'Whoop', predicted: 'Formula' }[tdee.source] || 'Estimate';
+    const label = { adaptive: 'Adaptive', whoop: bandName(), predicted: 'Formula' }[tdee.source] || 'Estimate';
     parts.push(el('div.flex', {},
       icon(tdee.source === 'adaptive' ? 'check' : 'info', 15),
       el('div', {},

@@ -279,8 +279,8 @@ export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
     } else if (d.toBed < 1.5 && ate) {
       add(50, 'info',
         `Bed in about ${d.toBed.toFixed(1)} h`,
-        `Eating close to sleep costs you sleep quality more than it costs you fat — Whoop usually sees it as `
-        + `a lower recovery the next morning rather than as anything on the scale.`);
+        `Eating close to sleep costs you sleep quality more than it costs you fat — it usually shows up as `
+        + `a worse night rather than as anything on the scale.`);
     }
   }
 

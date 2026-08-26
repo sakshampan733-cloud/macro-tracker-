@@ -26,7 +26,9 @@ import { openReport } from './report.js';
 import { openAppleHealth } from './apple.js';
 import { sleepTile, sleepSchedule, sleepHours } from './sleep.js';
 import { weightUnit, kgToLb, lbToKg, showWeight } from '../units.js';
-import { existingSource, sourceForMetric, healthSource, setHealthSource } from '../applehealth.js';
+import {
+  existingSource, sourceForMetric, healthSource, setHealthSource, canMeasure, bandName,
+} from '../applehealth.js';
 import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
 } from '../whooprelay.js';
@@ -211,7 +213,13 @@ function tdeeTile(s) {
 
   const rows = [
     { key: 'adaptive', label: 'Adaptive', note: 'From your own intake and weight trend', res: adaptive },
-    { key: 'whoop', label: 'Whoop', note: 'Device-measured daily burn', res: whoop },
+    /* The device row is named after whatever device you actually declared,
+       and reads neutrally when you declared none. */
+    { key: 'whoop',
+      label: healthSource() === 'apple' ? 'Apple Health'
+        : healthSource() === 'whoop' || healthSource() === 'both' ? 'Whoop'
+        : 'Your band',
+      note: 'Device-measured daily burn', res: whoop },
     { key: 'predicted', label: 'Formula', note: predicted.method, res: predicted },
   ];
 
@@ -360,7 +368,7 @@ function vitalsSection(s, ctx) {
   const recV = rec?.latest?.v ?? null;
   const colour = recoveryColour(recV);
 
-  const syncedVia = s.whoop.source === 'relay' ? 'live from Whoop'
+  const syncedVia = s.whoop.source === 'relay' ? `live from ${bandName()}`
     : s.whoop.source === 'demo' ? 'demo data' : 'imported';
 
   const wrap = el('div', {},
@@ -516,6 +524,9 @@ function vitalsSection(s, ctx) {
   const vitalKeys = new Set();
   const srcSeen = new Set();
   for (const [key, colour] of VITALS) {
+    /* Do not offer a row the hardware cannot produce. An empty Recovery
+       on an Apple Watch is not missing data, it is a category error. */
+    if (!canMeasure(key)) continue;
     const pts = seriesFor(s.whoop, key, 30);
     if (pts.length < 4) continue;
     const info = METRICS[key];
@@ -576,26 +587,32 @@ function vitalsSection(s, ctx) {
       : [];
 
     let note = null;
-    if (mixed && fromApple.length) {
+    /* The two-source note only makes sense when there genuinely are two.
+       On a single band it named hardware the reader does not own. */
+    if (mode === 'both' && mixed && fromApple.length) {
       /* Everything Apple is allowed to supply alongside Whoop is a count —
          steps, stand hours, exercise minutes — so the plural verb is
          always the right one here. */
       note = `${listWords(fromApple)} come from Apple Health, marked above. Everything else `
-           + 'is measured by Whoop. The two are never averaged together.';
+           + 'is measured by your Whoop. The two are never averaged together.';
     } else if (missing.length) {
-      note = `Your watch doesn\u2019t report ${listWords(missing)}. Those rows appear if you `
-           + 'connect a Whoop band as well.';
+      note = `Your watch has not sent ${listWords(missing)} yet — check the Shortcut `
+           + 'is collecting them.';
     }
 
     wrap.append(el('div.tile.flush.vitals', {},
       el('div.vitals-head', {},
         el('h3', {}, 'Vitals'),
-        src === 'both'
+        src === 'both' && mode === 'both'
           ? el('div.flex', { style: { gap: '6px' } },
               el('span.micro.src-tag', {}, 'Whoop'),
               el('span.micro.src-tag.is-apple', {}, 'Apple'))
+          /* Someone who says they wear nothing but still has imported data
+             gets a neutral label — naming a band they told us they do not
+             own is the thing this whole pass exists to stop. */
           : el('span.micro.src-tag' + (src === 'apple' ? '.is-apple' : ''), {},
-              src === 'apple' ? 'Apple Watch' : 'Whoop')),
+              mode === 'none' || !mode ? 'imported'
+                : src === 'apple' ? 'Apple Watch' : bandName())),
       ...vitalRows,
       note ? el('div.vital-note', {}, note) : null));
   }
