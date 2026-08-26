@@ -162,6 +162,10 @@ export function generateDemo({ years = 2, seed = 20260820 } = {}) {
       swsH: +(sleepH * (0.16 + r() * 0.05)).toFixed(2),
       debtH: +(Math.max(0, 7.8 - sleepH) * (0.5 + r())).toFixed(2),
       wakeHour: 6.4 + (r() - 0.5) * 1.1,
+      /* Steps come from the phone, not the strap — Whoop's API withholds
+         them. Marked per field so the Vitals panel can say so. */
+      steps: Math.round(6800 + strain * 420 + (r() - 0.5) * 3000),
+      by: { steps: 'apple' },
     };
 
     /* ── Weight, most mornings, with real scale noise ── */
@@ -171,6 +175,23 @@ export function generateDemo({ years = 2, seed = 20260820 } = {}) {
     /* ── Food, when it got logged ── */
     const logged = r() < phase.adherence;
     const entries = [];
+
+    /* Coffee on most mornings and an energy drink now and then, so the
+       caffeine card has something real to decay against bedtime. */
+    if (logged) {
+      const at = (hh, mm) => { const t = new Date(d); t.setHours(hh, mm, 0, 0); return t.getTime(); };
+      const drink = (fid, g, hh, mm, meal) => {
+        const f = BY_ID[fid];
+        if (!f) return;
+        entries.push({ id: 'e' + key + fid, ts: at(hh, mm), meal,
+          name: f.n, ref: f.id, per100: f.per100,
+          serv: (f.serv || []).map(x => Array.isArray(x) ? { l: x[0], g: x[1] } : x),
+          grams: g, method: 'portion', grade: f.grade });
+      };
+      if (r() < 0.85) drink('coffee-milk', 250, 8, 20, 'breakfast');
+      if (r() < 0.30) drink('coffee-black', 200, 15 + Math.floor(r() * 3), 30, 'snack');
+      if (trainingDay && r() < 0.25) drink('monster', 500, 17, 0, 'snack');
+    }
     if (logged) {
       for (const [id, g] of pick(r, BREAKFAST)) {
         const e = entryFor(r, id, g, 'breakfast', d); if (e) entries.push(e);
@@ -270,10 +291,68 @@ export function generateDemo({ years = 2, seed = 20260820 } = {}) {
     },
   };
 
+  /*
+   * Medication, with a realistic adherence record.
+   *
+   * The morning dose is nearly always taken and often a little late; the
+   * evening one gets missed about one night in five, which is the pattern
+   * the report exists to make visible.
+   */
+  const addedAt = Date.now() - 1.6e10;
+  const medications = [
+    { id: 'med:demo1', name: 'Metformin', nickname: 'morning one', ref: 'metformin',
+      purpose: 'blood sugar', mg: 500, unit: 'mg', perDose: 1,
+      times: ['08:00', '20:00'], addedAt },
+    { id: 'med:demo2', name: 'Cholecalciferol', nickname: '', ref: 'vitamin-d-rx',
+      purpose: 'vitamin D deficiency', mg: 60000, unit: 'IU', perDose: 1,
+      times: ['09:00'], addedAt },
+  ];
+
+  for (let i = 0; i < 120; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = iso(d);
+    if (!days[key]) continue;
+    const doses = {};
+    const stamp = (hh, mm) => { const t = new Date(d); t.setHours(hh, mm, 0, 0); return t.getTime(); };
+    if (r() < 0.95) doses['med:demo1@08:00'] = { at: stamp(8, 5 + Math.floor(r() * 70)), time: '08:00', medId: 'med:demo1' };
+    if (r() < 0.80) doses['med:demo1@20:00'] = { at: stamp(20, 5 + Math.floor(r() * 110)), time: '20:00', medId: 'med:demo1' };
+    if (d.getDay() === 0 && r() < 0.9) doses['med:demo2@09:00'] = { at: stamp(9, 10), time: '09:00', medId: 'med:demo2' };
+    days[key].doses = doses;
+  }
+
+  /* A plan for tomorrow, so the Plan tab has something to show. */
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const planned = (fid, g, meal) => {
+    const f = BY_ID[fid];
+    return f && { id: 'p' + fid, name: f.n, ref: f.id, per100: f.per100,
+                  serv: (f.serv || []).map(x => Array.isArray(x) ? { l: x[0], g: x[1] } : x),
+                  grams: g, grade: f.grade, method: 'portion', meal };
+  };
+  const plans = {
+    [iso(tomorrow)]: [
+      planned('egg-whole', 150, 'breakfast'),
+      planned('biryani-veg', 300, 'lunch'),
+      planned('dal-makhani', 150, 'dinner'),
+      planned('roti', 100, 'dinner'),
+    ].filter(Boolean),
+  };
+
   return {
     days, whoop: { rows: whoop, importedAt: Date.now(), source: 'demo' },
-    blood, meals, library,
+    blood, meals, library, medications, plans,
     supplementsTaken: ['vitamin-d3', 'creatine', 'multivitamin', 'omega3'],
+    /* The demo carries its own profile. Without one the whole app renders
+       targets of zero — every macro reads "of 0" — because BMR needs a
+       birth year and there is nowhere else for the demo to get one. */
+    profile: {
+      name: 'Demo', sex: 'male', birthYear: 1996, heightCm: 178,
+      weightKg: +weight.toFixed(1), bodyFatPct: null,
+      activity: 'moderate', goal: 'lean',
+    },
+    settings: {
+      healthSource: 'both',
+      sleepGoal: { bed: 22.75, wake: 6.5, setAt: addedAt },
+    },
     stats: { days: total, years },
   };
 }

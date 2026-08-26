@@ -423,6 +423,10 @@ function vitalsSection(s, ctx) {
             + (today.debtH ? ` · ${today.debtH.toFixed(1)} h of debt` : ''))
         : null,
     ));
+
+    /* The goal belongs next to the measurement, not only on the screen
+       you see before a band is connected. */
+    wrap.append(sleepTile(s, ctx.date || dayKey(), ctx));
   }
 
   /* ── trends, as shapes rather than rows of numbers ── */

@@ -392,41 +392,58 @@ export function sleepTile(s, key, ctx) {
           el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Sleep goal'),
           el('div.fine', { style: { marginTop: '3px' } },
             'Set a bedtime and a wake time, and the app can pace your meals, '
-            + 'water and caffeine around them without a band.')),
+            + 'water and caffeine around them.')),
         el('button.btn.sm', { onclick: () => openSleepGoal(ctx) }, 'Set it')));
   }
 
   const goalH = sleepHours(sch);
-  const logged = peekDay(key).sleep || null;
 
-  const rows = el('div');
-  if (logged) {
-    const diff = logged.hours - goalH;
-    rows.append(
+  /*
+   * A band measures last night better than anyone remembers it, so when
+   * one is present its figure is the one shown and the hand-logging button
+   * disappears. Without a band the manual log is the only source there is.
+   * Either way the goal is visible and editable, which it was not before —
+   * you could set a schedule and then never find it again.
+   */
+  const rows = Object.entries(s.whoop?.rows || {}).sort();
+  const lastBand = rows.length ? rows[rows.length - 1][1] : null;
+  const banded = lastBand?.sleepH > 0;
+  const manual = peekDay(key).sleep || null;
+
+  const sleptH = banded ? lastBand.sleepH : manual?.hours ?? null;
+  const source = banded ? 'measured' : manual ? 'your estimate' : null;
+
+  const body = el('div');
+  if (sleptH != null) {
+    const diff = sleptH - goalH;
+    const close = Math.abs(diff) < 0.5;
+    body.append(
       el('div.readout', { style: { marginTop: '10px' } },
         el('div', {},
           el('div.micro', {}, 'Last night'),
-          el('div.readout-main', { style: { fontSize: '30px' } }, durText(logged.hours))),
+          el('div.readout-main', { style: { fontSize: '30px' } }, durText(sleptH))),
         el('div.readout-side', {},
           el('div.micro', {}, 'Against goal'),
-          el('div.v', { style: { color: Math.abs(diff) < 0.5 ? 'var(--good)' : 'var(--muted)' } },
-            `${diff >= 0 ? '+' : ''}${durText(Math.abs(diff))}`))),
+          el('div.v', { style: { color: close ? 'var(--good)' : 'var(--muted)' } },
+            `${diff >= 0 ? '+' : '\u2212'}${durText(Math.abs(diff))}`))),
       el('div.micro', { style: { marginTop: '6px' } },
-        `${clockText(logged.bed)} → ${clockText(logged.wake)}`));
+        banded
+          ? `${durText(goalH)} goal \u00b7 ${source}`
+          : `${clockText(manual.bed)} \u2192 ${clockText(manual.wake)} \u00b7 ${source}`));
   } else {
-    rows.append(el('div.fine', { style: { marginTop: '9px' } },
+    body.append(el('div.fine', { style: { marginTop: '9px' } },
       'Nothing logged for last night.'));
   }
 
   return el('div.tile', {},
     el('div.between', {},
-      el('div.flex', { style: { gap: '7px' } }, icon('moon', 15), el('h3', {}, 'Sleep')),
+      el('div.flex', { style: { gap: '7px' } }, icon('moon', 15), el('h3', {}, 'Sleep goal')),
       el('button.btn.sm.ghost', { onclick: () => openSleepGoal(ctx) },
-        `${clockText(sch.bed)} → ${clockText(sch.wake)}`)),
-    rows,
-    el('button.btn.sm.block', { style: { marginTop: '11px' },
+        `${clockText(sch.bed)} \u2192 ${clockText(sch.wake)}`)),
+    body,
+    banded ? null : el('button.btn.sm.block', { style: { marginTop: '11px' },
       onclick: () => openLogSleep(key, sch, ctx) },
-      logged ? 'Change last night' : 'Log last night'));
+      manual ? 'Change last night' : 'Log last night'));
 }
 
 /* Logging a night by hand, on the same dial. */

@@ -13,6 +13,7 @@ import {
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
 import { generateDemo } from '../demo.js';
+import { openSleepGoal, sleepSchedule, sleepHours, clockText } from './sleep.js';
 import { ORBS, applyOrb } from '../theme.js';
 import { goalTile } from './goal.js';
 import { openGuide } from './guide.js';
@@ -313,6 +314,27 @@ export function renderSettings(root, ctx) {
       field('Suggestions', dietBox),
       field('Glass size (ml)', fGlass)),
 
+    /*
+     * Sleep sits in its own group rather than under Whoop, because the
+     * people who most need it are the ones with no band at all — burying
+     * it under a brand they do not own is how it stayed unfindable.
+     */
+    group(ctx, 'sleep', 'Sleep',
+      'Your bedtime and wake time, with or without a band.',
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', { style: { flex: '1', paddingRight: '12px' } },
+            el('div', { style: { fontWeight: '500' } }, 'Sleep goal'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              sleepSchedule()
+                ? `Asleep ${clockText(sleepSchedule().bed)} to ${clockText(sleepSchedule().wake)}`
+                  + ` — ${sleepHours(sleepSchedule()).toFixed(1)} h.`
+                : 'Not set. The coach, the water pacing and the caffeine cutoff are all '
+                  + 'measured from your wake time and bedtime — without a band this is '
+                  + 'where they come from.')),
+          el('button.btn.sm', { onclick: () => openSleepGoal(ctx) },
+            sleepSchedule() ? 'Change' : 'Set it')))),
+
     group(ctx, 'whoop', 'Whoop',
       'Whoop, or Apple Health from an iPhone.',
       el('div.tile', {},
@@ -416,7 +438,13 @@ export function renderSettings(root, ctx) {
                   st.meals = demo.meals;
                   st.library = demo.library;
                   st.supplementsTaken = demo.supplementsTaken;
+                  st.medications = demo.medications || [];
+                  st.plans = demo.plans || {};
+                  if (demo.profile) st.profile = { ...(st.profile || {}), ...demo.profile };
                   st.settings.isDemo = true;
+                  /* The demo has to exercise what the app now does, or it
+                     shows a version of the app that no longer exists. */
+                  Object.assign(st.settings, demo.settings || {});
                 }, 'import');
                 toast(`${demo.stats.days} days loaded.`);
                 location.reload();
