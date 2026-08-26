@@ -44,6 +44,18 @@ export function toItem(f) {
  * work: "pgs" finds "Post-gym shake", "brnrice" finds "Brown rice". It
  * scores low, so it only surfaces things nothing better matched.
  */
+/*
+ * Punctuation is not information here.
+ *
+ * "Parle-G" is typed "parle g", "Lay's" is typed "lays", "50-50" is typed
+ * "50 50". Comparing the raw strings, none of those match at any tier —
+ * "parle g" is not a prefix of "parle-g", is not contained in it, and is
+ * not even a subsequence of it, because the space is not there. Flattening
+ * hyphens, dots, slashes and apostrophes to spaces on both sides costs
+ * nothing and fixes the whole class.
+ */
+const flatten = s => s.toLowerCase().replace(/[-_/.,()'’&+]/g, ' ').replace(/\s+/g, ' ').trim();
+
 export function matchScore(text, needle) {
   if (!text) return 0;
   const t = text.toLowerCase();
@@ -51,6 +63,16 @@ export function matchScore(text, needle) {
   if (t.startsWith(needle)) return 800;
   if (t.split(/[\s,/()\-]+/).some(w => w.startsWith(needle))) return 650;
   if (t.includes(needle)) return 450;
+
+  /* The same four tiers again, with punctuation flattened away. Scored a
+     shade lower so an exact literal hit still wins where both apply. */
+  const tf = flatten(text), nf = flatten(needle);
+  if (nf && tf !== t) {
+    if (tf === nf) return 990;
+    if (tf.startsWith(nf)) return 790;
+    if (tf.split(' ').some(w => w.startsWith(nf))) return 640;
+    if (tf.includes(nf)) return 440;
+  }
 
   /*
    * Every word you typed, in any order.
@@ -65,9 +87,13 @@ export function matchScore(text, needle) {
    * the name is strict enough not to be noisy and forgiving about order,
    * which is the only thing that was actually wrong.
    */
-  const words = needle.split(/\s+/).filter(w => w.length > 1);
+  /* Single-letter words are dropped only when they are noise beside a
+     longer one; with two or more tokens they carry meaning — the "g" in
+     "parle g" is half the name. */
+  const raw = needle.split(/\s+/).filter(Boolean);
+  const words = raw.length > 1 ? raw : raw.filter(w => w.length > 1);
   if (words.length > 1) {
-    const parts = t.split(/[\s,/()\-]+/).filter(Boolean);
+    const parts = flatten(text).split(' ').filter(Boolean);
     const all = words.every(w => parts.some(part => part.startsWith(w)));
     if (all) return 620;
     /* Or present as a whole word anywhere. Plain containment matched
@@ -137,7 +163,16 @@ export function searchLocal(q) {
   for (const f of Object.values(s.library)) consider(toItem(f), 2000);
   for (const f of FOODS) consider(toItem(f), 0);
 
-  hits.sort((a, b) => b.score - a.score);
+  /*
+   * Ties break towards the shorter name.
+   *
+   * "chicken momo" matches both "Momos, chicken (steamed)" and "Wow! Momo,
+   * steamed chicken, 5 pc" at exactly the same tier, and the plain one is
+   * what somebody typing two generic words meant — a brand is something
+   * you name on purpose. Length is a decent proxy for how specific a name
+   * is, and it only ever decides an otherwise exact tie.
+   */
+  hits.sort((a, b) => (b.score - a.score) || ((a.f.n || '').length - (b.f.n || '').length));
 
   /* De-duplicate by name: a food you scanned and its stock twin should
      appear once, as yours. */
