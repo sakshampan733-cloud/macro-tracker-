@@ -53,6 +53,31 @@ export function matchScore(text, needle) {
   if (t.includes(needle)) return 450;
 
   /*
+   * Every word you typed, in any order.
+   *
+   * Foods are named the way a database names them and typed the way a
+   * person speaks. "Momos, chicken (steamed)" is what the row is called;
+   * "chicken momo" is what someone types, and before this that matched
+   * nothing at all — not the substring test, not the word-prefix test,
+   * and not the subsequence pass, which needs the letters in order.
+   *
+   * Requiring every typed word to appear as a word-prefix somewhere in
+   * the name is strict enough not to be noisy and forgiving about order,
+   * which is the only thing that was actually wrong.
+   */
+  const words = needle.split(/\s+/).filter(w => w.length > 1);
+  if (words.length > 1) {
+    const parts = t.split(/[\s,/()\-]+/).filter(Boolean);
+    const all = words.every(w => parts.some(part => part.startsWith(w)));
+    if (all) return 620;
+    /* Or present as a whole word anywhere. Plain containment matched
+       "red" inside "jarred", which ranked a pasta sauce above the pasta
+       dish for the query "pasta red" — a substring is not a word. */
+    const whole = w => new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(t);
+    if (words.every(whole)) return 430;
+  }
+
+  /*
    * Subsequence, but only a tight one starting at a word.
    *
    * A plain in-order scan matches almost anything: "whey" is a

@@ -15,7 +15,13 @@ import {
   el, sheet, kcal, g, grams, icon, segmented, explain, dateLabel, field, replaceKids, toast,
 } from '../ui.js';
 import { healthLine } from '../charts.js';
-import { get, totals, byMeal, dayKey, shiftDay, entryMacros } from '../store.js';
+import {
+  get, totals, byMeal, dayKey, shiftDay, entryMacros, doseLog, planFor, planTotals, peekDay,
+} from '../store.js';
+import { caffeineDay, DAILY_CEILING_MG } from '../data/caffeine.js';
+import { medicationById } from '../data/medications.js';
+import { SUPPLEMENTS } from '../data/supplements.js';
+import { sourceForMetric } from '../applehealth.js';
 import { macroTargets, bestTDEE } from '../nutrition.js';
 import { dayQuality, leucineByMeal, LEUCINE_THRESHOLD_G } from '../data/quality.js';
 import { NUTRIENTS, nutrientTargets } from '../data/nutrients.js';
@@ -58,6 +64,16 @@ export function buildReport(store, from, to) {
   const water = [];
   let lateNights = 0, longGaps = 0;
 
+  /* Every feature the app grew has to reach the report, or it may as well
+     not have been built — a week you cannot read back is a week of typing
+     for nothing. */
+  const meds = { due: 0, taken: 0, late: 0, byMed: {} };
+  const caff = { days: 0, totalMg: 0, overCeiling: 0, peak: 0 };
+  const plan = { planned: 0, followed: 0, plannedKcal: 0 };
+  const vitals = { hrv: [], rhr: [], recovery: [], sleepH: [], strain: [], steps: [] };
+  let wakeSum = 0, wakeDays = 0, firstMealSum = 0, firstMealDays = 0;
+  const manualSleep = [];
+
   for (const key of days) {
     const d = store.days[key];
     const t = totals(key);
@@ -66,6 +82,34 @@ export function buildReport(store, from, to) {
 
     rows.push({ date: key, kcal: has ? t.kcal : null, p: has ? t.p : null,
                 logged: !!has, water: t.water || 0, weight: d?.weight || null });
+
+    /* ── medication: counted whether or not any food was logged, because
+       adherence is a fact about the day and not about the diary. ── */
+    for (const dose of doseLog(key)) {
+      meds.due++;
+      const name = dose.med.nickname || dose.med.name;
+      const b = meds.byMed[name] || (meds.byMed[name] = { due: 0, taken: 0, late: 0, ref: dose.med.ref });
+      b.due++;
+      if (dose.taken) {
+        meds.taken++; b.taken++;
+        if (dose.lateMin != null && dose.lateMin > 60) { meds.late++; b.late++; }
+      }
+    }
+
+    /* ── vitals, whatever the band was ── */
+    const wr = store.whoop?.rows?.[key];
+    if (wr) {
+      for (const k of Object.keys(vitals)) if (wr[k] != null) vitals[k].push(wr[k]);
+      if (wr.wakeHour != null) { wakeSum += wr.wakeHour; wakeDays++; }
+    }
+
+    /* A night logged by hand counts the same as one measured, and is
+       marked as such rather than blended in silently. */
+    if (d?.sleep?.hours > 0 && (!wr || wr.sleepH == null)) {
+      manualSleep.push(d.sleep.hours);
+      if (d.sleep.wake != null) { wakeSum += d.sleep.wake; wakeDays++; }
+    }
+
     if (!has) continue;
 
     logged++;
@@ -79,6 +123,40 @@ export function buildReport(store, from, to) {
 
     const groups = byMeal(key);
     const entries = Object.values(groups).flat();
+
+    /* ── caffeine: one total, whatever it arrived as ── */
+    const cd = caffeineDay(entries);
+    /* Pre-workout ticked off as a supplement is the same molecule as the
+       coffee, and the ceiling applies to their sum — the day tile already
+       adds them, and a report that disagreed with the tile would be worse
+       than one that omitted the section entirely. */
+    const suppMg = (d.supps || []).reduce(
+      (a, id) => a + (SUPPLEMENTS[id]?.caffeine || store.supplementsCustom?.[id]?.caffeine || 0), 0);
+    const dayMg = cd.total + suppMg;
+    if (dayMg >= 5) {
+      caff.days++;
+      caff.totalMg += dayMg;
+      caff.peak = Math.max(caff.peak, dayMg);
+      if (dayMg > DAILY_CEILING_MG) caff.overCeiling++;
+    }
+
+    /* ── plan against actual ── */
+    const planned = planFor(key);
+    if (planned.length) {
+      plan.planned += planned.length;
+      plan.plannedKcal += planTotals(key).kcal || 0;
+    }
+    plan.followed += entries.filter(e => e.fromPlan).length;
+
+    /* ── when the first meal landed against when you woke ── */
+    if (wr?.wakeHour != null) {
+      const first = entries.map(e => new Date(e.ts)).sort((a, b) => a - b)[0];
+      if (first) {
+        const h = first.getHours() + first.getMinutes() / 60;
+        const gap = h >= wr.wakeHour ? h - wr.wakeHour : h + 24 - wr.wakeHour;
+        if (gap < 14) { firstMealSum += gap; firstMealDays++; }
+      }
+    }
     for (const m of MEALS) {
       mealSplit[m] += (groups[m] || []).reduce((a, e) => a + (entryMacros(e).kcal || 0), 0);
     }
@@ -126,7 +204,31 @@ export function buildReport(store, from, to) {
     mealSplit, totalMealKcal,
     leucineHits, carbTiers, fatSplit,
     weights,
-    timing: { lateNights, longGaps },
+    timing: {
+      lateNights, longGaps,
+      wakeHour: wakeDays ? wakeSum / wakeDays : null,
+      firstMealAfterWake: firstMealDays ? firstMealSum / firstMealDays : null,
+    },
+    meds: meds.due ? meds : null,
+    caffeine: caff.days ? {
+      ...caff, meanMg: caff.totalMg / caff.days,
+    } : null,
+    plan: plan.planned || plan.followed ? plan : null,
+    sleepGoal: store.settings?.sleepGoal || null,
+    manualSleep: manualSleep.length ? {
+      mean: manualSleep.reduce((a, b) => a + b, 0) / manualSleep.length,
+      n: manualSleep.length,
+    } : null,
+    vitals: Object.entries(vitals).reduce((acc, [k, arr]) => {
+      if (arr.length) {
+        acc[k] = {
+          mean: arr.reduce((a, b) => a + b, 0) / arr.length,
+          n: arr.length,
+          source: sourceForMetric(store, k, days.length) || 'whoop',
+        };
+      }
+      return acc;
+    }, {}),
   };
 }
 
@@ -240,13 +342,22 @@ function proteinTiming(r) {
 }
 
 function timingBlock(r) {
-  const { lateNights, longGaps } = r.timing;
+  const { lateNights, longGaps, wakeHour, firstMealAfterWake } = r.timing;
   if (!r.logged) return null;
-  if (!lateNights && !longGaps) return null;
+  if (!lateNights && !longGaps && firstMealAfterWake == null) return null;
+
+  const hh = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+
   return el('div', {},
     el('div.section-label', {}, el('span.micro', {}, 'Timing')),
     el('div.tile', {},
       el('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
+        /* Measured from when you woke, not from a fixed hour — the same
+           basis the coach uses, so the two never disagree. */
+        firstMealAfterWake != null
+          ? statLine('First meal', `${firstMealAfterWake.toFixed(1)} h`,
+              wakeHour != null ? `after waking, around ${hh(wakeHour)}` : 'after waking')
+          : null,
         statLine('Late finishes', String(lateNights), 'ate after 22:00'),
         statLine('Long gaps', String(longGaps), 'days with a 6h+ gap')),
       lateNights > r.logged * 0.4
@@ -256,6 +367,122 @@ function timingBlock(r) {
               + 'It does tend to cost sleep quality, and your Whoop recovery is downstream of that.'))
         : null),
   );
+}
+
+/*
+ * Medication adherence.
+ *
+ * Counts and times, and nothing else. Whether a pattern of missed evening
+ * doses matters is a conversation for the person who prescribed them —
+ * the report's job is to make the pattern visible enough to take to that
+ * conversation.
+ */
+function medsBlock(r) {
+  if (!r.meds) return null;
+  const m = r.meds;
+  const pct = m.due ? Math.round((m.taken / m.due) * 100) : 0;
+
+  const rows = Object.entries(m.byMed).map(([name, b]) =>
+    el('div.caff-row', {},
+      el('span.grow', {}, name),
+      el('span.num', {}, `${b.taken}/${b.due}`
+        + (b.late ? ` · ${b.late} late` : ''))));
+
+  return el('div', {},
+    el('div.section-label', {}, el('span.micro', {}, 'Medication')),
+    el('div.tile', {},
+      el('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
+        statLine('Marked taken', `${pct}%`, `${m.taken} of ${m.due} doses`),
+        m.late ? statLine('More than an hour late', String(m.late), 'of those taken') : null,
+        m.due - m.taken ? statLine('Unmarked', String(m.due - m.taken), 'no record either way') : null),
+      rows.length > 1 ? el('div', { style: { marginTop: '12px' } }, ...rows) : null,
+      el('div.fine', { style: { marginTop: '10px' } },
+        'Unmarked is not the same as missed — it means the app has no record. '
+        + 'Times and doses are your prescriber\u2019s; this is only what was logged.')));
+}
+
+/* Caffeine, and how close to bedtime it landed. */
+function caffeineBlock(r) {
+  if (!r.caffeine) return null;
+  const c = r.caffeine;
+  return el('div', {},
+    el('div.section-label', {}, el('span.micro', {}, 'Caffeine')),
+    el('div.tile', {},
+      el('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
+        statLine('Average', `${Math.round(c.meanMg)} mg`, `on ${c.days} day${c.days === 1 ? '' : 's'}`),
+        statLine('Highest day', `${Math.round(c.peak)} mg`, ''),
+        c.overCeiling ? statLine('Over 400 mg', String(c.overCeiling), 'days') : null),
+      el('div.fine', { style: { marginTop: '10px' } },
+        'Counted from everything logged — coffee entered as a drink and pre-workout '
+        + 'ticked off as a supplement both land here.')));
+}
+
+/* What was planned against what was eaten. */
+function planBlock(r) {
+  if (!r.plan) return null;
+  const p = r.plan;
+  return el('div', {},
+    el('div.section-label', {}, el('span.micro', {}, 'Plan against actual')),
+    el('div.tile', {},
+      el('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
+        statLine('Items planned', String(p.planned), ''),
+        statLine('Eaten from the plan', String(p.followed),
+          p.planned ? `${Math.round((p.followed / Math.max(p.planned + p.followed, 1)) * 100)}% of it` : '')),
+      el('div.fine', { style: { marginTop: '10px' } },
+        'A planned item counts as followed only when it was logged from the plan, '
+        + 'which is what keeps the timing of the meal honest.')));
+}
+
+/*
+ * Vitals, with the instrument named.
+ *
+ * A week of HRV means nothing without knowing whose HRV — Whoop's RMSSD
+ * and Apple's SDNN are different measures, so the source belongs in the
+ * report as much as the number does.
+ */
+/* Sleep, for someone without a band. */
+function sleepBlock(r) {
+  if (!r.manualSleep && !r.sleepGoal) return null;
+  const goalH = r.sleepGoal ? ((r.sleepGoal.wake - r.sleepGoal.bed) + 24) % 24 : null;
+  const got = r.manualSleep;
+
+  return el('div', {},
+    el('div.section-label', {}, el('span.micro', {}, 'Sleep')),
+    el('div.tile', {},
+      el('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } },
+        goalH != null ? statLine('Goal', `${goalH.toFixed(1)} h`, 'the schedule you set') : null,
+        got ? statLine('Actually slept', `${got.mean.toFixed(1)} h`,
+          `${got.n} night${got.n === 1 ? '' : 's'} logged`) : null,
+        got && goalH != null
+          ? statLine('Against goal',
+              `${got.mean - goalH >= 0 ? '+' : ''}${(got.mean - goalH).toFixed(1)} h`, '')
+          : null),
+      got ? el('div.fine', { style: { marginTop: '10px' } },
+        'Logged by hand rather than measured, so read it as your own estimate.') : null));
+}
+
+function vitalsBlock(r) {
+  const keys = Object.keys(r.vitals || {});
+  if (!keys.length) return null;
+
+  const LABELS = { hrv: ['HRV', 'ms'], rhr: ['Resting HR', 'bpm'], recovery: ['Recovery', '%'],
+                   sleepH: ['Sleep', 'h'], strain: ['Strain', ''], steps: ['Steps', ''] };
+  const cells = keys.filter(k => LABELS[k]).map(k => {
+    const v = r.vitals[k];
+    const [label, unit] = LABELS[k];
+    const val = k === 'sleepH' || k === 'strain' ? v.mean.toFixed(1) : Math.round(v.mean);
+    return statLine(label, `${val}${unit ? ' ' + unit : ''}`,
+      `${v.n} day${v.n === 1 ? '' : 's'} · ${v.source === 'apple' ? 'Apple' : 'Whoop'}`);
+  });
+
+  const sources = new Set(keys.map(k => r.vitals[k].source));
+  return el('div', {},
+    el('div.section-label', {}, el('span.micro', {}, 'Vitals')),
+    el('div.tile', {},
+      el('div', { style: { display: 'flex', gap: '20px', flexWrap: 'wrap' } }, ...cells),
+      sources.size > 1 ? el('div.fine', { style: { marginTop: '10px' } },
+        'Two instruments, kept apart. Whoop reports HRV as RMSSD and Apple as SDNN, '
+        + 'so the app never averages one into the other.') : null));
 }
 
 function microBlock(r, store) {
@@ -345,10 +572,69 @@ export function reportText(r, name = '') {
     L.push('');
   }
 
-  if (r.timing && (r.timing.lateNights || r.timing.longGaps)) {
+  if (r.timing && (r.timing.lateNights || r.timing.longGaps || r.timing.firstMealAfterWake != null)) {
     L.push('TIMING');
+    if (r.timing.firstMealAfterWake != null) {
+      L.push(`  First meal averaged ${r.timing.firstMealAfterWake.toFixed(1)} h after waking`);
+    }
     if (r.timing.lateNights) L.push(`  ${r.timing.lateNights} night${r.timing.lateNights === 1 ? '' : 's'} eating close to bedtime`);
     if (r.timing.longGaps)   L.push(`  ${r.timing.longGaps} long gap${r.timing.longGaps === 1 ? '' : 's'} between meals`);
+    L.push('');
+  }
+
+  if (r.plan) {
+    L.push('PLAN AGAINST ACTUAL');
+    L.push(`  ${r.plan.planned} item${r.plan.planned === 1 ? '' : 's'} planned, ${r.plan.followed} eaten from the plan`);
+    L.push('');
+  }
+
+  if (r.meds) {
+    const pctM = r.meds.due ? Math.round((r.meds.taken / r.meds.due) * 100) : 0;
+    L.push('MEDICATION');
+    L.push(`  ${r.meds.taken} of ${r.meds.due} scheduled doses marked taken (${pctM}%)`);
+    if (r.meds.late) L.push(`  ${r.meds.late} taken more than an hour after the scheduled time`);
+    for (const [nameM, b] of Object.entries(r.meds.byMed)) {
+      L.push(`  ${nameM}: ${b.taken}/${b.due}${b.late ? `, ${b.late} late` : ''}`);
+    }
+    L.push('  Unmarked means no record either way, not a missed dose.');
+    L.push('  Doses and times are as prescribed; Basal only records what was logged.');
+    L.push('');
+  }
+
+  if (r.caffeine) {
+    L.push('CAFFEINE');
+    L.push(`  ${Math.round(r.caffeine.meanMg)} mg a day on average across ${r.caffeine.days} day${r.caffeine.days === 1 ? '' : 's'}`);
+    L.push(`  Highest single day ${Math.round(r.caffeine.peak)} mg`);
+    if (r.caffeine.overCeiling) L.push(`  ${r.caffeine.overCeiling} day(s) above 400 mg`);
+    L.push('');
+  }
+
+  if (r.manualSleep || r.sleepGoal) {
+    const goalH = r.sleepGoal ? ((r.sleepGoal.wake - r.sleepGoal.bed) + 24) % 24 : null;
+    L.push('SLEEP');
+    if (goalH != null) L.push(`  Goal ${goalH.toFixed(1)} h`);
+    if (r.manualSleep) {
+      L.push(`  Slept ${r.manualSleep.mean.toFixed(1)} h across ${r.manualSleep.n} logged night(s)`);
+      L.push('  Logged by hand, not measured.');
+    }
+    L.push('');
+  }
+
+  const vk = Object.keys(r.vitals || {});
+  if (vk.length) {
+    const LAB = { hrv: ['HRV', 'ms'], rhr: ['Resting HR', 'bpm'], recovery: ['Recovery', '%'],
+                  sleepH: ['Sleep', 'h'], strain: ['Strain', ''], steps: ['Steps', ''] };
+    L.push('VITALS');
+    for (const k of vk) {
+      if (!LAB[k]) continue;
+      const v = r.vitals[k];
+      const val = k === 'sleepH' || k === 'strain' ? v.mean.toFixed(1) : Math.round(v.mean);
+      L.push(`  ${LAB[k][0].padEnd(11)} ${val}${LAB[k][1] ? ' ' + LAB[k][1] : ''}`
+        + `  (${v.n} days, ${v.source === 'apple' ? 'Apple Health' : 'Whoop'})`);
+    }
+    if (new Set(vk.map(k => r.vitals[k].source)).size > 1) {
+      L.push('  Sources are kept separate: Whoop reports HRV as RMSSD, Apple as SDNN.');
+    }
     L.push('');
   }
 
@@ -480,6 +766,11 @@ export function openReport(ctx, initialDays = 7) {
         proteinTiming(r),
         mealBalance(r),
         timingBlock(r),
+        planBlock(r),
+        medsBlock(r),
+        caffeineBlock(r),
+        sleepBlock(r),
+        vitalsBlock(r),
         microBlock(r, store),
 
         r.weights.length > 1 ? el('div', {},

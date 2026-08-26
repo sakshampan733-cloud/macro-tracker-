@@ -9,6 +9,7 @@ import { el, clear, icon, kcal, grams, g, hourLabel, toast, empty } from '../ui.
 import { get, totals, dayKey, addEntry, macrosFor, mealForNow } from '../store.js';
 import { suggest, schedule, mealBudget, currentMeal } from '../coach.js';
 import { dayTargets } from './today.js';
+import { plannerTile } from './planner.js';
 import { openPortion } from './portion.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
@@ -29,6 +30,10 @@ export function renderPlan(root, ctx) {
     el('h1', { style: { marginBottom: '4px' } }, 'Plan'),
     el('div.micro', { style: { marginBottom: '16px' } },
       `${MEAL_LABELS[result.meal]} · ${hourLabel(now.getHours() + now.getMinutes() / 60)}`),
+
+    /* The rehearsal half of this tab leads: this is the thing you open the
+       tab to do. What's already true about today follows underneath. */
+    plannerTile(ctx, targets),
 
     ...sched.notes.map(n => el('div', { class: 'note ' + n.tone }, el('div', {}, n.text))),
 

@@ -79,9 +79,14 @@ export const SUPPLEMENTS = {
     note: 'Log this as food instead — it carries real protein and calories.',
   },
   'caffeine': {
-    label: 'Caffeine', dose: '200 mg', tag: 'training',
+    label: 'Caffeine', dose: '200 mg', tag: 'training', caffeine: 200,
     provides: {},
-    note: 'Half of it is still in you six hours later. Watch it against your sleep.',
+    note: 'Half of it is still in you five hours later. Watch it against your sleep.',
+  },
+  'pre-workout': {
+    label: 'Pre-workout', dose: '1 scoop', tag: 'training', caffeine: 200,
+    provides: {},
+    note: 'Most scoops sit between 150 and 300 mg of caffeine. Counted against the daily total.',
   },
   'electrolytes': {
     label: 'Electrolytes', dose: '1 serving', tag: 'training',

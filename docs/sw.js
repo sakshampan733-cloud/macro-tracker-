@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.08.23-livecoach';
+const CACHE = 'basal-2026.08.26';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -16,6 +16,12 @@ const SHELL = [
   'js/theme.js',
   'js/swipe.js',
   'js/search.js',
+  'js/views/planner.js',
+  'js/views/starbucks.js', 'js/data/starbucks.js',
+  'js/views/restaurant.js', 'js/data/restaurants.js',
+  'js/views/medication.js', 'js/data/medications.js',
+  'js/views/labelscan.js', 'js/label.js', 'js/reminders.js',
+  'js/views/sleep.js', 'js/data/caffeine.js',
   'js/views/apple.js',
   'js/applehealth.js',
   'js/views/guide.js', 'js/store.js', 'js/nutrition.js', 'js/whoop.js', 'js/coach.js',

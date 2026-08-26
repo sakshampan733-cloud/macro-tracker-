@@ -54,6 +54,56 @@ export function pushUrl(relay) {
  */
 export function rowSource(row) { return row?.src === 'apple' ? 'apple' : 'whoop'; }
 
+/*
+ * Which bands you actually wear.
+ *
+ * Four answers, and the app behaves differently for each — not because
+ * the cases are hard, but because guessing wrong is worse than asking.
+ * Someone with both devices should be offered both syncs; someone with
+ * neither should not be shown a sync button at all.
+ */
+export const HEALTH_SOURCES = ['none', 'whoop', 'apple', 'both'];
+
+export function healthSource() {
+  const v = get().settings?.healthSource;
+  return HEALTH_SOURCES.includes(v) ? v : null;
+}
+
+export function setHealthSource(v) {
+  if (!HEALTH_SOURCES.includes(v)) return;
+  commit(s => { s.settings.healthSource = v; }, 'settings');
+}
+
+/*
+ * What Apple is allowed to write when you wear both.
+ *
+ * Whoop's API does not return step counts, so steps are a genuine gap and
+ * Apple can fill them without any risk of disagreement. Everything else
+ * Apple offers, Whoop already measures — and taking Apple's version would
+ * not add a reading, it would overwrite one. HRV is the sharp case: Whoop
+ * reports RMSSD and Apple reports SDNN, and the same wrist on the same
+ * night produces numbers that differ by a factor of two or more. A trend
+ * built from both is not a noisy trend, it is a meaningless one.
+ */
+export const APPLE_GAP_FIELDS = ['steps', 'standH', 'exerciseMin'];
+
+/*
+ * Where one metric's numbers came from, judged on the recent rows rather
+ * than on a global setting — the setting says what you wear now, the rows
+ * say what actually produced the history you are looking at.
+ */
+export function sourceForMetric(store, metric, lastN = 30) {
+  const rows = Object.entries(store.whoop?.rows || {}).sort().slice(-lastN).map(e => e[1]);
+  let apple = 0, whoop = 0;
+  for (const r of rows) {
+    if (r?.[metric] == null) continue;
+    const by = r.by?.[metric] || rowSource(r);
+    if (by === 'apple') apple++; else whoop++;
+  }
+  if (!apple && !whoop) return null;
+  return apple > whoop ? 'apple' : 'whoop';
+}
+
 export function existingSource(store) {
   const rows = Object.values(store.whoop?.rows || {});
   if (!rows.length) return null;
@@ -74,13 +124,20 @@ export async function syncApple({ relay, key } = {}) {
   if (!base) return { ok: false, error: 'No relay address set.' };
   if (!k) return { ok: false, error: 'No health key yet — generate one first.' };
 
+  /* Both bands is a supported setup, not a conflict — but it means Apple
+     fills only what Whoop cannot measure. Without a declared setup, fall
+     back to the old rule and refuse rather than guess. */
+  const mode = healthSource();
   const prior = existingSource(store);
-  if (prior === 'whoop') {
+  const gapsOnly = mode === 'both' || (mode == null && prior === 'whoop');
+
+  if (mode == null && prior === 'whoop') {
     return { ok: false, mixed: true,
-      error: 'This app already holds Whoop data. Mixing the two would corrupt '
-           + 'your HRV history — Whoop reports RMSSD and Apple reports SDNN, '
-           + 'which are different scales for the same thing. Clear the Whoop '
-           + 'import first if you want to switch.' };
+      error: 'This app already holds Whoop data. Tell it you wear both bands '
+           + 'and Apple will fill only the gaps — steps, which Whoop\u2019s API '
+           + 'does not return. Left to merge freely it would overwrite your '
+           + 'HRV history with a different measure of it: Whoop reports RMSSD, '
+           + 'Apple reports SDNN.' };
   }
 
   let payload;
@@ -109,16 +166,37 @@ export async function syncApple({ relay, key } = {}) {
          and active alone would understate a rest day badly. */
       const kcal = r.kcal ?? (r.activeKcal != null && r.basalKcal != null
         ? r.activeKcal + r.basalKcal : r.activeKcal);
+      /* Provenance is recorded per field, not per row. A day where Whoop
+         gave the HRV and Apple gave the steps is the normal case for
+         someone wearing both, and a single row-level label could only
+         lie about one of them. */
+      const by = { ...(prevRow.by || {}) };
+      const take = {};
+      const put = (field, value) => {
+        if (value == null) return;
+        take[field] = value;
+        by[field] = 'apple';
+      };
+
+      put('steps', r.steps);
+      put('standH', r.standH);
+      put('exerciseMin', r.exerciseMin);
+
+      if (!gapsOnly) {
+        put('rhr', r.rhr);
+        put('hrv', r.hrv);
+        put('sleepH', r.sleepH);
+        put('remH', r.remH);
+        put('swsH', r.swsH ?? r.deepH);
+        put('kcal', kcal);
+      }
+
       s.whoop.rows[r.date] = {
         ...prevRow,
         date: r.date,
-        src: 'apple',
-        ...(r.rhr    != null ? { rhr: r.rhr } : {}),
-        ...(r.hrv    != null ? { hrv: r.hrv } : {}),
-        ...(r.sleepH != null ? { sleepH: r.sleepH } : {}),
-        ...(r.remH   != null ? { remH: r.remH } : {}),
-        ...((r.swsH ?? r.deepH) != null ? { swsH: r.swsH ?? r.deepH } : {}),
-        ...(kcal     != null ? { kcal } : {}),
+        src: gapsOnly ? (prevRow.src || 'whoop') : 'apple',
+        by,
+        ...take,
       };
       added++;
     }
@@ -126,7 +204,8 @@ export async function syncApple({ relay, key } = {}) {
     s.settings.healthSyncedAt = Date.now();
   }, 'whoop');
 
-  return { ok: true, days: added, from: rows[0].date, to: rows[rows.length - 1].date };
+  return { ok: true, days: added, gapsOnly,
+           from: rows[0].date, to: rows[rows.length - 1].date };
 }
 
 /*

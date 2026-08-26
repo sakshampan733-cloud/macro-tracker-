@@ -76,6 +76,43 @@ export const replaceKids = (node, ...kids) => {
   return node;
 };
 
+/*
+ * A tile that redraws itself.
+ *
+ * Folding "Keep under" open used to call ctx.refresh(), which rebuilds the
+ * whole screen — so a disclosure triangle behaved like a page reload,
+ * losing your scroll position and flashing every other tile. Nothing about
+ * opening a fold requires any of that.
+ *
+ * `live()` returns a host element that rerenders only its own contents,
+ * and resubscribes to the store so a change made elsewhere still reaches
+ * it. The subscription unhooks itself the moment the host leaves the
+ * document, which is what keeps a route change from leaving listeners
+ * behind.
+ */
+export const live = (build, { on = null, subscribe = null, cls = '' } = {}) => {
+  const host = cls ? el('div.' + cls) : el('div');
+  let off = null;
+
+  const paint = () => {
+    /* Detachment is the signal that this tile is gone for good. */
+    if (off && !host.isConnected) { off(); off = null; return; }
+    replaceKids(host, build(paint));
+  };
+
+  paint();
+
+  if (subscribe) {
+    off = subscribe(evt => {
+      if (on && !on.includes(evt)) return;
+      if (!host.isConnected) { off?.(); off = null; return; }
+      paint();
+    });
+  }
+  return host;
+};
+
+
 export const $ = (s, r = document) => r.querySelector(s);
 
 /* ── Formatting ─────────────────────────────────────────────────────── */
@@ -211,6 +248,12 @@ const PATHS = {
   upload:  'M12 16V4M7 9l5-5 5 5M4 20h16',
   info:    'M12 8h.01M11 12h1v5h1M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
   pot:     'M4 9h16v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V9zM2 9h2M20 9h2M8 6c0-1 1-1 1-2M12 6c0-1 1-1 1-2M16 6c0-1 1-1 1-2',
+  /* A crescent, for sleep. */
+  moon:    'M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z',
+  /* A takeaway cup, for the counter. */
+  cup:     'M6 8h12l-1.2 11.2A2 2 0 0 1 14.8 21H9.2a2 2 0 0 1-2-1.8zM5 5h14l-.4 3H5.4zM10 11v6M14 11v6',
+  /* A capsule, tilted — the one shape nobody mistakes for anything else. */
+  pill:    'M10.5 3.5a4.95 4.95 0 0 1 7 7l-7 7a4.95 4.95 0 0 1-7-7zM7 7l7 7',
   gear:    'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.4-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
 };
 

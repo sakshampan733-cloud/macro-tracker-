@@ -19,9 +19,13 @@ import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import {
   ring, stageBar, liveDot, recoveryColour,
-  healthBars, healthLine,
+  healthBars, healthLine, miniSpark,
 } from '../charts.js';
+import { haptic } from '../feedback.js';
 import { openReport } from './report.js';
+import { openAppleHealth } from './apple.js';
+import { sleepTile, sleepSchedule, sleepHours } from './sleep.js';
+import { existingSource, sourceForMetric, healthSource, setHealthSource } from '../applehealth.js';
 import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
 } from '../whooprelay.js';
@@ -258,15 +262,83 @@ function vitalsSection(s, ctx) {
   const sum = summary(s.whoop);
 
   if (!sum) {
+    const mode = healthSource();
+
+    /* Until you say what you wear, the honest screen is the question —
+       not a Whoop button aimed at someone who may own an Apple Watch, or
+       neither. */
+    if (!mode) {
+      return el('div', {},
+        el('div.section-label', {}, el('span.micro', {}, 'Vitals')),
+        el('div.tile', {}, empty(
+          'What do you wear?',
+          'The app tracks perfectly well without a band. Tell it what you have and it '
+          + 'will only offer the syncs that apply to you.',
+          el('button.btn.primary', { onclick: () => openHealthSetup(ctx) },
+            icon('bolt', 16), 'Choose'))));
+    }
+
+    if (mode === 'none') {
+      /* Without a strap the app still needs a wake time and a bedtime —
+         the coach, the water pacing and the caffeine cutoff are all
+         measured from them. A schedule you set yourself supplies both. */
+      return el('div', {},
+        el('div.section-label', {}, el('span.micro', {}, 'Sleep')),
+        sleepTile(s, ctx.date || dayKey(), ctx),
+        el('div.section-label', {}, el('span.micro', {}, 'Vitals')),
+        el('div.tile', {}, empty(
+          'No band, and nothing missing',
+          'Weight, intake and the adaptive TDEE do the work here — a band would add '
+          + 'recovery and strain, not accuracy.',
+          el('button.btn.ghost', { onclick: () => openHealthSetup(ctx) }, 'I got one'))));
+    }
+
+    const buttons = el('div', {});
+    if (mode === 'whoop' || mode === 'both') {
+      buttons.append(
+        el('button.btn.primary', { onclick: () => openWhoopRelay(ctx) }, icon('bolt', 16), 'Connect Whoop'),
+        el('button.btn.ghost', { style: { marginTop: '8px' }, onclick: () => openWhoopImport(ctx) },
+          icon('upload', 16), 'Or load a CSV export'));
+    }
+    if (mode === 'apple' || mode === 'both') {
+      buttons.append(el('button.btn' + (mode === 'apple' ? '.primary' : '.ghost'),
+        { style: mode === 'both' ? { marginTop: '8px' } : {}, onclick: () => openAppleHealth(ctx) },
+        icon('bolt', 16), 'Set up Apple Health'));
+    }
+    buttons.append(el('button.btn.ghost.sm', { style: { marginTop: '10px' },
+      onclick: () => openHealthSetup(ctx) }, 'Change what I wear'));
+
+    /* Until the band is actually syncing, a hand-set schedule is what the
+       coach has to work from. */
+    return el('div', {},
+      el('div.section-label', {}, el('span.micro', {}, 'Sleep')),
+      sleepTile(s, ctx.date || dayKey(), ctx),
+      el('div.section-label', {}, el('span.micro', {}, 'Vitals')),
+      el('div.tile', {}, empty(
+        mode === 'apple' ? 'No Apple Health data yet'
+          : mode === 'both' ? 'Nothing synced yet'
+          : 'No Whoop data yet',
+        mode === 'both'
+          ? 'Connect both. Whoop measures recovery, strain and blood oxygen; Apple fills '
+          + 'the one gap Whoop\u2019s API leaves, which is your step count.'
+          : mode === 'apple'
+          ? 'Your watch pushes to the relay through a Shortcut — the app walks you through it.'
+          : 'Connect Whoop for live sync, or load a CSV export if you would rather not set up the relay.',
+        buttons)));
+
     return el('div', {},
       el('div.section-label', {}, el('span.micro', {}, 'Vitals')),
       el('div.tile', {}, empty(
-        'No Whoop data yet',
-        'Connect Whoop for live sync, or load a CSV export if you would rather not set up the relay.',
-        el('div', {},
-          el('button.btn.primary', { onclick: () => openWhoopRelay(ctx) }, icon('bolt', 16), 'Connect Whoop'),
-          el('button.btn.ghost', { style: { marginTop: '8px' }, onclick: () => openWhoopImport(ctx) },
-            icon('upload', 16), 'Or load a CSV export')))));
+        mode === 'apple' ? 'No Apple Health data yet'
+          : mode === 'both' ? 'Nothing synced yet'
+          : 'No Whoop data yet',
+        mode === 'both'
+          ? 'Connect both. Whoop measures recovery, strain and blood oxygen; Apple fills '
+          + 'the one gap Whoop\u2019s API leaves, which is your step count.'
+          : mode === 'apple'
+          ? 'Your watch pushes to the relay through a Shortcut — the app walks you through it.'
+          : 'Connect Whoop for live sync, or load a CSV export if you would rather not set up the relay.',
+        buttons)));
   }
 
   const rec = sum.metrics.recovery;
@@ -402,29 +474,118 @@ function vitalsSection(s, ctx) {
   };
 
   /*
-   * Everything Whoop actually sends.
+   * Vitals, as a panel rather than a wall.
    *
-   * Only HRV and resting heart rate were ever drawn, so blood oxygen,
-   * skin temperature, respiratory rate, strain and energy burned were
-   * downloaded, stored, given labels and units — and then never shown.
-   * The data was there the whole time; nothing rendered it.
+   * Seven full charts stacked is not a dashboard, it is a scroll. Each of
+   * these numbers is checked in a second — "is my resting heart rate
+   * where it usually is" — and a 132px chart is the wrong instrument for
+   * a one-second question.
    *
-   * Driven off the metric table rather than a hand-written pair, so a
-   * metric added to the importer appears here without being wired up
-   * twice.
+   * So: one row each, with the current value, a sparkline small enough to
+   * read as a direction rather than as data, and where that sits against
+   * your own middle band. The full chart is one tap away and unchanged.
+   *
+   * Recovery and sleep keep their own panels below. They carry things a
+   * row cannot hold — a distribution, a stage breakdown — and they are
+   * the two you actually open.
    */
-  const TRENDS = [
+  const VITALS = [
     ['hrv',    'var(--m-p)'],
     ['rhr',    'var(--accent)'],
     ['strain', 'var(--m-f)'],
+    ['kcal',   'var(--m-c)'],
     ['spo2',   'var(--m-fib)'],
     ['resp',   'var(--m-water)'],
-    ['temp',   'var(--m-c)'],
-    ['kcal',   'var(--m-c-ink)'],
+    ['temp',   'var(--m-c-ink)'],
+    ['steps',  'var(--m-p)'],
   ];
-  for (const [key, colour] of TRENDS) {
-    const pane = trendFor(key, colour);
-    if (pane) wrap.append(pane);
+
+  const vitalRows = [];
+  const vitalKeys = new Set();
+  const srcSeen = new Set();
+  for (const [key, colour] of VITALS) {
+    const pts = seriesFor(s.whoop, key, 30);
+    if (pts.length < 4) continue;
+    const info = METRICS[key];
+    const st30 = stats(pts.map(p => p.v));
+    if (!st30) continue;
+    const latest = pts[pts.length - 1].v;
+
+    /* Against your own middle half, not a population range. Outside it is
+       worth a word; inside it is the answer "normal", which is usually the
+       one you were looking for. */
+    let where = 'usual', tone = '';
+    if (latest > st30.p75) { where = 'above usual'; tone = info.good === 'high' ? 'is-good' : info.good === 'low' ? 'is-warn' : ''; }
+    else if (latest < st30.p25) { where = 'below usual'; tone = info.good === 'low' ? 'is-good' : info.good === 'high' ? 'is-warn' : ''; }
+
+    vitalKeys.add(key);
+    /* Which band this particular row came off. Judged per metric, because
+       for someone wearing both the answer genuinely differs by row. */
+    const from = sourceForMetric(s, key);
+    if (from) srcSeen.add(from);
+
+    vitalRows.push(el('button.vital' + (from === 'apple' ? '.from-apple' : ''), {
+      onclick: () => openMetric(s, key, ctx),
+      'aria-label': `${info.label}, from ${from === 'apple' ? 'Apple Health' : 'Whoop'}`,
+    },
+      el('span.vital-name', {},
+        info.label,
+        from === 'apple' ? el('span.from-tag', {}, 'Apple') : null),
+      el('span.vital-val', { style: { color: colour } },
+        latest.toFixed(info.dp), el('i', {}, info.unit ? ' ' + info.unit : '')),
+      el('span.vital-spark', { style: { color: colour } },
+        miniSpark(pts.map(p => p.v), { colour })),
+      el('span.vital-where' + (tone ? '.' + tone : ''), {}, where),
+      icon('chevron', 13)));
+  }
+
+  /* "a, b and c" — a list you can read out loud. */
+  const listWords = xs => xs.length < 2 ? (xs[0] || '')
+    : xs.slice(0, -1).join(', ') + ' or ' + xs[xs.length - 1];
+
+  if (vitalRows.length) {
+    /* Which band these numbers came off. The two sources are never blended
+       — an Apple import is refused outright while Whoop data is present,
+       because Whoop's HRV is RMSSD and Apple's is SDNN and averaging them
+       would produce a number that is not any kind of HRV at all. Saying so
+       on the panel is the difference between segregated and merely
+       separate-by-accident. */
+    const mode = healthSource();
+    const mixed = srcSeen.size > 1;
+    const src = mixed ? 'both' : (srcSeen.values().next().value || existingSource(s) || 'whoop');
+
+    /* Named in words as well as marked in colour: which rows are Apple's
+       is the kind of thing you want stated, not inferred from a tint. */
+    const fromApple = VITALS.map(([k]) => k)
+      .filter(k => vitalKeys.has(k) && sourceForMetric(s, k) === 'apple')
+      .map(k => METRICS[k].label);
+    const missing = (src === 'apple' || mode === 'apple')
+      ? VITALS.map(([k]) => k).filter(k => !vitalKeys.has(k)).map(k => METRICS[k].label)
+      : [];
+
+    let note = null;
+    if (mixed && fromApple.length) {
+      /* Everything Apple is allowed to supply alongside Whoop is a count —
+         steps, stand hours, exercise minutes — so the plural verb is
+         always the right one here. */
+      note = `${listWords(fromApple)} come from Apple Health, marked above. Everything else `
+           + 'is measured by Whoop. The two are never averaged together.';
+    } else if (missing.length) {
+      note = `Your watch doesn\u2019t report ${listWords(missing)}. Those rows appear if you `
+           + 'connect a Whoop band as well.';
+    }
+
+    wrap.append(el('div.tile.flush.vitals', {},
+      el('div.vitals-head', {},
+        el('h3', {}, 'Vitals'),
+        src === 'both'
+          ? el('div.flex', { style: { gap: '6px' } },
+              el('span.micro.src-tag', {}, 'Whoop'),
+              el('span.micro.src-tag.is-apple', {}, 'Apple'))
+          : el('span.micro.src-tag' + (src === 'apple' ? '.is-apple' : ''), {},
+              src === 'apple' ? 'Apple Watch' : 'Whoop')),
+      ...vitalRows,
+      note ? el('div.vital-note', {}, note) : null));
   }
 
   /* ── the fortnight, at a glance ── */
@@ -888,4 +1049,46 @@ function correlationTile(s) {
       'These are correlations across your own days, not causes. '
       + 'Use them to pick something worth testing deliberately for a fortnight, then check whether it held.')),
   );
+}
+
+
+/*
+ * Which bands you wear, asked once.
+ *
+ * Four setups, and the app genuinely behaves differently in each: what it
+ * offers to sync, what it can show, and — for the person wearing both —
+ * which readings it is willing to take from which device.
+ */
+export function openHealthSetup(ctx) {
+  const OPTIONS = [
+    ['whoop', 'Whoop only',
+     'Recovery, strain, HRV, resting heart rate, sleep stages, blood oxygen, skin temperature '
+     + 'and respiratory rate. No step count — Whoop measures steps but its API does not hand them over.'],
+    ['apple', 'Apple Watch only',
+     'Steps, heart rate, sleep and energy, pushed from the Health app by a Shortcut. '
+     + 'No recovery or strain score — those are Whoop\u2019s own calculations.'],
+    ['both', 'Both',
+     'Whoop supplies everything it measures. Apple fills only the gap: steps. '
+     + 'HRV is never taken from both — Whoop reports RMSSD and Apple reports SDNN, '
+     + 'and a trend mixing the two would be meaningless.'],
+    ['none', 'Neither',
+     'Everything except recovery and strain still works: intake, weight trend, '
+     + 'adaptive TDEE and the quality breakdown.'],
+  ];
+
+  const body = el('div');
+  const draw = () => {
+    const cur = healthSource();
+    replaceKids(body, ...OPTIONS.map(([v, label, note]) =>
+      el('button.pick-row' + (cur === v ? '.is-on' : ''), {
+        onclick: () => { setHealthSource(v); haptic('tap'); draw(); ctx.refresh?.(); },
+      },
+        el('div.grow', {},
+          el('div.pick-name', {}, label),
+          el('div.fine', {}, note)),
+        cur === v ? icon('check', 16) : null)));
+  };
+  draw();
+
+  return sheet({ title: 'What do you wear?', body });
 }

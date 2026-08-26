@@ -11,6 +11,7 @@ import { el, sheet, toast, icon, field, confirmSheet, append } from '../ui.js';
 import { get, commit } from '../store.js';
 import {
   healthKey, makeHealthKey, forgetHealthKey, pushUrl, syncApple, existingSource,
+  healthSource,
 } from '../applehealth.js';
 
 const copy = async (text, what) => {
@@ -33,6 +34,9 @@ export function openAppleHealth(ctx) {
     const key = healthKey();
     const url = pushUrl(relay);
     const source = existingSource(s);
+    /* Wearing both narrows this page to one field, which is the whole
+       difference between the two setups. */
+    const both = healthSource() === 'both';
 
     const kids = [];
 
@@ -89,10 +93,15 @@ export function openAppleHealth(ctx) {
           el('ol.steps', {},
             el('li', {}, 'Open ', el('b', {}, 'Shortcuts'), ' and make a new shortcut.'),
             el('li', {}, 'Add ', el('b', {}, 'Find Health Samples'), '. Set it to ',
-              el('b', {}, 'Resting Heart Rate'), ', sorted by ', el('b', {}, 'End Date'),
-              ', limit ', el('b', {}, '1'), '.'),
-            el('li', {}, 'Repeat that for ', el('b', {}, 'Heart Rate Variability'), ', ',
-              el('b', {}, 'Sleep Analysis'), ' and ', el('b', {}, 'Active Energy'), '.'),
+              el('b', {}, 'Steps'), ', filter ', el('b', {}, 'Start Date is today'),
+              ', and set ', el('b', {}, 'Statistic → Sum'), '.'),
+            both
+              ? el('li', {}, 'That is the only one you need. Whoop measures everything '
+                  + 'else already, and steps are the one thing its API will not hand over.')
+              : el('li', {}, 'Repeat for ', el('b', {}, 'Resting Heart Rate'), ', ',
+                  el('b', {}, 'Heart Rate Variability'), ', ', el('b', {}, 'Sleep Analysis'),
+                  ' and ', el('b', {}, 'Active Energy'), ' — sorted by ',
+                  el('b', {}, 'End Date'), ', limit ', el('b', {}, '1'), '.'),
             el('li', {}, 'Add ', el('b', {}, 'Get Contents of URL'), ' and set it up as below.'),
             el('li', {}, 'Then ', el('b', {}, 'Automation → Time of Day'),
               ', pick something after you normally wake, and run it daily.')),
@@ -109,9 +118,17 @@ export function openAppleHealth(ctx) {
           el('div.fine', { style: { marginTop: '12px', marginBottom: '8px' } },
             'The JSON fields, each set to the matching variable from the steps above. '
             + 'Send only the ones you set up — anything missing is simply not recorded.'),
-          codeRow('JSON', '{ "date": "<Current Date, formatted yyyy-MM-dd>", '
-            + '"rhr": <Resting Heart Rate>, "hrv": <HRV>, '
-            + '"sleepH": <Sleep hours>, "activeKcal": <Active Energy> }')),
+          codeRow('JSON', both
+            ? '{ "date": "<Current Date, formatted yyyy-MM-dd>", "steps": <Steps> }'
+            : '{ "date": "<Current Date, formatted yyyy-MM-dd>", '
+              + '"steps": <Steps>, "rhr": <Resting Heart Rate>, "hrv": <HRV>, '
+              + '"sleepH": <Sleep hours>, "activeKcal": <Active Energy> }'),
+          both ? el('div.fine', { style: { marginTop: '10px' } },
+            'Only steps, deliberately. You wear a Whoop, so heart rate, HRV and sleep '
+            + 'already come from it — and Apple\u2019s HRV is SDNN while Whoop\u2019s is '
+            + 'RMSSD, so importing both would corrupt the trend rather than enrich it. '
+            + 'Even if you send the other fields, the app will ignore them while Whoop '
+            + 'is your source.') : null),
 
         el('div.section-label', {}, el('span.micro', {}, 'Step 4 — bring it in')),
         el('div.tile', {},

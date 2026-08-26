@@ -8,8 +8,8 @@
  * day it could actually see, and only makes claims about that part.
  */
 
-import { el, rail, g, icon } from '../ui.js';
-import { get, commit, totals, dayKey } from '../store.js';
+import { el, rail, g, icon, live } from '../ui.js';
+import { get, commit, totals, dayKey, subscribe } from '../store.js';
 import { NUTRIENTS, nutrientTargets } from '../data/nutrients.js';
 
 const ORDER = ['fe', 'ca', 'vd', 'b12', 'fol', 'zn', 'mg', 'k', 'vc', 'va'];
@@ -25,6 +25,15 @@ const ORDER = ['fe', 'ca', 'vd', 'b12', 'fol', 'zn', 'mg', 'k', 'vc', 'va'];
 export function nutrientsTile(s, key = dayKey(), ctx = null) {
   const t = totals(key);
   if (!t.count && !(t.suppCount > 0)) return null;
+  /* Same reasoning as the other folds: opening this should redraw this
+     tile, not the screen behind it. */
+  return live(paint => buildNutrients(get(), key, ctx, paint),
+              { subscribe, on: ['entry:add', 'entry:update', 'entry:remove', 'supplements', 'settings'] });
+}
+
+function buildNutrients(s, key, ctx, repaint) {
+  const t = totals(key);
+  if (!t.count && !(t.suppCount > 0)) return el('div');
 
   const targets = nutrientTargets(s.profile);
   const coveragePct = Math.round((t.microCoverage || 0) * 100);
@@ -35,9 +44,7 @@ export function nutrientsTile(s, key = dayKey(), ctx = null) {
   const header = el('button', {
     style: { display: 'block', width: '100%', textAlign: 'left', padding: 0, background: 'none' },
     'aria-expanded': String(open),
-    onclick: () => {
-      if (ctx) { commit(st => { st.settings.microOpen = !open; }); ctx.refresh(); }
-    },
+    onclick: () => { commit(st => { st.settings.microOpen = !open; }, 'settings'); repaint(); },
   },
     el('div.between', {},
       el('div.flex', {},

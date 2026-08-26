@@ -81,7 +81,10 @@ export function installSwipe({ surface, order, current, go }) {
 
   surface.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
-    if (e.target.closest('.sheet, .scrim, input, textarea, select')) return;
+    /* .no-swipe marks anything that handles its own horizontal drag —
+       a dismissible coach note, for instance. Without this the tab
+       swiper and the card would both claim the same gesture. */
+    if (e.target.closest('.sheet, .scrim, input, textarea, select, .no-swipe')) return;
     const t = e.touches[0];
     startX = lastX = t.clientX; startY = t.clientY;
     lastT = e.timeStamp;

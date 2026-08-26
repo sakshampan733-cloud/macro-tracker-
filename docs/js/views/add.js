@@ -15,6 +15,11 @@ import {
 import { FOODS, GROUPS, atwater } from '../data/foods.js';
 import { toItem, matchScore, searchLocal, searchMeals } from '../search.js';
 import { resolveBarcode, searchProducts, validEAN, isIndian } from '../off.js';
+import { openLabelScan } from './labelscan.js';
+import { openRestaurant, restaurantCell } from './restaurant.js';
+import { searchRestaurants, searchDrinks } from '../data/restaurants.js';
+import { defaultBuild, buildMacros } from '../data/starbucks.js';
+import { openBuilder as openDrinkBuilder } from './starbucks.js';
 import { Scanner, cameraSupported, secureEnough, decodeImageFile, diagnose } from '../scanner.js';
 import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
@@ -119,6 +124,16 @@ export function foodSurface(ctx) {
     if (q.length < 2) { showShortcuts(); return; }
 
     clear(results);
+
+    /* Places first here too, so the two search boxes behave the same. */
+    const places = searchRestaurants(q);
+    if (places.length) {
+      results.append(sectionLabel('Places'));
+      const pg = el('div.rest-list');
+      for (const b of places.slice(0, 4)) pg.append(restaurantCell(b, ctx));
+      results.append(pg);
+    }
+
     results.append(sectionLabel('Your foods and reference database'));
 
     const local = searchLocal(q);
@@ -127,6 +142,21 @@ export function foodSurface(ctx) {
     } else {
       results.append(el('div.tile', {}, el('div.dim', { style: { fontSize: '13.5px' } },
         'Nothing local matches. Checking packaged products…')));
+    }
+
+    const drinks = searchDrinks(q);
+    if (drinks.length) {
+      results.append(sectionLabel('Starbucks'));
+      const dg = el('div.food-grid');
+      for (const d of drinks.slice(0, 8)) {
+        const m = buildMacros(defaultBuild(d.id, 'grande'));
+        dg.append(el('button.food-cell', {
+          onclick: () => openDrinkBuilder(d.id, ctx.date || dayKey(), ctx),
+        },
+          el('span.fc-name', {}, d.name),
+          el('span.fc-kcal', {}, `${m.kcal} kcal · ${m.caffeine} mg`)));
+      }
+      results.append(dg);
     }
 
     if (validEAN(q.replace(/\s/g, ''))) {
@@ -149,7 +179,9 @@ export function foodSurface(ctx) {
       results.append(el('div.tile', {}, el('div.dim', { style: { fontSize: '13.5px' } },
         'No packaged product found. Build it from the packet instead.'),
         el('button.btn.sm', { style: { marginTop: '10px' },
-          onclick: () => openBuilder({ name: q, onSaved: ctx.refresh }) }, 'Build it')));
+          onclick: () => openBuilder({ name: q, onSaved: ctx.refresh }) }, 'Build it'),
+        el('button.btn', { onclick: () => openLabelScan(ctx, { name: q }) },
+          icon('scan', 16), 'Read a label')));
     } else {
       results.append(listTile(r.products.map(toItem), ctx));
     }
@@ -524,15 +556,26 @@ export function openScanner(ctx) {
   }
 
   function notFound(code, food, ctx) {
-    sheet({
+    /*
+     * Indian snacks miss far more often than anything else here — Open
+     * Food Facts is contributor-built and thinly covered in India, so a
+     * perfectly ordinary packet of namkeen simply is not in it. Sending
+     * someone to type eight numbers off the back was the real failure;
+     * reading the label is the same job with the typing removed.
+     */
+    const sh = sheet({
       title: 'Not in the database',
       body: el('div', {},
         el('p', { style: { color: 'var(--text-2)', marginTop: 0, lineHeight: '1.55' } },
           `Barcode ${code}`, isIndian(code) ? ' is an Indian product code' : '',
-          ` but Open Food Facts has no entry for it. Build it once from the packet and it's yours permanently.`),
+          ' but Open Food Facts has no entry for it — its Indian coverage is thin. '
+          + 'Capture the label once and the packet is yours permanently.'),
         el('button.btn.primary.block', {
-          onclick: () => openBuilder({ barcode: code, onSaved: ctx.refresh }),
-        }, 'Enter it from the packet')),
+          onclick: () => { sh.close(); openLabelScan(ctx, { barcode: code }); },
+        }, icon('scan', 16), 'Read the label'),
+        el('button.btn.block', { style: { marginTop: '9px' },
+          onclick: () => { sh.close(); openBuilder({ barcode: code, onSaved: ctx.refresh }); },
+        }, 'Type it in instead')),
     });
   }
 

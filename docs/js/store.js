@@ -55,10 +55,12 @@ const EMPTY = () => ({
   library: {},
   meals: {},
   supplementsTaken: [],     // which supplement ids the user actually takes
+  medications: [],          // prescriptions, kept apart from supplements
   favourites: [],           // food ids starred for the top of the list
   hidden: [],               // refs you never want suggested again
   blood: {},                // blood panels, keyed by id
   goal: null,               // { startKg, targetKg, startDate, byDate }
+  plans: {},                // date -> [ planned items ], a day rehearsed before it happens
   recipes: {},
   cache: {},
   whoop: { rows: {}, importedAt: null },
@@ -388,6 +390,79 @@ export function undoWater(key) {
   commit(s => { day(key).water.pop(); }, 'water');
 }
 
+/* ── Planning a day before you eat it ──────────────────────────────────
+ *
+ * A plan is not a log. Logging tomorrow's dinner tonight would put the
+ * calories in the wrong day and destroy every timing signal the app has —
+ * meal spacing, the gap since eating, how late the last meal was. So
+ * planned items live in their own store and move into the log only when
+ * you say you have actually eaten them, stamped at that moment.
+ */
+
+export function planFor(key) { return (state.plans && state.plans[key]) || []; }
+
+export function addPlanned(key, item) {
+  /* The spread has to come first. With it last, an item that already
+     carries an id — anything re-planned from an existing row, which is
+     exactly what a swap does — kept the old id, and two planned rows
+     sharing an id meant removing one removed the other. */
+  const it = { ...item, id: uid(), meal: item.meal || 'lunch' };
+  commit(s => {
+    s.plans = s.plans || {};
+    (s.plans[key] = s.plans[key] || []).push(it);
+  }, 'plan');
+  return it;
+}
+
+export function removePlanned(key, id) {
+  commit(s => {
+    if (!s.plans?.[key]) return;
+    s.plans[key] = s.plans[key].filter(p => p.id !== id);
+  }, 'plan');
+}
+
+export function updatePlanned(key, id, patch) {
+  commit(s => {
+    const list = s.plans?.[key];
+    if (!list) return;
+    const i = list.findIndex(p => p.id === id);
+    if (i >= 0) list[i] = { ...list[i], ...patch };
+  }, 'plan');
+}
+
+export function clearPlan(key) {
+  commit(s => { if (s.plans) delete s.plans[key]; }, 'plan');
+}
+
+/* What the plan comes to, using the same maths as a logged day. */
+export function planTotals(key) {
+  const sum = { kcal: 0, p: 0, c: 0, f: 0, fib: 0 };
+  for (const it of planFor(key)) {
+    const m = macrosFor(it.per100, it.grams);
+    for (const k in sum) sum[k] += m[k] || 0;
+  }
+  return sum;
+}
+
+/*
+ * Eat a planned item for real.
+ *
+ * Stamped now, not at the hour it was planned for — the whole reason a
+ * plan is kept separate is so that when you actually eat matters.
+ */
+export function eatPlanned(key, id) {
+  const it = planFor(key).find(p => p.id === id);
+  if (!it) return null;
+  const entry = addEntry(key, {
+    name: it.name, brand: it.brand || '', ref: it.ref || null,
+    barcode: it.barcode || null, per100: it.per100, serv: it.serv || [],
+    grams: it.grams, method: it.method || 'portion', grade: it.grade || 'C',
+    meal: it.meal, fromPlan: true,
+  });
+  removePlanned(key, id);
+  return entry;
+}
+
 /* ── Weight ─────────────────────────────────────────────────────────── */
 
 export function setWeight(key, kg) {
@@ -480,6 +555,115 @@ export function toggleSupplement(key, id) {
     if (i >= 0) d.supps.splice(i, 1);
     else d.supps.push(id);
   }, 'supplements');
+}
+
+/* ── Medication ─────────────────────────────────────────────────────
+ *
+ * Kept in its own list rather than folded into supplements. A supplement
+ * is a choice you can change on a whim; a prescription has a schedule
+ * somebody else set, and missing one is a different kind of event from
+ * skipping creatine. The app records both facts — that it was due, and
+ * whether it was taken — without ever having an opinion about the
+ * schedule itself.
+ */
+export function medications() { return state.medications || []; }
+
+export function addMedication(med) {
+  const m = {
+    id: 'med:' + uid(),
+    name: '', nickname: '', ref: null, purpose: '',
+    mg: null, unit: 'mg', perDose: 1,
+    times: [],                 // ['08:00', '21:00']
+    addedAt: Date.now(),
+    ...med,
+  };
+  commit(s => { s.medications = s.medications || []; s.medications.push(m); }, 'meds');
+  return m;
+}
+
+export function updateMedication(id, patch) {
+  commit(s => {
+    const i = (s.medications || []).findIndex(m => m.id === id);
+    if (i >= 0) s.medications[i] = { ...s.medications[i], ...patch };
+  }, 'meds');
+}
+
+export function removeMedication(id) {
+  commit(s => { s.medications = (s.medications || []).filter(m => m.id !== id); }, 'meds');
+}
+
+/*
+ * Doses are recorded per day and per scheduled time, so "took the morning
+ * one late" and "skipped the evening one" stay distinguishable — which is
+ * the distinction the report is built on.
+ */
+export function doseKey(medId, time) { return `${medId}@${time}`; }
+
+export function takeDose(key, medId, time, at = Date.now()) {
+  commit(s => {
+    const d = day(key);
+    d.doses = d.doses || {};
+    d.doses[doseKey(medId, time)] = { at, time, medId };
+  }, 'meds');
+}
+
+export function untakeDose(key, medId, time) {
+  commit(s => {
+    const d = day(key);
+    if (d.doses) delete d.doses[doseKey(medId, time)];
+  }, 'meds');
+}
+
+export function dosesFor(key) { return peekDay(key).doses || {}; }
+
+/*
+ * Every dose that was due on a day, with whether and when it was taken.
+ * A medication added on Tuesday is not counted as missed on Monday.
+ */
+export function doseLog(key) {
+  const taken = dosesFor(key);
+  const dayStart = new Date(key + 'T00:00:00').getTime();
+  const out = [];
+  for (const m of medications()) {
+    if (m.addedAt && m.addedAt > dayStart + 864e5) continue;
+    for (const time of m.times || []) {
+      const rec = taken[doseKey(m.id, time)];
+      let lateMin = null;
+      if (rec) {
+        const [hh, mm] = time.split(':').map(Number);
+        const due = new Date(key + 'T00:00:00');
+        due.setHours(hh, mm, 0, 0);
+        lateMin = Math.round((rec.at - due.getTime()) / 60000);
+      }
+      out.push({ med: m, time, taken: !!rec, at: rec?.at || null, lateMin });
+    }
+  }
+  return out.sort((a, b) => a.time.localeCompare(b.time));
+}
+
+/*
+ * Coach notes you have read and want gone.
+ *
+ * Dismissal is per day rather than forever: "you haven't eaten since you
+ * woke up" is true again tomorrow morning, and a note you silenced once
+ * should not be silenced for good. The id is the headline, which is
+ * stable for a given rule and changes when the rule's numbers change —
+ * which is exactly when you want to see it again.
+ */
+export function dismissNote(key, id) {
+  commit(s => {
+    const d = day(key);
+    d.dismissed = d.dismissed || [];
+    if (!d.dismissed.includes(id)) d.dismissed.push(id);
+  }, 'coach');
+}
+
+export function noteDismissed(key, id) {
+  return (peekDay(key).dismissed || []).includes(id);
+}
+
+export function restoreNotes(key) {
+  commit(s => { day(key).dismissed = []; }, 'coach');
 }
 
 export function suppsTaken(key = dayKey()) {

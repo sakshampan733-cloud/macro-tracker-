@@ -533,3 +533,40 @@ export function healthLine(points, {
 
   return svg;
 }
+
+/*
+ * A sparkline small enough to sit in a table row.
+ *
+ * No axes, no labels, no baseline text — at this size any of those would
+ * be unreadable and would only add ink. It answers one question: has this
+ * been going up, down, or nowhere. The number beside it says where it is
+ * now, and the detail view says everything else.
+ */
+export function miniSpark(values, { w = 62, h = 22, colour = 'currentColor' } = {}) {
+  const svg = svgEl('svg', { class: 'mspark', viewBox: `0 0 ${w} ${h}` });
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  const vals = (values || []).filter(v => v != null && Number.isFinite(v));
+  if (vals.length < 2) return svg;
+
+  const hi = Math.max(...vals), lo = Math.min(...vals);
+  /* Pad by the range, never the magnitude — a series moving 0.4 around 85
+     must still show the 0.4. */
+  const range = (hi - lo) || Math.max(Math.abs(hi) * 0.02, 0.001);
+  const top = hi + range * 0.18, bot = lo - range * 0.18;
+  const n = vals.length;
+  const X = i => (i / (n - 1)) * w;
+  const Y = v => h - ((v - bot) / (top - bot)) * h;
+
+  const d = vals.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+  svg.append(svgEl('path', {
+    d, fill: 'none', stroke: colour, 'stroke-width': 1.6,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+    'vector-effect': 'non-scaling-stroke',
+  }));
+  /* The most recent point, so the eye lands on where it ends. */
+  svg.append(svgEl('circle', {
+    cx: X(n - 1).toFixed(1), cy: Y(vals[n - 1]).toFixed(1), r: 1.9, fill: colour,
+  }));
+  return svg;
+}

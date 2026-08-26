@@ -183,6 +183,7 @@ export const METRICS = {
   resp:      { label: 'Respiratory rate',unit: 'rpm', good: 'none', dp: 1 },
   spo2:      { label: 'Blood oxygen',    unit: '%',   good: 'high', dp: 1 },
   temp:      { label: 'Skin temp',       unit: '°C',  good: 'none', dp: 1 },
+  steps:     { label: 'Steps',           unit: '',    good: 'high', dp: 0 },
 };
 
 function quantile(sorted, q) {

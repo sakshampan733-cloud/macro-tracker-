@@ -15,17 +15,24 @@ import { el, clear, icon, kcal, toast, sheet, confirmSheet, append } from '../ui
 import { flyToTotals, haptic } from '../feedback.js';
 import { openMealLogger } from './meallog.js';
 import { openMealBuilder } from './meal.js';
-import { topWhoopAdvice } from '../coachwhoop.js';
+import { whoopAdvice } from '../coachwhoop.js';
+import { overdueNote } from '../reminders.js';
+import { caffeineNote } from './supplements.js';
 import {
   get, totals, dayKey, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
-  scannedFoods, builtFoods,
+  scannedFoods, builtFoods, addWater, undoWater, peekDay, dismissNote, noteDismissed,
+  commit,
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
 import { openScanner, openQuickAdd, openBuilder } from './add.js';
+import { openBuilder as openDrinkBuilder } from './starbucks.js';
+import { openRestaurant, restaurantCell } from './restaurant.js';
+import { searchRestaurants, searchDrinks, brandOf } from '../data/restaurants.js';
 import { searchLocal, searchMeals, toItem } from '../search.js';
+import { defaultBuild, buildMacros } from '../data/starbucks.js';
 import { searchProducts, resolveBarcode, validEAN } from '../off.js';
 import { openDish } from './dish.js';
 
@@ -46,6 +53,7 @@ export function renderHome(root, ctx) {
     readout(t, targets, ctx),
     coachCard(s, targets, key, ctx),
     actions(ctx),
+    waterStrip(key, targets),
     picker(s, ctx, key),
     logSection(key, ctx),
   );
@@ -277,22 +285,124 @@ function coachCard(store, targets, key, ctx) {
     if (next) host.append(next);
   };
 
+  /* Dismissing one note should reveal the next, not blank the slot and
+     not rebuild the screen. */
+  ctx.repaintCoach = () => paint();
+
   paint({ first: true });
   if (key === dayKey()) timer = setInterval(paint, 4 * 60 * 1000);
   return host;
 }
 
+/*
+ * A note's identity is its headline.
+ *
+ * The rules have no ids of their own, and adding them would fix the
+ * wording of every rule forever. The headline is stable while the advice
+ * is the same advice, and changes when the numbers in it change — which
+ * is the moment the note has become new information again.
+ */
+const noteId = a => String(a.headline || '').slice(0, 80);
+
+/*
+ * Swipe a note away.
+ *
+ * Pointer events rather than touch, so it works with a trackpad too, and
+ * a movement threshold before capture so a vertical scroll that starts on
+ * the card still scrolls. Under 90px it springs back — the distance is
+ * the confirmation, since there is no undo dialog for something this
+ * small.
+ */
+function makeDismissible(card, done) {
+  let x0 = null, y0 = null, dx = 0, active = false;
+
+  card.addEventListener('pointerdown', e => {
+    if (e.button != null && e.button !== 0) return;
+    x0 = e.clientX; y0 = e.clientY; dx = 0; active = false;
+  });
+
+  card.addEventListener('pointermove', e => {
+    if (x0 == null) return;
+    const mx = e.clientX - x0, my = e.clientY - y0;
+    /* Claim the gesture only once it is clearly sideways. */
+    if (!active && Math.abs(mx) > 12 && Math.abs(mx) > Math.abs(my)) {
+      active = true;
+      card.setPointerCapture?.(e.pointerId);
+      card.style.transition = 'none';
+    }
+    if (!active) return;
+    dx = mx;
+    card.style.transform = `translateX(${dx}px)`;
+    card.style.opacity = String(Math.max(0, 1 - Math.abs(dx) / 260));
+  });
+
+  const release = () => {
+    if (x0 == null) return;
+    const gone = Math.abs(dx) > 90;
+    card.style.transition = '';
+    if (gone) {
+      card.style.transform = `translateX(${dx > 0 ? 500 : -500}px)`;
+      card.style.opacity = '0';
+      done();
+    } else {
+      card.style.transform = '';
+      card.style.opacity = '';
+    }
+    x0 = y0 = null; dx = 0; active = false;
+  };
+  card.addEventListener('pointerup', release);
+  card.addEventListener('pointercancel', release);
+}
+
 function buildCoach(store, targets, key, ctx) {
-  let advice = null;
-  try { advice = topWhoopAdvice(store, targets, key); }
-  catch { return null; }
+  let all = [];
+  try { all = whoopAdvice(store, targets, key) || []; }
+  catch { all = []; }
+
+  /* An unmarked dose outranks most nutrition advice, so it joins the same
+     queue rather than getting a card of its own — and it is dismissible
+     like anything else, because you may simply have taken it. */
+  try {
+    const meds = overdueNote(key);
+    if (meds) all = [meds, ...all];
+  } catch { /* medication is optional; never let it break the card */ }
+
+  /* Caffeine has no widget on Home — this note is the whole of its
+     presence there, which is why it has to earn its place by only
+     appearing when the answer changes something. */
+  try {
+    const caff = caffeineNote(key);
+    if (caff) all = [...all, caff];
+  } catch { /* likewise */ }
+
+  all.sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
+
+  if (!all.length) return null;
+
+  /* Skip the ones already read and swiped away today. */
+  const advice = all.find(a => !noteDismissed(key, noteId(a)));
   if (!advice) return null;
 
-  const card = el('div.tile.coach-card.' + (advice.tone === 'warn' ? 'is-warn' : 'is-good'), {},
+  const id = noteId(advice);
+  const card = el('div.tile.coach-card.no-swipe.' + (advice.tone === 'warn' ? 'is-warn' : 'is-good'), {},
     el('div.coach-top', {},
-      el('span.coach-tag', {}, 'WHOOP'),
-      el('div.coach-head', {}, advice.headline)),
+      el('span.coach-tag', {}, advice.source === 'meds' ? 'MEDS'
+        : advice.source === 'caffeine' ? 'CAFFEINE' : 'WHOOP'),
+      el('div.coach-head', {}, advice.headline),
+      /* Swipe is the gesture, but a gesture nobody can see is a secret.
+         The button does the same thing and announces that it is possible. */
+      el('button.coach-x', {
+        'aria-label': 'Dismiss this note',
+        onclick: e => { e.stopPropagation(); dismiss(); },
+      }, '\u00D7')),
     el('div.coach-body', {}, advice.body));
+
+  const dismiss = () => {
+    card.classList.add('is-going');
+    haptic('tap');
+    setTimeout(() => { dismissNote(key, id); ctx.repaintCoach?.(); }, 190);
+  };
+  makeDismissible(card, dismiss);
 
   /* Named foods, tappable — a recommendation you cannot act on is a lecture. */
   if (advice.action && advice.action.kind === 'foods' && advice.action.picks.length) {
@@ -326,6 +436,57 @@ function actions(ctx) {
  * pushing it down the page, so the results appear where your eye already
  * is and the screen never gets taller than it started.
  */
+/*
+ * Water, on the screen where logging happens.
+ *
+ * It lived in Detail, which meant a glass of water — the single most
+ * frequent thing anyone logs — was the one thing you had to leave Home to
+ * record. This is the same model as the Detail tile, drawn as a strip
+ * rather than a card, and it repaints only itself: rebuilding the screen
+ * on every glass was an earlier complaint and the scroll position going
+ * with it is what made it feel like the app had restarted.
+ */
+function waterStrip(key, targets) {
+  const s = get();
+  const goal = targets.water || 3000;
+  const glassMl = s.settings.glassMl || 250;
+  const glasses = Math.min(Math.ceil(goal / glassMl), 14);
+
+  const grid = el('div.water-grid.water-strip');
+  const readoutEl = el('span.num', { style: { fontSize: '12.5px' } });
+
+  const repaint = () => {
+    const water = (peekDay(key)?.water || []).reduce((a, w) => a + (w.ml || w || 0), 0);
+    const full = Math.floor(water / glassMl);
+    const partial = (water % glassMl) / glassMl;
+
+    grid.replaceChildren();
+    for (let i = 0; i < glasses; i++) {
+      const cls = i < full ? 'glass full' : (i === full && partial > 0.05 ? 'glass part' : 'glass');
+      const node = el('div', { class: cls, 'aria-hidden': 'true' });
+      if (i === full && partial > 0.05) node.style.setProperty('--lvl', Math.round(partial * 100) + '%');
+      grid.append(node);
+    }
+    readoutEl.textContent = `${(water / 1000).toFixed(2)} / ${(goal / 1000).toFixed(1)} L`;
+  };
+  repaint();
+
+  const add = ml => { addWater(key, ml); haptic('tap'); repaint(); };
+
+  return el('div.tile.water-tile', {},
+    el('div.between', { style: { marginBottom: '9px' } },
+      el('div.flex', { style: { gap: '7px' } }, icon('drop', 15), el('span.micro', {}, 'Water')),
+      readoutEl),
+    grid,
+    el('div.btn-row', { style: { marginTop: '10px' } },
+      el('button.btn.sm', { onclick: () => add(glassMl) }, `+ ${glassMl}`),
+      el('button.btn.sm', { onclick: () => add(500) }, '+ 500'),
+      el('button.btn.sm.ghost', {
+        onclick: () => { undoWater(key); haptic('tap'); repaint(); },
+        'aria-label': 'Undo last water entry',
+      }, 'Undo')));
+}
+
 function picker(s, ctx, key) {
   const grid = el('div');
   const wrap = el('div', {});
@@ -413,11 +574,42 @@ function picker(s, ctx, key) {
         grid.append(mg);
       }
 
+      /* Then the places. Typing "KFC" should hand you KFC, not eleven
+         separate KFC items you have to read through — and typing a dish
+         you half remember still lands on the counter that sells it,
+         because the aliases carry the dish names too. */
+      const places = searchRestaurants(q);
+      if (places.length) {
+        grid.append(label('Places'));
+        const pg = el('div.rest-list');
+        for (const b of places.slice(0, 4)) pg.append(restaurantCell(b, ctx));
+        grid.append(pg);
+      }
+
       const hits = searchLocal(q);
       if (hits.length) {
-        if (meals.length) grid.append(label('Foods'));
+        if (meals.length || places.length) grid.append(label('Foods'));
         grid.append(cells(hits.slice(0, 24).map(toItem)));
       }
+
+      /* Starbucks drinks are built rather than stored, so they are not in
+         the food library and need their own pass to stay findable by
+         name — "mocha" has to work from the main box. */
+      const drinks = searchDrinks(q);
+      if (drinks.length) {
+        grid.append(label('Starbucks'));
+        const dg = el('div.food-grid');
+        for (const d of drinks.slice(0, 8)) {
+          const m = buildMacros(defaultBuild(d.id, 'grande'));
+          dg.append(el('button.food-cell', {
+            onclick: () => openDrinkBuilder(d.id, key, ctx),
+          },
+            el('span.fc-name', {}, d.name),
+            el('span.fc-kcal', {}, `${m.kcal} kcal · ${m.caffeine} mg`)));
+        }
+        grid.append(dg);
+      }
+
       grid.append(remote);
       return;
     }
@@ -470,7 +662,7 @@ function picker(s, ctx, key) {
 
     const meals = mealsList();
     if (meals.length) {
-      grid.append(label('Your meals'));
+      const buildMeals = () => {
       const g = el('div.food-grid');
       for (const m of meals.slice(0, 6)) {
         const mt = mealTotals(m);
@@ -487,11 +679,13 @@ function picker(s, ctx, key) {
             onclick: e => { e.stopPropagation(); openMealActions(m, ctx); },
           }, '\u22EF')));
       }
-      grid.append(g);
+        return g;
+      };
+      grid.append(section('Your meals', meals.length, buildMeals, true));
     }
 
     const favs = favouriteFoods().map(toItem);
-    if (favs.length) grid.append(label('Favourites'), cells(favs));
+    if (favs.length) grid.append(section('Favourites', favs.length, () => cells(favs), true));
 
     /*
      * Your own foods, split by where they came from.
@@ -503,16 +697,16 @@ function picker(s, ctx, key) {
      * hand-entered matters because you remember which one a thing was.
      */
     const scanned = scannedFoods(12).map(toItem);
-    if (scanned.length) grid.append(label('Scanned'), cells(scanned));
+    if (scanned.length) grid.append(section('Scanned', scanned.length, () => cells(scanned), false));
 
     const built = builtFoods(12).map(toItem);
-    if (built.length) grid.append(label('Added by hand'), cells(built));
+    if (built.length) grid.append(section('Added by hand', built.length, () => cells(built), false));
 
     const freq = frequentFoods(18).map(toItem);
-    if (freq.length) grid.append(label('Most eaten'), cells(freq));
+    if (freq.length) grid.append(section('Most eaten', freq.length, () => cells(freq), true));
 
     const recent = recentFoods(12).map(toItem);
-    if (recent.length) grid.append(label('Recent'), cells(recent));
+    if (recent.length) grid.append(section('Recent', recent.length, () => cells(recent), false));
 
     if (!meals.length && !freq.length && !recent.length && !scanned.length && !built.length) {
       grid.append(el('div.grid-empty', {},
@@ -521,6 +715,50 @@ function picker(s, ctx, key) {
   }
 
   const label = text => el('div.section-label', {}, el('span.micro', {}, text));
+
+  /*
+   * A foldable section.
+   *
+   * Most eaten, Recent, Scanned and Added by hand are each up to a dozen
+   * cells, and stacked they pushed everything else three screens down —
+   * the shortcut rows were costing more scrolling than they saved. Folded
+   * they are one line each, the count is on the header so you know whether
+   * opening it is worth it, and the choice is remembered per section
+   * because which rows matter differs by person.
+   */
+  function section(title, count, buildBody, defaultOpen) {
+    const saved = get().settings?.homeSections?.[title];
+    let open = saved == null ? defaultOpen : saved;
+
+    const caret = el('span.sec-caret', {}, open ? '\u25BE' : '\u25B8');
+    const body = el('div');
+
+    const paint = () => {
+      caret.textContent = open ? '\u25BE' : '\u25B8';
+      head.setAttribute('aria-expanded', String(open));
+      clear(body);
+      if (open) body.append(buildBody());
+    };
+
+    const head = el('button.sec-head', {
+      'aria-expanded': String(open),
+      onclick: () => {
+        open = !open;
+        commit(st => {
+          st.settings.homeSections = st.settings.homeSections || {};
+          st.settings.homeSections[title] = open;
+        }, 'settings');
+        haptic('tap');
+        paint();
+      },
+    },
+      el('span.micro', {}, title),
+      el('span.sec-count', {}, String(count)),
+      caret);
+
+    paint();
+    return el('div.home-sec', {}, head, body);
+  }
 
   wrap.append(el('div.field.home-search', {}, icon('search', 16), search), grid);
   drawShortcuts();

@@ -7,11 +7,12 @@
 
 import {
   el, clear, rail, macroRail, kcal, grams, g, clock, dateLabel, icon,
-  toast, sheet, confirmSheet, empty, append,
+  toast, sheet, confirmSheet, empty, append, live,
 } from '../ui.js';
 import {
   get, commit, day, totals, byMeal, MEALS, METHODS, dayKey, shiftDay,
   removeEntry, addWater, undoWater, entryMacros, setWeight, saveMeal, peekDay,
+  subscribe,
 } from '../store.js';
 import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
 import { dayFactor } from '../whoop.js';
@@ -19,7 +20,8 @@ import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
 import { openMacroDetail } from './macro.js';
 import { nutrientsTile } from './nutrients.js';
-import { supplementsTile } from './supplements.js';
+import { supplementsTile, caffeineTile } from './supplements.js';
+import { medicationTile } from './medication.js';
 import { nowAdvice } from '../coachnow.js';
 
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
@@ -33,18 +35,25 @@ export function renderToday(root, ctx) {
   clear(root);
 
   root.classList.add('stagger');
-  root.append(
+  /* append() drops nulls; Element.append stringifies them, and a tile that
+     returns null on an empty day printed the word "null" under the
+     supplements card. */
+  append(root,
     dateStrip(key, ctx),
     nowCard(s, targets, key, ctx),
     energyTile(t, targets, s, key, ctx),
     macroTile(t, targets, key, ctx),
+    /* Directly under the macros. Buried below the log it may as well not
+       have existed — you had to scroll past everything to reach it. */
+    caffeineTile(s, key),
 
     mealsTile(key, ctx),
 
     /* Everything below is review, not entry, so it sits after the log. */
     waterTile(t, targets, key, ctx),
+    medicationTile(s, key, ctx),
     supplementsTile(s, key, ctx),
-    nutrientsTile(s, key, ctx) || el('div'),
+    nutrientsTile(s, key, ctx),
   );
 }
 
@@ -307,6 +316,14 @@ function macroTile(t, targets, key, ctx) {
  * over.
  */
 function ceilings(t, targets, key, ctx) {
+  /* Wrapped in live() so the fold redraws this tile and nothing else.
+     Opening a disclosure triangle should not cost you your scroll
+     position, which is what calling ctx.refresh() here did. */
+  return live(paint => buildCeilings(t, targets, key, ctx, paint),
+              { subscribe, on: ['entry:add', 'entry:update', 'entry:remove', 'settings'] });
+}
+
+function buildCeilings(t, targets, key, ctx, repaint) {
   const s = get();
   const open = s.settings.limitsOpen === true;
 
@@ -317,6 +334,9 @@ function ceilings(t, targets, key, ctx) {
    * sheet shows grams, not the ceiling; sodium stays because nothing else
    * shows it at all.
    */
+  /* Caffeine had a bar here briefly and it was the wrong home for it: it
+     has its own card, which says far more than a bar against a ceiling
+     can, and two places showing the same number is how they drift apart. */
   const items = [
     ['Sugar', t.sug, targets.sug, 'g'],
     ['Sodium', t.na, targets.na, 'mg'],
@@ -331,7 +351,7 @@ function ceilings(t, targets, key, ctx) {
   const header = el('button', {
     style: { display: 'block', width: '100%', textAlign: 'left', padding: 0, background: 'none' },
     'aria-expanded': String(open),
-    onclick: () => { commit(st => { st.settings.limitsOpen = !open; }); ctx.refresh(); },
+    onclick: () => { commit(st => { st.settings.limitsOpen = !open; }, 'settings'); repaint(); },
   },
     el('div.between', {},
       el('span.micro', {}, 'Keep under ', open ? '▾' : '▸'),

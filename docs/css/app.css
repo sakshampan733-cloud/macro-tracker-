@@ -1547,6 +1547,8 @@ i.dot {
   letter-spacing: .1em; text-transform: uppercase;
 }
 
+/* Five now that Starbucks is here — a fifth chip alone on its own row
+   looked like a mistake rather than a choice. */
 .home-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
 .chip {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
@@ -2192,3 +2194,333 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 /* The coach host is only a mount point; it must not add space when the
    card inside it has nothing to say. */
 .coach-host:empty { display: none; }
+
+/* ── Vitals panel ─────────────────────────────────────────────────────
+   One row per measurement instead of seven stacked charts. The question
+   these answer — "is this where it usually is" — takes a second, and a
+   full chart is the wrong instrument for a one-second question.       */
+.vitals { padding: 0; }
+.vitals-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 16px 16px 10px;
+}
+
+.vital {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  align-items: center; gap: 10px;
+  width: 100%; padding: 11px 14px 11px 16px;
+  border-top: 1px solid var(--line);
+  background: none; border-left: 0; border-right: 0; border-bottom: 0;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background .18s ease;
+}
+.vital:hover { background: var(--surface-2); }
+.vital:active { background: var(--raised); }
+
+.vital-name { font-size: 13.5px; color: var(--text); }
+.vital-val {
+  font-size: 15px; font-weight: 550; font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vital-val i { font-size: 10.5px; font-style: normal; opacity: .75; }
+.vital-spark { display: flex; align-items: center; opacity: .85; }
+
+/* "usual" is the answer most of the time and should read as unremarkable;
+   only a reading outside your own middle half earns a colour. */
+.vital-where {
+  font-size: 10.5px; letter-spacing: .04em; color: var(--dim);
+  white-space: nowrap; min-width: 62px; text-align: right;
+}
+.vital-where.is-good { color: var(--good); }
+.vital-where.is-warn { color: var(--caution); }
+.vital .ic { color: var(--dim); }
+
+@media (max-width: 380px) {
+  .vital { grid-template-columns: 1fr auto auto auto; gap: 8px; padding-right: 10px; }
+  /* icon() returns a bare <svg> with no class, so the old `.ic` selector
+     never matched and the chevron wrapped onto its own line under every
+     row name on any phone this narrow. */
+  .vital > svg, .vital .ic { display: none; }
+  .vital-where { min-width: 0; font-size: 10px; }
+}
+
+/* ── Day planner ─────────────────────────────────────────────────────── */
+.plan-bars { margin-top: 18px; display: grid; gap: 11px; }
+.plan-bar .between { margin-bottom: 5px; }
+.plan-track {
+  height: 6px; border-radius: 3px; overflow: hidden;
+  background: var(--bg-2); border: 1px solid var(--line);
+}
+.plan-track i { display: block; height: 100%; border-radius: 3px; transition: width .5s cubic-bezier(.22,1,.36,1); }
+
+.plan-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13.5px;
+}
+.plan-row .num { font-variant-numeric: tabular-nums; color: var(--text-2); min-width: 54px; text-align: right; }
+.plan-eat { flex: none; padding: 6px 12px; font-size: 12px; }
+
+/* ── Compare ─────────────────────────────────────────────────────────── */
+.cmp-row { padding: 14px 16px; border-top: 1px solid var(--line); }
+.cmp-row:first-child { border-top: 0; }
+.cmp-name { font-size: 14.5px; font-weight: 550; }
+.cmp-head { margin-bottom: 12px; }
+.cmp-macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cmp-cell {
+  text-align: center; padding: 9px 4px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface-2);
+}
+/* The winner of each column, when there is something to win against. */
+.cmp-cell.is-best { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.cmp-v { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cmp-v i { font-size: 10px; font-style: normal; opacity: .7; }
+.cmp-l { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: .08em; }
+.cmp-note { padding: 12px 16px; font-size: 12px; color: var(--text-2); border-top: 1px solid var(--line); }
+
+/* Where the vitals came off. Never both at once — see body.js. */
+.src-tag {
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--text-2);
+}
+.src-tag.is-apple { border-color: var(--accent); color: var(--accent); }
+.vital-note {
+  padding: 12px 14px 14px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+/* Compare, in depth: what the carbs and the fat actually are. */
+.cmp-parts { margin: 2px 0 8px; color: var(--muted); }
+.cmp-deep {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+.deep-cell { display: flex; flex-direction: column; gap: 2px; position: relative; }
+.deep-k { font-size: 10.5px; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }
+.deep-v { font-size: 15px; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.deep-cell.is-best .deep-v { color: var(--text); }
+.deep-star { position: absolute; top: -2px; right: 0; font-size: 9px; color: var(--accent); }
+.cmp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.cmp-tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+}
+.cmp-tag.is-p { border-color: color-mix(in srgb, var(--m-p) 45%, transparent); color: var(--m-p); }
+.cmp-tag.is-c { border-color: color-mix(in srgb, var(--m-c) 45%, transparent); color: var(--m-c-ink, var(--m-c)); }
+.cmp-tag.is-f { border-color: color-mix(in srgb, var(--m-f) 45%, transparent); color: var(--m-f); }
+.cmp-tag.is-warn { border-color: color-mix(in srgb, var(--warn) 55%, transparent); color: var(--warn); }
+
+/* Apple-sourced vitals, marked so the difference is visible and not only
+   stated. A tinted left edge rather than a different colour scheme: these
+   are the same measurements, just a different instrument. */
+.vital.from-apple { border-left: 2px solid var(--accent); padding-left: 12px; }
+.from-tag {
+  margin-left: 7px;
+  font-size: 9.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  padding: 1px 6px;
+  vertical-align: 1px;
+}
+
+/* The what-do-you-wear picker: a choice with consequences, so each row
+   carries the consequence rather than just a label. */
+.pick-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  margin-bottom: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.pick-row.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
+.pick-row .ic { color: var(--accent); flex: none; margin-top: 2px; }
+.pick-name { font-size: 15px; font-weight: 560; margin-bottom: 4px; }
+.pick-row .fine { line-height: 1.45; }
+
+/* Water on Home: the same glasses, drawn as a strip. */
+.water-tile { padding: 13px 14px 14px; }
+.water-strip { --glass-h: 26px; }
+
+/* A coach note you can swipe away. */
+.coach-card { touch-action: pan-y; transition: transform .19s ease, opacity .19s ease; }
+.coach-card.is-going { transform: translateX(-460px); opacity: 0; }
+.coach-top { position: relative; }
+.coach-x {
+  position: absolute; top: -4px; right: -4px;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 999px;
+  background: none; color: var(--dim);
+  font-size: 17px; line-height: 1;
+}
+.coach-x:hover { color: var(--text); background: var(--raised); }
+
+/* Caffeine: one total, fed by food and supplements alike. */
+.caff-bar { height: 6px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.caff-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width .25s ease; }
+.caff-fill.is-over { background: var(--caution); }
+.caff-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 0; font-size: 13px; color: var(--text-2);
+  border-bottom: 1px solid var(--line);
+}
+.caff-row:last-child { border-bottom: 0; }
+.caff-row .num { font-size: 13px; color: var(--text); }
+.fine.is-warn { color: var(--caution); }
+
+/* The Starbucks counter: small integer choices, as steppers. */
+.step-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0; font-size: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.step-row:last-child { border-bottom: 0; }
+.step-val {
+  min-width: 26px; text-align: center;
+  font-variant-numeric: tabular-nums; font-size: 15px;
+}
+.tile-hero .fine { margin-top: 10px; }
+
+/* Medication: a checklist with times, kept visually distinct from
+   supplements so the two are never read as the same kind of thing. */
+.dose-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.dose-row:last-of-type { border-bottom: 0; }
+.dose-check {
+  width: 24px; height: 24px; flex: none;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--line-2); border-radius: 999px;
+  background: none; color: var(--bg);
+}
+.dose-row.is-done .dose-check { background: var(--good); border-color: var(--good); }
+.dose-row.is-late .dose-check { border-color: var(--caution); }
+.dose-open { text-align: left; background: none; border: 0; padding: 0; color: inherit; }
+.dose-name { font-size: 14px; color: var(--text); }
+.dose-row.is-done .dose-name { color: var(--dim); }
+.is-late-tag {
+  color: var(--caution); border: 1px solid color-mix(in srgb, var(--caution) 45%, transparent);
+  border-radius: 999px; padding: 2px 8px; font-size: 10.5px;
+}
+.chip-x { background: none; border: 0; color: inherit; margin-left: 6px; font-size: 14px; padding: 0; }
+
+/* Label capture. */
+.label-paste {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: 13.5px; line-height: 1.5;
+  resize: vertical;
+}
+.label-shot {
+  width: 100%; max-height: 240px; object-fit: contain;
+  border-radius: var(--r-lg); border: 1px solid var(--line);
+  margin-top: 10px; background: var(--raised);
+}
+
+/* A place in the search results — wider than a food cell, because it is a
+   destination rather than an item. */
+.rest-list { display: flex; flex-direction: column; gap: 7px; }
+.rest-cell {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%; padding: 12px 13px;
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--surface-2); color: var(--text);
+  text-align: left;
+}
+.rest-mark {
+  width: 30px; height: 30px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 9px; background: var(--raised); color: var(--accent);
+  font-size: 14px; font-weight: 650; letter-spacing: .02em;
+}
+.rest-name { display: block; font-size: 14.5px; font-weight: 550; }
+.rest-cell .micro { display: block; margin-top: 1px; }
+.rest-cell .ic { color: var(--dim); }
+
+/* Foldable shortcut rows on Home. */
+.home-sec { margin-top: 4px; }
+.sec-head {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 13px 2px 9px;
+  background: none; border: 0; color: inherit; text-align: left;
+}
+.sec-head .micro { flex: 1; }
+.sec-count {
+  font-size: 10.5px; color: var(--dim);
+  border: 1px solid var(--line-2); border-radius: 999px;
+  padding: 1px 7px; font-variant-numeric: tabular-nums;
+}
+.sec-caret { color: var(--dim); font-size: 10px; width: 12px; text-align: center; }
+.sec-head[aria-expanded="true"] .sec-caret { color: var(--accent); }
+
+/* ── The sleep dial ─────────────────────────────────────────────────
+   Apple's Bedtime control: a 24-hour ring with a draggable night band.
+   The band is the control; the face inside is only orientation. */
+.sched-card { padding: 16px 14px 18px; }
+.sched-heads { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.sched-time { font-size: 27px; font-weight: 600; letter-spacing: -.01em; margin: 3px 0 1px; }
+.sched-dial-wrap { display: flex; justify-content: center; margin: 6px 0 4px; }
+.sleep-dial {
+  width: min(280px, 78vw); height: auto;
+  touch-action: none;                 /* the ring owns the gesture */
+  user-select: none; -webkit-user-select: none;
+}
+.dial-track { stroke: var(--raised); }
+.dial-face-bg { fill: color-mix(in srgb, var(--raised) 55%, transparent); }
+.dial-tick { stroke: var(--line-2); stroke-width: 1; }
+.dial-tick.is-major { stroke: var(--dim); stroke-width: 1.5; }
+.dial-num { fill: var(--dim); font-size: 10px; font-weight: 500; }
+.dial-num.is-major { fill: var(--text); font-size: 11px; font-weight: 600; }
+.dial-glyph { font-size: 15px; }
+.dial-glyph.is-moon { fill: var(--m-p); }
+.dial-glyph.is-sun { fill: var(--m-c); }
+
+.dial-band { stroke: var(--text); stroke-linecap: round; opacity: .92; }
+.dial-rib { stroke: var(--bg); stroke-width: 1.2; opacity: .38; }
+.dial-knob { fill: var(--text); }
+.dial-knob-glyph { fill: var(--bg); font-size: 11px; pointer-events: none; }
+.sleep-dial.is-dragging .dial-band { opacity: 1; }
+.sleep-dial.is-dragging .dial-knob { fill: var(--accent); }
+
+.sched-dur {
+  text-align: center; font-size: 23px; font-weight: 600;
+  margin-top: 8px; font-variant-numeric: tabular-nums;
+}
+.sched-verdict { text-align: center; font-size: 12.5px; color: var(--dim); margin-top: 4px; line-height: 1.45; }
+.sched-verdict.is-good { color: var(--good); }
+
+:root[data-theme="light"] .dial-band { stroke: var(--text); }
+:root[data-theme="light"] .dial-rib { stroke: #fff; opacity: .5; }
+
+.caff-card { cursor: pointer; }
+.caff-card .caff-row:last-child { border-bottom: 0; }
+.fine.is-good { color: var(--good); }
+.fine.is-plain { color: var(--muted); }
+.caff-row .micro { margin-top: 2px; }

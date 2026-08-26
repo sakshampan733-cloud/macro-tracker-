@@ -115,10 +115,16 @@ function dayShape(store, key, now) {
   const rows = store.whoop?.rows || {};
   const today = rows[key];
 
+  /* A hand-set schedule is the fallback for anyone without a strap. It is
+     a worse measurement than a watch and a far better one than none — and
+     without it every wake-relative rule below simply never fires, which is
+     how the coach ended up silent for people wearing nothing. */
+  const sched = store.settings?.sleepGoal;
   const wakeHour = today?.wakeHour ?? (() => {
     const past = Object.entries(rows).sort().slice(-14)
       .map(([, r]) => r.wakeHour).filter(h => h != null);
-    return past.length >= 3 ? past.reduce((a, b) => a + b, 0) / past.length : null;
+    if (past.length >= 3) return past.reduce((a, b) => a + b, 0) / past.length;
+    return sched?.wake ?? null;
   })();
 
   /* Their own bedtime, not a rule of thumb: wake hour minus however long
@@ -126,7 +132,8 @@ function dayShape(store, key, now) {
   const sleeps = Object.entries(rows).sort().slice(-14)
     .map(([, r]) => r.sleepH).filter(v => v > 0);
   const typicalSleep = sleeps.length
-    ? sleeps.reduce((a, b) => a + b, 0) / sleeps.length : 7.5;
+    ? sleeps.reduce((a, b) => a + b, 0) / sleeps.length
+    : (sched ? ((sched.wake - sched.bed) + 24) % 24 : 7.5);
 
   const hour = now.getHours() + now.getMinutes() / 60;
   const awake = wakeHour == null ? null
@@ -154,7 +161,9 @@ function fmtClock(h) {
 export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
   const w = strainPicture(store, key);
   const row = store.whoop?.rows?.[key];
-  if (!w && !row) return [];              // no strap data: say nothing
+  /* A schedule is enough to reason about the clock, even with no strap:
+     the wake-relative rules only need to know when the day started. */
+  if (!w && !row && !store.settings?.sleepGoal) return [];
 
   const t = totals(key);
   const tm = timing(key, now);
