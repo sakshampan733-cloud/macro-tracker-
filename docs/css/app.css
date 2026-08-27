@@ -2540,3 +2540,48 @@ ol.steps li b { color: var(--text); font-weight: 600; }
   background: none; color: var(--muted);
 }
 .supp-info:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── Pull to refresh ────────────────────────────────────────────────
+   Sits above the scroller and is dragged into view by the gesture. */
+.ptr {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 6px);
+  left: 50%;
+  margin-left: -17px;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  backdrop-filter: saturate(170%) blur(20px);
+  -webkit-backdrop-filter: saturate(170%) blur(20px);
+  opacity: 0;
+  transform: translateY(-40px);
+  z-index: 40;
+  pointer-events: none;
+}
+.ptr-ring {
+  width: 18px; height: 18px;
+  border-radius: 999px;
+  border: 2px solid var(--line-2);
+  position: relative;
+}
+/* The arc fills clockwise as you pull, so the gesture shows its own
+   progress rather than making you guess when it will fire. */
+.ptr-arc {
+  position: absolute; inset: -2px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  border-top-color: var(--accent);
+  transform: rotate(calc(var(--turn, 0) * 360deg));
+}
+.ptr.is-ready .ptr-ring { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.ptr.is-busy .ptr-arc {
+  animation: ptr-spin .7s linear infinite;
+  border-top-color: var(--accent);
+}
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ptr.is-busy .ptr-arc { animation-duration: 1.6s; }
+}

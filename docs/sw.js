@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.08.27-wearable';
+const CACHE = 'basal-2026.08.27-pull';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -17,6 +17,7 @@ const SHELL = [
   'js/swipe.js',
   'js/search.js',
   'js/views/planner.js',
+  'js/pulltorefresh.js',
   'js/views/starbucks.js', 'js/data/starbucks.js',
   'js/views/restaurant.js', 'js/data/restaurants.js',
   'js/views/medication.js', 'js/data/medications.js',

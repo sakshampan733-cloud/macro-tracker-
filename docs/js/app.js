@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.27-wearable';
+export const VERSION = '2026.08.27-pull';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
@@ -20,6 +20,7 @@ import { renderFoods } from './views/foods.js';
 import { renderOnboarding, renderSettings } from './views/setup.js';
 import { autoSyncWhoop } from './views/body.js';
 import { installFeedback } from './feedback.js';
+import { installPullToRefresh, refreshEverything } from './pulltorefresh.js';
 import { startReminders } from './reminders.js';
 import { applyOrb } from './theme.js';
 import { installSwipe } from './swipe.js';
@@ -296,6 +297,11 @@ addEventListener('visibilitychange', () => { if (document.visibilityState === 'h
 
 installFeedback();
 startReminders();
+
+/* Pull down at the top of any screen to re-sync the band and pick up a new
+   build. A service-worker app otherwise waits for every tab to close
+   before a new version takes over, which on a phone can be days. */
+installPullToRefresh(scroller, () => refreshEverything({ redraw: () => draw() }));
 maybeShowGuide();
 
 /*
