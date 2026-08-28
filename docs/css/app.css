@@ -2585,3 +2585,8 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) {
   .ptr.is-busy .ptr-arc { animation-duration: 1.6s; }
 }
+
+/* A pressed source tag: the panel is filtered to it. */
+.src-tag.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.src-tag.is-apple.is-on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+button.src-tag { cursor: pointer; }

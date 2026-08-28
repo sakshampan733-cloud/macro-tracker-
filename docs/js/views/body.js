@@ -284,6 +284,20 @@ const notReadyNote = r =>
  * same night as six with normal deep and REM, and a single number hides
  * that completely.
  */
+/* A source tag you can press to narrow the panel to that band. */
+function srcChip(which, label, current, ctx) {
+  const on = current === which;
+  return el('button.micro.src-tag' + (which === 'apple' ? '.is-apple' : '') + (on ? '.is-on' : ''), {
+    'aria-pressed': String(on),
+    title: on ? 'Show every source' : `Show only ${label}`,
+    onclick: () => {
+      commit(st => { st.settings.vitalsSource = on ? 'all' : which; }, 'settings');
+      haptic('tap');
+      ctx.refresh();
+    },
+  }, label);
+}
+
 function vitalsSection(s, ctx) {
   const sum = summary(s.whoop);
 
@@ -530,6 +544,16 @@ function vitalsSection(s, ctx) {
     ['steps',  'var(--m-p)'],
   ];
 
+  /*
+   * Which band's readings to show.
+   *
+   * On two bands the panel is a mix, and "which of these came off which
+   * wrist" is a real question — particularly when the answer decides
+   * whether a number is comparable to yesterday's. Tapping a source tag
+   * narrows the list to it; tapping again clears.
+   */
+  const srcFilter = s.settings?.vitalsSource || 'all';
+
   const vitalRows = [];
   const vitalKeys = new Set();
   const srcSeen = new Set();
@@ -538,24 +562,37 @@ function vitalsSection(s, ctx) {
        on an Apple Watch is not missing data, it is a category error. */
     if (!canMeasure(key)) continue;
     const pts = seriesFor(s.whoop, key, 30);
-    if (pts.length < 4) continue;
+    /* One reading is enough to show. Requiring four before the row would
+       appear at all meant somebody who had just connected an Apple Watch
+       imported a day, saw nothing, and reasonably concluded it had failed
+       — the number was there the whole time, waiting for a quorum. */
+    if (!pts.length) continue;
     const info = METRICS[key];
-    const st30 = stats(pts.map(p => p.v));
-    if (!st30) continue;
     const latest = pts[pts.length - 1].v;
 
-    /* Against your own middle half, not a population range. Outside it is
-       worth a word; inside it is the answer "normal", which is usually the
-       one you were looking for. */
+    /*
+     * "Above usual" needs a usual to be above. Under four readings there
+     * is no distribution worth comparing against, so it says how many
+     * readings it has instead of inventing a verdict.
+     */
     let where = 'usual', tone = '';
-    if (latest > st30.p75) { where = 'above usual'; tone = info.good === 'high' ? 'is-good' : info.good === 'low' ? 'is-warn' : ''; }
-    else if (latest < st30.p25) { where = 'below usual'; tone = info.good === 'low' ? 'is-good' : info.good === 'high' ? 'is-warn' : ''; }
+    const st30 = pts.length >= 4 ? stats(pts.map(p => p.v)) : null;
+    if (!st30) {
+      where = pts.length === 1 ? 'first reading' : `${pts.length} readings`;
+    } else if (latest > st30.p75) {
+      where = 'above usual'; tone = info.good === 'high' ? 'is-good' : info.good === 'low' ? 'is-warn' : '';
+    } else if (latest < st30.p25) {
+      where = 'below usual'; tone = info.good === 'low' ? 'is-good' : info.good === 'high' ? 'is-warn' : '';
+    }
 
     vitalKeys.add(key);
     /* Which band this particular row came off. Judged per metric, because
        for someone wearing both the answer genuinely differs by row. */
     const from = sourceForMetric(s, key);
     if (from) srcSeen.add(from);
+    /* Filtered after the source is counted, so the tags still show every
+       band you own rather than only the one you are looking at. */
+    if (srcFilter !== 'all' && from && from !== srcFilter) continue;
 
     vitalRows.push(el('button.vital' + (from === 'apple' ? '.from-apple' : ''), {
       onclick: () => openMetric(s, key, ctx),
@@ -615,8 +652,8 @@ function vitalsSection(s, ctx) {
         el('h3', {}, 'Vitals'),
         src === 'both' && mode === 'both'
           ? el('div.flex', { style: { gap: '6px' } },
-              el('span.micro.src-tag', {}, 'Whoop'),
-              el('span.micro.src-tag.is-apple', {}, 'Apple'))
+              srcChip('whoop', 'Whoop', srcFilter, ctx),
+              srcChip('apple', 'Apple', srcFilter, ctx))
           /* Someone who says they wear nothing but still has imported data
              gets a neutral label — naming a band they told us they do not
              own is the thing this whole pass exists to stop. */
@@ -624,7 +661,11 @@ function vitalsSection(s, ctx) {
               mode === 'none' || !mode ? 'imported'
                 : src === 'apple' ? 'Apple Watch' : bandName())),
       ...vitalRows,
-      note ? el('div.vital-note', {}, note) : null));
+      srcFilter !== 'all'
+        ? el('div.vital-note', {},
+            `Showing only what ${srcFilter === 'apple' ? 'your Apple Watch' : 'your Whoop'} `
+            + 'measures. Tap the tag again for everything.')
+        : (note ? el('div.vital-note', {}, note) : null)));
   }
 
   /* ── the fortnight, at a glance ── */
