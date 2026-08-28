@@ -621,7 +621,10 @@ function vitalsSection(s, ctx) {
   const listWords = xs => xs.length < 2 ? (xs[0] || '')
     : xs.slice(0, -1).join(', ') + ' or ' + xs[xs.length - 1];
 
-  if (vitalRows.length) {
+  /* Render the panel when there is something to show OR when a filter is
+     on — otherwise choosing Apple with no Apple data made the whole panel
+     disappear, taking the chips that would let you choose again with it. */
+  if (vitalRows.length || srcFilter !== 'all') {
     /* Which band these numbers came off. The two sources are never blended
        — an Apple import is refused outright while Whoop data is present,
        because Whoop's HRV is RMSSD and Apple's is SDNN and averaging them
@@ -658,7 +661,11 @@ function vitalsSection(s, ctx) {
     wrap.append(el('div.tile.flush.vitals', {},
       el('div.vitals-head', {},
         el('h3', {}, 'Vitals'),
-        src === 'both' && mode === 'both'
+        /* Both chips appear whenever you have declared both bands, not only
+           once data from both has arrived. They were vanishing at exactly
+           the moment you needed them — when one band had sent nothing and
+           you wanted to look at it to find out why. */
+        mode === 'both'
           ? el('div.flex', { style: { gap: '6px' } },
               srcChip('whoop', 'Whoop', srcFilter, ctx),
               srcChip('apple', 'Apple', srcFilter, ctx))
@@ -669,6 +676,13 @@ function vitalsSection(s, ctx) {
               mode === 'none' || !mode ? 'imported'
                 : src === 'apple' ? 'Apple Watch' : bandName())),
       ...vitalRows,
+      !vitalRows.length && srcFilter !== 'all'
+        ? el('div.vital-note', {},
+            `Nothing from ${srcFilter === 'apple' ? 'your Apple Watch' : 'your Whoop'} yet. `
+            + (srcFilter === 'apple'
+                ? 'Run the Shortcut on your phone, then pull from the relay in Settings.'
+                : 'Connect Whoop or import an export.'))
+        : null,
       srcFilter !== 'all'
         ? el('div.vital-note', {},
             `Showing only what ${srcFilter === 'apple' ? 'your Apple Watch' : 'your Whoop'} `

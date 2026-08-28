@@ -171,11 +171,31 @@ function toDay(v) {
   return '';
 }
 
+/*
+ * A number as a phone writes it.
+ *
+ * Shortcuts formats its results for display before putting them in a JSON
+ * field, so a step count arrives as "9,412" and a heart rate can arrive as
+ * "55 bpm". Number() returns NaN for both, and the field was then dropped
+ * without a word — the day imported, empty, and looked like the watch had
+ * recorded nothing.
+ */
+function num(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (v == null) return null;
+  /* Keep digits, one decimal point and a leading minus; discard grouping
+     separators, units and stray spaces. */
+  const cleaned = String(v).replace(/[^0-9.\-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.') return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
 function clean(row) {
   const out = {};
   for (const f of FIELDS) {
-    const v = Number(row[f]);
-    if (Number.isFinite(v) && v >= 0) out[f] = v;
+    const v = num(row[f]);
+    if (v != null && v >= 0) out[f] = v;
   }
   return out;
 }
