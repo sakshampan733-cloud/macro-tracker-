@@ -56,6 +56,9 @@ const EMPTY = () => ({
   meals: {},
   supplementsTaken: [],     // which supplement ids the user actually takes
   medications: [],          // prescriptions, kept apart from supplements
+  /* What the watch recorded, kept whole and separate from the merged
+     whoop rows so "show me only Apple" has something to show. */
+  appleHealth: { rows: {}, importedAt: null },
   favourites: [],           // food ids starred for the top of the list
   hidden: [],               // refs you never want suggested again
   blood: {},                // blood panels, keyed by id

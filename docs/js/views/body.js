@@ -28,7 +28,7 @@ import { sleepTile, sleepSchedule, sleepHours } from './sleep.js';
 import { weightUnit, kgToLb, lbToKg, showWeight } from '../units.js';
 import {
   existingSource, sourceForMetric, healthSource, setHealthSource, canMeasure, bandName,
-  relayBase,
+  relayBase, rowsFor,
 } from '../applehealth.js';
 import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
@@ -554,14 +554,25 @@ function vitalsSection(s, ctx) {
    */
   const srcFilter = s.settings?.vitalsSource || 'all';
 
+  /*
+   * Read from the band you asked for rather than filtering the merge.
+   *
+   * Narrowing the merged rows only ever showed what the merge had already
+   * decided to keep — which on two bands is Whoop for everything except
+   * steps, so tapping Apple showed one row and looked broken. Reading the
+   * band's own store instead answers the question actually being asked:
+   * what did this watch record.
+   */
+  const viewRows = { rows: rowsFor(s, srcFilter) };
+
   const vitalRows = [];
   const vitalKeys = new Set();
   const srcSeen = new Set();
   for (const [key, colour] of VITALS) {
     /* Do not offer a row the hardware cannot produce. An empty Recovery
        on an Apple Watch is not missing data, it is a category error. */
-    if (!canMeasure(key)) continue;
-    const pts = seriesFor(s.whoop, key, 30);
+    if (!canMeasure(key, srcFilter === 'all' ? null : srcFilter)) continue;
+    const pts = seriesFor(viewRows, key, 30);
     /* One reading is enough to show. Requiring four before the row would
        appear at all meant somebody who had just connected an Apple Watch
        imported a day, saw nothing, and reasonably concluded it had failed
@@ -588,11 +599,8 @@ function vitalsSection(s, ctx) {
     vitalKeys.add(key);
     /* Which band this particular row came off. Judged per metric, because
        for someone wearing both the answer genuinely differs by row. */
-    const from = sourceForMetric(s, key);
-    if (from) srcSeen.add(from);
-    /* Filtered after the source is counted, so the tags still show every
-       band you own rather than only the one you are looking at. */
-    if (srcFilter !== 'all' && from && from !== srcFilter) continue;
+    const from = srcFilter === 'all' ? sourceForMetric(s, key) : srcFilter;
+    if (srcFilter === 'all' && from) srcSeen.add(from);
 
     vitalRows.push(el('button.vital' + (from === 'apple' ? '.from-apple' : ''), {
       onclick: () => openMetric(s, key, ctx),

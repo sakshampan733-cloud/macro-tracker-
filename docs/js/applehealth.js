@@ -280,6 +280,38 @@ export async function syncApple({ relay, key } = {}) {
         ...take,
       };
 
+      /*
+       * Everything Apple sent, kept whole and separately.
+       *
+       * The merged row above deliberately drops most of it when you wear
+       * both bands — Whoop measures those things better and averaging two
+       * HRV scales would corrupt the trend. But dropping it from the
+       * merge is not a reason to discard it: "show me what my watch
+       * actually recorded" is a fair question, and it had no answer
+       * because the numbers were thrown away on arrival.
+       *
+       * So the merge stays exactly as careful as it was, and this keeps
+       * the raw readings alongside for the Apple view to read.
+       */
+      s.appleHealth = s.appleHealth || { rows: {}, importedAt: null };
+      const prevApple = s.appleHealth.rows[r.date] || {};
+      const raw = { date: r.date, src: 'apple' };
+      const keep = (field, value) => { if (value != null) raw[field] = value; };
+      keep('steps', r.steps);
+      keep('rhr', r.rhr);
+      keep('hrv', r.hrv);
+      keep('sleepH', r.sleepH);
+      keep('remH', r.remH);
+      keep('swsH', r.swsH ?? r.deepH);
+      keep('kcal', kcal);
+      keep('spo2', r.spo2);
+      keep('resp', r.resp);
+      keep('temp', r.temp);
+      keep('vo2max', r.vo2max);
+      keep('weightKg', r.weightKg);
+      s.appleHealth.rows[r.date] = { ...prevApple, ...raw };
+      s.appleHealth.importedAt = Date.now();
+
       /* A weigh-in is not a vital sign — it belongs on the day, where the
          trend line and the adaptive TDEE read it from. Never overwrite a
          weight already entered by hand. */
@@ -335,4 +367,30 @@ export async function autoSyncApple() {
   const r = await syncApple({});
   commit(st => { st.settings.healthPulledAt = Date.now(); }, 'settings');
   return !!(r && r.ok && r.days);
+}
+
+/*
+ * The rows one band alone recorded.
+ *
+ * 'apple' is what the watch sent, untouched by the merge. 'whoop' is the
+ * merged store with anything Apple contributed taken back out, so the
+ * Whoop view never shows a step count Whoop cannot measure. Anything else
+ * is the merged view, which is the one the rest of the app reasons from.
+ */
+export function rowsFor(store, which) {
+  if (which === 'apple') return store.appleHealth?.rows || {};
+  const rows = store.whoop?.rows || {};
+  if (which !== 'whoop') return rows;
+
+  const out = {};
+  for (const [date, row] of Object.entries(rows)) {
+    const by = row.by || {};
+    const kept = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (by[k] === 'apple') continue;      /* Apple filled this one in */
+      kept[k] = v;
+    }
+    out[date] = kept;
+  }
+  return out;
 }
