@@ -56,7 +56,11 @@ function corsHeaders(request, env) {
   return {
     'Access-Control-Allow-Origin': ok ? origin : DEFAULT_ORIGINS[0],
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    /* x-basal-key is how the Apple endpoints authenticate, and a browser
+       will not send a header the preflight did not permit. Omitting it
+       meant the app could never reach /apple/pull while curl and the
+       Shortcut both could — neither of those does a preflight. */
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, x-basal-key',
     'Access-Control-Max-Age': '86400',
   };
 }
