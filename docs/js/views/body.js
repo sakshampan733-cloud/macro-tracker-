@@ -28,6 +28,7 @@ import { sleepTile, sleepSchedule, sleepHours } from './sleep.js';
 import { weightUnit, kgToLb, lbToKg, showWeight } from '../units.js';
 import {
   existingSource, sourceForMetric, healthSource, setHealthSource, canMeasure, bandName,
+  relayBase,
 } from '../applehealth.js';
 import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
@@ -846,7 +847,10 @@ export function openWhoopRelay(ctx) {
       el('div.btn-row', {},
         el('button.btn', {
           onclick: async () => {
-            const v = urlInput.value.trim().replace(/\/+$/, '');
+            /* Normalise before testing, so a pasted bare host or a stray
+               newline is fixed rather than saved and failed on later. */
+            const v = relayBase(urlInput.value);
+            if (!v) { toast('That is not a usable web address.', 'err'); return; }
             const res = await checkRelay(v);
             if (!res.ok) { toast(res.error, 'err'); return; }
             commit(st => { st.settings.relayUrl = v; });

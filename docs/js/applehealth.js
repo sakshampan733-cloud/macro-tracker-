@@ -41,8 +41,32 @@ export function forgetHealthKey() {
 }
 
 /* The endpoint your Shortcut posts to. */
+/*
+ * A relay address, tidied.
+ *
+ * Pasted addresses arrive with trailing newlines, stray spaces from a
+ * share sheet, and often no scheme at all. fetch() rejects all of that
+ * with "The string did not match the expected pattern", which tells the
+ * person nothing about which string or which pattern.
+ */
+export function relayBase(relay) {
+  let base = String(relay ?? get().settings?.relayUrl ?? '')
+    .replace(/[\s\u200B-\u200D\uFEFF]+/g, '')   /* spaces, newlines, zero-widths */
+    .replace(/\/+$/, '');
+  if (!base) return '';
+  /* A bare host is what people paste when they copy from a dashboard. */
+  if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
+  try {
+    const u = new URL(base);
+    /* A hostname with no dot in it is not a relay, it is a typo — "hello
+       world" survives URL parsing perfectly happily otherwise. */
+    if (!u.hostname.includes('.')) return '';
+    return u.origin;
+  } catch { return ''; }
+}
+
 export function pushUrl(relay) {
-  const base = (relay || get().settings?.relayUrl || '').replace(/\/+$/, '');
+  const base = relayBase(relay);
   return base ? `${base}/apple/push` : null;
 }
 
@@ -164,9 +188,12 @@ export function existingSource(store) {
  */
 export async function syncApple({ relay, key } = {}) {
   const store = get();
-  const base = (relay || store.settings?.relayUrl || '').replace(/\/+$/, '');
+  const base = relayBase(relay);
   const k = key || healthKey();
-  if (!base) return { ok: false, error: 'No relay address set.' };
+  if (!base) {
+    return { ok: false, error: 'No relay address set, or the one saved is not a '
+      + 'usable web address. Set it under Whoop live sync.' };
+  }
   if (!k) return { ok: false, error: 'No health key yet — generate one first.' };
 
   /* Both bands is a supported setup, not a conflict — but it means Apple
@@ -191,7 +218,9 @@ export async function syncApple({ relay, key } = {}) {
     if (!r.ok) return { ok: false, error: `The relay answered ${r.status}.` };
     payload = await r.json();
   } catch (e) {
-    return { ok: false, error: 'Could not reach the relay. ' + e.message };
+    return { ok: false,
+      error: `Could not reach ${base}/apple/pull — ${e.message}. `
+           + 'Check the relay address under Whoop live sync.' };
   }
 
   const rows = payload.rows || [];
