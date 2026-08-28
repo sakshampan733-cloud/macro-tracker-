@@ -2590,3 +2590,6 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 .src-tag.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
 .src-tag.is-apple.is-on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 button.src-tag { cursor: pointer; }
+
+.src-tag.is-both.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.vitals-head .flex { flex-wrap: wrap; justify-content: flex-end; }

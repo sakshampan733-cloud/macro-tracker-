@@ -284,14 +284,24 @@ const notReadyNote = r =>
  * same night as six with normal deep and REM, and a single number hides
  * that completely.
  */
-/* A source tag you can press to narrow the panel to that band. */
+/*
+ * Which band's readings the panel shows.
+ *
+ * Three states, all of them a button. "Both" was previously the state you
+ * reached by having no chip selected, which is not a state anybody can
+ * find — you could get out of it and then not back into it. A mode you
+ * cannot name on screen is a mode that does not exist.
+ */
 function srcChip(which, label, current, ctx) {
   const on = current === which;
-  return el('button.micro.src-tag' + (which === 'apple' ? '.is-apple' : '') + (on ? '.is-on' : ''), {
+  return el('button.micro.src-tag'
+      + (which === 'apple' ? '.is-apple' : which === 'all' ? '.is-both' : '')
+      + (on ? '.is-on' : ''), {
     'aria-pressed': String(on),
-    title: on ? 'Show every source' : `Show only ${label}`,
+    title: which === 'all' ? 'Whoop, plus the steps only Apple counts' : `Show only ${label}`,
     onclick: () => {
-      commit(st => { st.settings.vitalsSource = on ? 'all' : which; }, 'settings');
+      if (on) return;                     /* already showing it */
+      commit(st => { st.settings.vitalsSource = which; }, 'settings');
       haptic('tap');
       ctx.refresh();
     },
@@ -666,7 +676,8 @@ function vitalsSection(s, ctx) {
            the moment you needed them — when one band had sent nothing and
            you wanted to look at it to find out why. */
         mode === 'both'
-          ? el('div.flex', { style: { gap: '6px' } },
+          ? el('div.flex', { style: { gap: '5px' } },
+              srcChip('all', 'Both', srcFilter, ctx),
               srcChip('whoop', 'Whoop', srcFilter, ctx),
               srcChip('apple', 'Apple', srcFilter, ctx))
           /* Someone who says they wear nothing but still has imported data
@@ -683,11 +694,7 @@ function vitalsSection(s, ctx) {
                 ? 'Run the Shortcut on your phone, then pull from the relay in Settings.'
                 : 'Connect Whoop or import an export.'))
         : null,
-      srcFilter !== 'all'
-        ? el('div.vital-note', {},
-            `Showing only what ${srcFilter === 'apple' ? 'your Apple Watch' : 'your Whoop'} `
-            + 'measures. Tap the tag again for everything.')
-        : (note ? el('div.vital-note', {}, note) : null)));
+      srcFilter === 'all' && note ? el('div.vital-note', {}, note) : null));
   }
 
   /* ── the fortnight, at a glance ── */
