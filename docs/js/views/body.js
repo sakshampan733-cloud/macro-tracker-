@@ -41,12 +41,21 @@ export function renderBody(root, ctx) {
     (root.classList.add('stagger'), el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Body'),
       el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report'))),
+    /*
+     * The band's readings lead.
+     *
+     * They are what changed overnight and what you opened this tab to
+     * look at. Weight, maintenance and the rest are review — true all
+     * week, and none of it moves while you are reading it. Putting the
+     * weigh-in first meant scrolling past a number you already knew to
+     * reach the one you did not.
+     */
+    vitalsSection(s, ctx),
     checkInTile(s, ctx),
     weightTile(ctx),
     tdeeTile(s),
     calibrationTile(s) || el('div'),
     bloodTile(s, ctx),
-    vitalsSection(s, ctx),
     correlationTile(s),
   );
 }
