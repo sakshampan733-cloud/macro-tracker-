@@ -96,6 +96,52 @@ const FIELDS = ['rhr', 'hrv', 'sleepH', 'remH', 'swsH', 'deepH',
                 'kcal', 'activeKcal', 'steps', 'weightKg', 'vo2max',
                 'spo2', 'resp', 'temp'];
 
+/*
+ * Whatever the phone calls today.
+ *
+ * The push endpoint used to demand a literal yyyy-MM-dd and silently skip
+ * anything else, which meant every user had to find the date-format panel
+ * in Shortcuts and type a format string correctly. Most did not, and the
+ * failure looked like success: ok true, written zero.
+ *
+ * A date is not ambiguous enough to be worth that. Normalise here instead
+ * and accept ISO, ISO with a time on it, and the slash and dot formats
+ * phones actually produce.
+ *
+ * Day-first where it is genuinely ambiguous: this is used in India, where
+ * 08/09 means the eighth of September. Where one number is above twelve it
+ * decides itself and no assumption is needed.
+ */
+function toDay(v) {
+  if (v == null) return '';
+  const s = String(v).trim();
+
+  /* 2026-08-27, with or without a time after it. */
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+
+  /* 27/08/2026, 27-08-26, 27.08.2026 */
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if (m) {
+    let [, a, b, y] = m;
+    if (y.length === 2) y = '20' + y;
+    let day = +a, mon = +b;
+    /* A number above twelve can only be the day, whatever the locale. */
+    if (mon > 12 && day <= 12) { const t = day; day = mon; mon = t; }
+    if (mon >= 1 && mon <= 12 && day >= 1 && day <= 31) {
+      return `${y}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  /* Anything else the runtime can parse — "27 August 2026 at 14:37". */
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+  }
+  return '';
+}
+
 function clean(row) {
   const out = {};
   for (const f of FIELDS) {
@@ -164,9 +210,15 @@ export default {
 
         const rows = Array.isArray(body) ? body : [body];
         let written = 0;
+        const skipped = [];
         for (const row of rows) {
-          const date = String(row.date || '').slice(0, 10);
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+          const date = toDay(row.date);
+          if (!date) {
+            /* Say what arrived. A silent skip that still reports ok is the
+               worst possible answer — it looks like success. */
+            skipped.push(String(row.date ?? '(no date field)').slice(0, 40));
+            continue;
+          }
           /* Merge rather than replace: a Shortcut that only sends sleep
              must not wipe the heart rate an earlier one sent. */
           const prevRaw = await env.HEALTH.get(`${key}:${date}`);
@@ -177,7 +229,10 @@ export default {
             { expirationTtl: 60 * 60 * 24 * 400 });   // a year and a bit
           written++;
         }
-        return json({ ok: true, written }, request, env);
+        return json(skipped.length
+          ? { ok: true, written, skipped,
+              error: 'Could not read those as dates. Send date as yyyy-MM-dd.' }
+          : { ok: true, written }, request, env);
       }
 
       if (path === '/apple/pull') {
