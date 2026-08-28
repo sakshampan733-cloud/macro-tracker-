@@ -133,8 +133,33 @@ function toDay(v) {
     }
   }
 
-  /* Anything else the runtime can parse — "27 August 2026 at 14:37". */
-  const d = new Date(s);
+  /*
+   * Month names, which is what Shortcuts actually sends: "29 Aug 2026 at
+   * 4:04 AM". The word "at" is the part no Date parser copes with, and it
+   * is not optional in Apple's medium format — so read the pieces directly
+   * rather than hoping a parser gets there.
+   */
+  const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun',
+                  'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const monthOf = w => MONTHS.indexOf(String(w).slice(0, 3).toLowerCase()) + 1;
+
+  /* "29 Aug 2026", "29 August 2026 at 4:04 AM" */
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,})\.?,?\s+(\d{4})/);
+  if (m) {
+    const mon = monthOf(m[2]);
+    if (mon) return `${m[3]}-${String(mon).padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+
+  /* "Aug 29, 2026", "August 29 2026 at 4:04 AM" */
+  m = s.match(/^([A-Za-z]{3,})\.?\s+(\d{1,2}),?\s+(\d{4})/);
+  if (m) {
+    const mon = monthOf(m[1]);
+    if (mon) return `${m[3]}-${String(mon).padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+  }
+
+  /* Last resort: hand it to the runtime with the "at" taken out, since
+     that single word is what defeats an otherwise capable parser. */
+  const d = new Date(s.replace(/\s+at\s+/i, ' '));
   if (!Number.isNaN(d.getTime())) {
     const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
     return local.toISOString().slice(0, 10);
