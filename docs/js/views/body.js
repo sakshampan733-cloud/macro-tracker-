@@ -51,7 +51,7 @@ export function renderBody(root, ctx) {
      * weigh-in first meant scrolling past a number you already knew to
      * reach the one you did not.
      */
-    sourceBar(s, ctx),
+    sourceBar(s, ctx) || el('div'),
     vitalsSection(s, ctx),
     checkInTile(s, ctx),
     weightTile(ctx),
@@ -219,24 +219,55 @@ function tdeeTile(s) {
   if (!s.profile) return el('div');
   const best = bestTDEE(s, s.profile);
   const adaptive = adaptiveTDEE(s);
-  const whoop = whoopTDEE(s);
   const predicted = predictedTDEE(s.profile);
+
+  /*
+   * The burn row follows the band you are looking at.
+   *
+   * This tile always said "Whoop", including on the Apple view, where the
+   * number underneath it had been measured by an Apple Watch. The label
+   * was hard-coded to the declared setup rather than read from the data,
+   * so the one card whose entire job is to say where your maintenance
+   * figure comes from was the card getting it wrong.
+   */
+  const mode = healthSource();
+  const pick = effectivePick(s);
+  const scopedRows = mode === 'both' && pick !== 'all' ? rowsFor(s, pick) : null;
+  const whoop = whoopTDEE(s, 14, scopedRows);
+
+  const bandLabel =
+    mode === 'apple' ? 'Apple Watch'
+    : mode === 'whoop' ? 'Whoop'
+    : mode === 'both'
+      ? (pick === 'apple' ? 'Apple Watch' : pick === 'whoop' ? 'Whoop' : 'Whoop + Apple')
+      : 'Your band';
+
+  /* Said from the counted provenance, not from the setting: on both bands
+     the merge keeps Whoop's burn and never averages the two, and this is
+     the sentence that tells you so. */
+  const bandNote = !whoop.ready ? 'Device-measured daily burn'
+    : whoop.fromApple && whoop.fromWhoop
+      ? `${whoop.fromWhoop} days from Whoop, ${whoop.fromApple} from Apple. Never averaged.`
+    : whoop.fromApple
+      ? `Measured by your Apple Watch over ${whoop.days} days`
+      : mode === 'both' && pick === 'all'
+        ? `Whoop measured all ${whoop.days} days, so Whoop is the one in use`
+        : `Measured by your ${bandLabel} over ${whoop.days} days`;
 
   const rows = [
     { key: 'adaptive', label: 'Adaptive', note: 'From your own intake and weight trend', res: adaptive },
-    /* The device row is named after whatever device you actually declared,
-       and reads neutrally when you declared none. */
-    { key: 'whoop',
-      label: healthSource() === 'apple' ? 'Apple Health'
-        : healthSource() === 'whoop' || healthSource() === 'both' ? 'Whoop'
-        : 'Your band',
-      note: 'Device-measured daily burn', res: whoop },
+    { key: 'whoop', label: bandLabel, note: bandNote, res: whoop },
     { key: 'predicted', label: 'Formula', note: predicted.method, res: predicted },
   ];
 
+  /* "in use: whoop" was a variable name showing through to the reader. */
+  const inUseName = best.source === 'whoop' ? bandLabel
+    : best.source === 'adaptive' ? 'Adaptive'
+    : best.source === 'predicted' ? 'Formula' : best.source;
+
   return el('div.tile', {},
     el('div.tile-head', {}, el('h3', {}, 'Maintenance calories'),
-      el('span.micro', {}, 'in use: ' + best.source)),
+      el('span.micro', {}, 'in use: ' + inUseName)),
 
     el('div.tile.flush', { style: { margin: 0, border: '1px solid var(--line)' } },
       ...rows.map(r => {
@@ -266,7 +297,9 @@ function tdeeTile(s) {
 const notReadyNote = r =>
   r.key === 'adaptive'
     ? `Needs ${r.res.need.intakeDays} logged days and ${r.res.need.weighIns} weigh-ins`
-    : r.key === 'whoop' ? 'Import your Whoop export to enable' : '';
+    : r.key === 'whoop'
+      ? `Needs 5 days of measured burn — there ${r.res.have === 1 ? 'is' : 'are'} ${r.res.have || 0}`
+      : '';
 
 /* ── Vitals ─────────────────────────────────────────────────────────── */
 
@@ -313,6 +346,19 @@ function sourceBar(s, ctx) {
       srcChip('apple', 'Apple', cur, ctx)));
 }
 
+/*
+ * Which band this tab is showing, given what you actually wear.
+ *
+ * The stored setting is only meaningful on two bands. With one, the band
+ * you own is the answer and the setting is ignored rather than obeyed.
+ */
+function effectivePick(s) {
+  const mode = healthSource();
+  if (mode === 'apple') return 'apple';
+  if (mode === 'both') return s.settings?.vitalsSource || 'all';
+  return 'all';
+}
+
 function srcChip(which, label, current, ctx) {
   const on = current === which;
   return el('button.micro.src-tag'
@@ -329,10 +375,126 @@ function srcChip(which, label, current, ctx) {
   }, label);
 }
 
+/*
+ * The Health-app categories, and which of Apple's readings sit in each.
+ *
+ * The grouping is Apple's own, not one invented here: blood oxygen is
+ * filed under Respiratory in Health rather than under Heart, and wrist
+ * temperature under Body Measurements. Somebody checking this against
+ * their own phone should find the same reading in the same place.
+ */
+const APPLE_CARDS = [
+  ['steps',  'Activity',          '#FC7A2E', 'steps'],
+  ['kcal',   'Activity',          '#FA3E5B', 'flame'],
+  ['rhr',    'Heart',             '#FF375F', 'heart'],
+  ['hrv',    'Heart',             '#FF375F', 'heart'],
+  ['sleepH', 'Sleep',             '#37B9E8', 'bed'],
+  ['spo2',   'Respiratory',       '#4ED9C6', 'lungs'],
+  ['resp',   'Respiratory',       '#4ED9C6', 'lungs'],
+  ['temp',   'Body Measurements', '#A85CFF', 'thermo'],
+];
+
+function appleVitals(s, ctx, scoped, sum) {
+  const latestKey = Object.keys(scoped.rows || {}).sort().pop();
+  const today = scoped.rows?.[latestKey] || {};
+
+  const wrap = el('div.ah', {},
+    el('div.between', { style: { marginBottom: '12px' } },
+      el('div', {},
+        el('h2.ah-title', {}, 'Health'),
+        el('div.micro', {}, `Apple Watch · ${latestKey}`)),
+      el('button.btn.sm.ghost', { onclick: () => openWhoopRelay(ctx) }, 'Sync')));
+
+  const cards = [];
+  for (const [key, category, colour, glyph] of APPLE_CARDS) {
+    const info = sum.metrics[key];
+    if (!info?.latest) continue;                 /* never a blank card */
+    const pts = seriesFor(scoped, key, 30);
+    const value = info.latest.v;
+
+    const card = el('div.ah-card.tappable', {
+      role: 'button', tabIndex: 0,
+      style: { '--ah': colour },
+      'aria-label': `${info.label}, ${value} ${info.unit}, from Apple Health`,
+      onclick: () => openMetric(s, key, ctx),
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, key, ctx); } },
+    },
+      el('div.between', {},
+        el('span.ah-cat', {}, icon(glyph, 15), category),
+        el('span.flex', {},
+          el('span.ah-when', {}, info.latest.date === latestKey ? 'Today' : info.latest.date),
+          icon('chevron', 13))),
+      el('div.ah-name', {}, info.label),
+      el('div.ah-value', {},
+        /* Health groups its thousands; 8000 steps reads as a serial
+           number without the separator. */
+        value.toLocaleString(undefined, { minimumFractionDigits: info.dp, maximumFractionDigits: info.dp }),
+        info.unit ? el('span.ah-unit', {}, info.unit) : null),
+      /* A sparkline, not a chart: the range labels a full chart carries
+         collide with themselves at this height, and the card is answering
+         "which way is this going" rather than "what were the extremes".
+         The full chart is still one tap away. */
+      pts.length >= 2
+        ? healthBars(pts.map(p => ({ v: p.v, label: `${p.date}: ${p.v.toFixed(info.dp)} ${info.unit}` })),
+            { colour, h: 62, showRange: false, unit: info.unit ? ' ' + info.unit : '', dp: info.dp })
+        : el('div.fine', {}, 'First reading. A trend appears once there are a few days.'));
+    cards.push(card);
+  }
+
+  wrap.append(cards.length
+    ? el('div.ah-grid', {}, ...cards)
+    : el('div.tile', {}, el('div.fine', {},
+        'Nothing from your Apple Watch yet. Run the Shortcut once on your phone.')));
+
+  /* Sleep stages, in Apple's own vocabulary — Health calls them Core,
+     Deep and REM, and a Watch owner reading "Light" would wonder which
+     of their numbers it corresponds to. */
+  if (today.sleepH) {
+    const core = Math.max(0, today.sleepH - (today.remH || 0) - (today.swsH || 0));
+    const stages = [
+      { label: 'Deep', value: today.swsH || 0, colour: '#2B4EC4' },
+      { label: 'REM',  value: today.remH || 0, colour: '#38C0E8' },
+      { label: 'Core', value: core,            colour: '#7FD8F0' },
+    ];
+    wrap.append(el('div.ah-card', { style: { '--ah': '#37B9E8' } },
+      el('div.between', {},
+        el('span.ah-cat', {}, icon('bed', 15), 'Sleep'),
+        el('span.ah-when', {}, 'Last night')),
+      el('div.ah-value', {}, today.sleepH.toFixed(1), el('span.ah-unit', {}, 'h')),
+      stageBar(stages),
+      el('div.stage-key', {},
+        ...stages.map(st => el('span.micro', {},
+          el('i', { style: { background: st.colour } }),
+          `${st.label} ${st.value.toFixed(1)}h`))),
+      (today.remH || today.swsH) ? null
+        : el('div.fine', { style: { marginTop: '8px' } },
+            'Your Shortcut is sending total sleep only. Add REM and Deep to it '
+            + 'and the stages fill in.')));
+    wrap.append(sleepTile(s, ctx.date || dayKey(), ctx));
+  }
+
+  /* What an Apple Watch does not measure, said once and plainly, rather
+     than left as empty cards for the reader to interpret. */
+  wrap.append(el('div.note.info', {},
+    el('div', {},
+      'Recovery and Strain are Whoop\u2019s own scores rather than measurements, '
+      + 'so there is nothing for an Apple Watch to report and this view leaves '
+      + 'them out. Everything else the app does \u2014 targets, the daily '
+      + 'adjustment, maintenance calories, the report \u2014 runs on the '
+      + 'readings above.')));
+
+  return wrap;
+}
+
 function vitalsSection(s, ctx) {
   /* The hero and the charts read the selected band as well, so choosing
-     Apple shows the tab an Apple Watch owner would actually see. */
-  const pick = s.settings?.vitalsSource || 'all';
+     Apple shows the tab an Apple Watch owner would actually see.
+     
+     Only somebody wearing both has a choice to make, and only they are
+     shown the chips. Reading the setting regardless meant a Whoop-only
+     user who had once tried the Apple view stayed stuck in it, with no
+     control on screen to get back — the setting outlived the band. */
+  const pick = effectivePick(s);
   const scoped = pick === 'all' ? s.whoop : { rows: rowsFor(s, pick), source: s.whoop?.source };
   const sum = summary(scoped);
 
@@ -415,6 +577,24 @@ function vitalsSection(s, ctx) {
           : 'Connect Whoop for live sync, or load a CSV export if you would rather not set up the relay.',
         buttons)));
   }
+
+  /*
+   * Apple gets Apple's screen, not Whoop's with the holes showing.
+   *
+   * Scoping the existing layout to Apple's rows was only half an answer.
+   * The layout is built around a Recovery ring with Strain beside it, and
+   * an Apple Watch measures neither — so choosing Apple produced a big
+   * empty dial captioned RECOVERY and a Strain reading of "—". Two blanks
+   * in the largest card on the page, which reads as a broken app rather
+   * than as a watch that does not compute those scores.
+   *
+   * A Watch owner already has a mental model of what their data looks
+   * like, and it is the Health app: readings filed under a coloured
+   * category, the category named and iconned, the number large, the unit
+   * small beside it. So that is what this draws. Nothing here can be
+   * blank, because the list is built from what actually arrived.
+   */
+  if (pick === 'apple') return appleVitals(s, ctx, scoped, sum);
 
   const rec = sum.metrics.recovery;
   const hrv = sum.metrics.hrv;
@@ -587,7 +767,7 @@ function vitalsSection(s, ctx) {
    * whether a number is comparable to yesterday's. Tapping a source tag
    * narrows the list to it; tapping again clears.
    */
-  const srcFilter = s.settings?.vitalsSource || 'all';
+  const srcFilter = effectivePick(s);
 
   /*
    * Read from the band you asked for rather than filtering the merge.

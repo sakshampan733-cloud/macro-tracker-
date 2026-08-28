@@ -258,9 +258,9 @@ export async function syncApple({ relay, key } = {}) {
       if (!gapsOnly) {
         put('rhr', r.rhr);
         put('hrv', r.hrv);
-        put('sleepH', r.sleepH);
-        put('remH', r.remH);
-        put('swsH', r.swsH ?? r.deepH);
+        put('sleepH', sleepHours(r.sleepH));
+        put('remH', sleepHours(r.remH));
+        put('swsH', sleepHours(r.swsH ?? r.deepH));
         put('kcal', kcal);
         /* An Apple Watch measures these too — Series 6 upwards for blood
            oxygen, Series 8 upwards for wrist temperature, and respiratory
@@ -300,9 +300,9 @@ export async function syncApple({ relay, key } = {}) {
       keep('steps', r.steps);
       keep('rhr', r.rhr);
       keep('hrv', r.hrv);
-      keep('sleepH', r.sleepH);
-      keep('remH', r.remH);
-      keep('swsH', r.swsH ?? r.deepH);
+      keep('sleepH', sleepHours(r.sleepH));
+      keep('remH', sleepHours(r.remH));
+      keep('swsH', sleepHours(r.swsH ?? r.deepH));
       keep('kcal', kcal);
       keep('spo2', r.spo2);
       keep('resp', r.resp);
@@ -377,6 +377,56 @@ export async function autoSyncApple() {
  * Whoop view never shows a step count Whoop cannot measure. Anything else
  * is the merged view, which is the one the rest of the app reasons from.
  */
+/*
+ * A sleep duration, in hours, whatever unit the phone actually sent.
+ *
+ * Shortcuts has no single answer for "how long was this sample". Depending
+ * on which action you tap, the same night arrives as 7.4 (hours), 444
+ * (minutes) or 26640 (seconds), and nothing in the JSON says which. The
+ * relay stores the number it is given, the app labelled it "h", and a
+ * perfectly ordinary night rendered as "679.0 h" — a fortnight of sleep,
+ * displayed without comment beside a stage bar claiming 679 hours of light
+ * sleep.
+ *
+ * Nobody sleeps for more than a day, so the magnitude is the unit. Try
+ * hours, then minutes, then seconds, and take the first reading that
+ * describes a night a human could have had. Anything still impossible
+ * after all three is not a unit problem and is dropped rather than shown.
+ */
+const MAX_SLEEP_H = 24;
+export function sleepHours(v) {
+  if (v == null) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return null;
+  if (n <= MAX_SLEEP_H) return n;
+  if (n / 60 <= MAX_SLEEP_H) return n / 60;
+  if (n / 3600 <= MAX_SLEEP_H) return n / 3600;
+  return null;
+}
+
+/*
+ * Repair rows that were stored before the above existed.
+ *
+ * The bad numbers are already on people's phones, and a fix that only
+ * applies to tomorrow's sync leaves last night reading 679 h forever.
+ */
+export function repairSleepUnits() {
+  let touched = 0;
+  commit(s => {
+    for (const bucket of [s.whoop?.rows, s.appleHealth?.rows]) {
+      for (const row of Object.values(bucket || {})) {
+        for (const f of ['sleepH', 'remH', 'swsH', 'deepH']) {
+          if (row[f] == null) continue;
+          const fixed = sleepHours(row[f]);
+          if (fixed == null) { delete row[f]; touched++; }
+          else if (Math.abs(fixed - row[f]) > 1e-9) { row[f] = fixed; touched++; }
+        }
+      }
+    }
+  }, 'import');
+  return touched;
+}
+
 export function rowsFor(store, which) {
   if (which === 'apple') return store.appleHealth?.rows || {};
   const rows = store.whoop?.rows || {};

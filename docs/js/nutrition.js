@@ -204,11 +204,15 @@ function dayTotals(d) {
 }
 
 /* Whoop reports total daily energy expenditure directly. */
-export function whoopTDEE(store, windowDays = 14) {
-  const rows = Object.entries(store.whoop?.rows || {}).sort();
+export function whoopTDEE(store, windowDays = 14, rowsOverride = null) {
+  const rows = Object.entries(rowsOverride || store.whoop?.rows || {}).sort();
   const recent = rows.slice(-windowDays).filter(([, r]) => r.kcal > 0);
   if (recent.length < 5) return { kcal: null, source: 'whoop', ready: false, have: recent.length };
   const vals = recent.map(([, r]) => r.kcal);
+  /* Which wrist the burn was actually read off, counted rather than
+     assumed — the tile beside this names a band, and naming the wrong one
+     is worse than naming none. */
+  const fromApple = recent.filter(([, r]) => r.by?.kcal === 'apple').length;
   const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
   const sd = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
   return {
@@ -217,6 +221,8 @@ export function whoopTDEE(store, windowDays = 14) {
     source: 'whoop',
     ready: true,
     days: recent.length,
+    fromApple,
+    fromWhoop: recent.length - fromApple,
   };
 }
 

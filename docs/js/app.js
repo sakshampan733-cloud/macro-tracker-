@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.29-appleview';
+export const VERSION = '2026.08.29-health';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
@@ -19,7 +19,7 @@ import { renderBody } from './views/body.js';
 import { renderFoods } from './views/foods.js';
 import { renderOnboarding, renderSettings } from './views/setup.js';
 import { autoSyncWhoop } from './views/body.js';
-import { autoSyncApple } from './applehealth.js';
+import { autoSyncApple, repairSleepUnits } from './applehealth.js';
 import { installFeedback } from './feedback.js';
 import { installPullToRefresh, refreshEverything } from './pulltorefresh.js';
 import { startReminders } from './reminders.js';
@@ -285,6 +285,9 @@ if (get().profile) {
     /* The phone pushes on its own schedule; this is the other half of it.
        Without it the pipeline ends in somebody remembering to tap a
        button, which is not a pipeline. */
+    /* Sleep arrived in whatever unit the phone felt like; repair what is
+       already stored before anything renders it as hours. */
+    if (repairSleepUnits()) draw();
     autoSyncApple().then(changed => { if (changed) draw(); }).catch(() => {});
   }
 }
