@@ -239,7 +239,8 @@ export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
     if (row.recovery < 34 && left.kcal > 200) {
       add(80, 'warn',
         `Recovery ${Math.round(row.recovery)}% — do not run a deficit today`,
-        `Red recovery with ${left.kcal} kcal still available. Eat to maintenance and take the deficit tomorrow. `
+        `Your target today is already your maintenance rather than a deficit — the app `
+        + `raised it because of this. You have ${left.kcal} kcal still to eat against it. `
         + `Under-eating on a red day is the reliable way to turn one poor night into a poor week.`,
         left.c > 40 ? { kind: 'foods', label: 'Carbohydrate helps here',
                         picks: suggestFoods(left, { want: 'carb' }) } : null);

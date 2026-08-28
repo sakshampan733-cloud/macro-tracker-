@@ -77,6 +77,31 @@ export function dayTargets(s, key) {
   const base = macroTargets(profile, tdee.kcal);
   const day = dayFactor(s, key);
 
+  /*
+   * A red recovery lifts the target to maintenance.
+   *
+   * The coach has always said "do not run a deficit today" on a red
+   * morning, and the number underneath it never moved — because the daily
+   * adjustment tracks energy burned, and a red day is often a day you
+   * burned less. So the app told you to eat more and then marked you over
+   * for doing it. Advice the target contradicts is worse than no advice.
+   *
+   * Only ever upward, only on a genuine deficit, and only to maintenance
+   * — this removes the deficit for a day, it does not create a surplus.
+   */
+  const row = s.whoop?.rows?.[key];
+  const cutting = (profile.rate ?? 0) < 0;
+  const redRecovery = row?.recovery != null && row.recovery < 34;
+
+  if (redRecovery && cutting && s.settings.tdeeSource !== 'predicted') {
+    const held = macroTargets({ ...profile, rate: 0, goal: 'maintain' }, tdee.kcal);
+    return {
+      ...held, source: 'recovery-hold', tdee, day, base, suppShift,
+      hold: { reason: 'red recovery', recovery: Math.round(row.recovery),
+              added: Math.max(0, held.kcal - base.kcal) },
+    };
+  }
+
   if (day && s.settings.tdeeSource !== 'predicted') {
     const adjusted = macroTargets(profile, tdee.kcal * day.factor);
     return { ...adjusted, source: 'whoop-day', tdee, day, base, suppShift };
@@ -257,6 +282,18 @@ function confidenceLabel(t) {
  */
 function targetBasis(targets, s, key) {
   const parts = [];
+
+  if (targets.source === 'recovery-hold') {
+    parts.push(el('div.flex', {},
+      icon('bolt', 15),
+      el('div', {},
+        el('div', { style: { fontSize: '13px' } },
+          `Recovery is ${targets.hold.recovery}%, so today's target is your maintenance `
+          + `rather than a deficit — ${kcal(targets.hold.added)} kcal more than usual.`),
+        el('div.fine', { style: { marginTop: '3px' } },
+          'Under-eating on a red day is the reliable way to turn one poor night into a '
+          + 'poor week. The deficit resumes tomorrow.'))));
+  }
 
   if (targets.source === 'whoop-day') {
     const d = targets.day;

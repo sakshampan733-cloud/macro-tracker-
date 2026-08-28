@@ -51,6 +51,7 @@ export function renderBody(root, ctx) {
      * weigh-in first meant scrolling past a number you already knew to
      * reach the one you did not.
      */
+    sourceBar(s, ctx),
     vitalsSection(s, ctx),
     checkInTile(s, ctx),
     weightTile(ctx),
@@ -292,6 +293,26 @@ const notReadyNote = r =>
  * find — you could get out of it and then not back into it. A mode you
  * cannot name on screen is a mode that does not exist.
  */
+/*
+ * Whose readings this whole tab is showing.
+ *
+ * At the top rather than tucked into one card, because it governs the
+ * whole page: pick Apple and the hero, the vitals and the charts all
+ * become the watch's, which is the only way to see what the app looks
+ * like for somebody who owns one. Only shown when you wear both — with a
+ * single band there is nothing to choose between.
+ */
+function sourceBar(s, ctx) {
+  if (healthSource() !== 'both') return null;
+  const cur = s.settings?.vitalsSource || 'all';
+  return el('div.source-bar', {},
+    el('span.micro', {}, 'Showing'),
+    el('div.flex', { style: { gap: '5px' } },
+      srcChip('all', 'Both', cur, ctx),
+      srcChip('whoop', 'Whoop', cur, ctx),
+      srcChip('apple', 'Apple', cur, ctx)));
+}
+
 function srcChip(which, label, current, ctx) {
   const on = current === which;
   return el('button.micro.src-tag'
@@ -309,7 +330,11 @@ function srcChip(which, label, current, ctx) {
 }
 
 function vitalsSection(s, ctx) {
-  const sum = summary(s.whoop);
+  /* The hero and the charts read the selected band as well, so choosing
+     Apple shows the tab an Apple Watch owner would actually see. */
+  const pick = s.settings?.vitalsSource || 'all';
+  const scoped = pick === 'all' ? s.whoop : { rows: rowsFor(s, pick), source: s.whoop?.source };
+  const sum = summary(scoped);
 
   if (!sum) {
     const mode = healthSource();
@@ -397,8 +422,8 @@ function vitalsSection(s, ctx) {
   const sleep = sum.metrics.sleepH;
   const strain = sum.metrics.strain;
 
-  const latestKey = Object.keys(s.whoop.rows || {}).sort().pop();
-  const today = s.whoop.rows?.[latestKey] || {};
+  const latestKey = Object.keys(scoped.rows || {}).sort().pop();
+  const today = scoped.rows?.[latestKey] || {};
   const recV = rec?.latest?.v ?? null;
   const colour = recoveryColour(recV);
 
@@ -481,7 +506,7 @@ function vitalsSection(s, ctx) {
 
   /* ── trends, as shapes rather than rows of numbers ── */
   const trendFor = (key, colour) => {
-    const pts = seriesFor(s.whoop, key, 30);
+    const pts = seriesFor(scoped, key, 30);
     if (pts.length < 4) return null;
     const info = sum.metrics[key];
     /*
@@ -698,7 +723,7 @@ function vitalsSection(s, ctx) {
   }
 
   /* ── the fortnight, at a glance ── */
-  const recentRec = seriesFor(s.whoop, 'recovery', 14);
+  const recentRec = seriesFor(scoped, 'recovery', 14);
   if (recentRec.length > 3) {
     wrap.append(el('div.tile.tappable', {
       role: 'button', tabIndex: 0,
