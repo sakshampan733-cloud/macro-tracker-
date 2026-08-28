@@ -282,3 +282,28 @@ export function shortcutSteps(relay, key) {
   const url = pushUrl(relay) || 'https://YOUR-RELAY/apple/push';
   return { url, key: key || 'YOUR-KEY' };
 }
+
+/*
+ * Pull on opening, without being asked.
+ *
+ * The phone pushes to the relay on a schedule, but the app was only
+ * fetching when somebody went to Settings and tapped a button — which
+ * makes an automatic pipeline end in a manual step, and means the data is
+ * always as stale as the last time you remembered.
+ *
+ * Throttled to once an hour: the Shortcut runs daily, so checking on every
+ * single app open would be a request per glance for nothing.
+ */
+export async function autoSyncApple() {
+  const s = get();
+  const mode = healthSource();
+  if (mode !== 'apple' && mode !== 'both') return false;
+  if (!healthKey() || !(s.settings?.relayUrl || '').trim()) return false;
+
+  const last = s.settings.healthPulledAt || 0;
+  if (Date.now() - last < 60 * 60 * 1000) return false;
+
+  const r = await syncApple({});
+  commit(st => { st.settings.healthPulledAt = Date.now(); }, 'settings');
+  return !!(r && r.ok && r.days);
+}
