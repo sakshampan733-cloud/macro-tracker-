@@ -2612,8 +2612,13 @@ button.src-tag { cursor: pointer; }
  * The category colour rides in on --ah per card, so one rule serves all
  * eight and nothing here hard-codes a metric.
  */
+/* One gap rule for the whole view. The sleep card and the sleep goal
+   below it were separate elements with no margin between them, so they
+   met on a shared edge and read as one card overlapping another. */
+.ah { display: grid; gap: 12px; margin-bottom: 14px; }
+.ah > * { margin-bottom: 0 !important; margin-top: 0 !important; }
 .ah-title { font-size: 27px; letter-spacing: -.5px; margin: 0 0 2px; }
-.ah-grid { display: grid; gap: 10px; }
+.ah-grid { display: grid; gap: 12px; }
 
 .ah-card {
   background: var(--surface);
@@ -2622,7 +2627,6 @@ button.src-tag { cursor: pointer; }
   padding: 14px 15px 12px;
   display: grid; gap: 7px;
 }
-.ah-card + .ah-card, .ah-grid + .ah-card { margin-top: 10px; }
 
 .ah-cat {
   display: inline-flex; align-items: center; gap: 6px;
@@ -2648,3 +2652,36 @@ button.src-tag { cursor: pointer; }
 
 /* Two across once there is room; one per row on a phone, as in Health. */
 @media (min-width: 620px) { .ah-grid { grid-template-columns: 1fr 1fr; } }
+
+/* Health's own chart furniture: a floor, two labelled edges, dates below.
+   The bars stop short of the right-hand scale so a reading never has to
+   be read through a number that is not one. */
+.ac { display: grid; gap: 5px; }
+.ac-plot { position: relative; }
+
+.ac-grid { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--line); }
+.ac-hi { top: 0; }
+.ac-lo { bottom: 0; border-top-color: var(--line-2); }
+.ac-grid span {
+  position: absolute; right: 0;
+  font-size: 10.5px; font-family: var(--mono); color: var(--muted);
+  letter-spacing: -.2px; white-space: nowrap;
+}
+.ac-hi span { top: 2px; }
+.ac-lo span { bottom: 2px; }
+
+.ac-bars {
+  position: absolute; inset: 0; padding-right: 52px;
+  display: flex; align-items: flex-end; gap: 2px;
+}
+.ac-cell { position: relative; flex: 1; height: 100%; }
+.ac-cell i {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: 62%; max-width: 9px; min-width: 3px;
+  border-radius: 99px;
+}
+
+.ac-axis {
+  display: flex; justify-content: space-between; padding-right: 52px;
+  font-size: 11px; color: var(--muted);
+}

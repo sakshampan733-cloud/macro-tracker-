@@ -19,7 +19,7 @@ import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import {
   ring, stageBar, liveDot, recoveryColour,
-  healthBars, healthLine, miniSpark,
+  healthBars, healthLine, miniSpark, appleChart,
 } from '../charts.js';
 import { haptic } from '../feedback.js';
 import { openReport } from './report.js';
@@ -384,14 +384,15 @@ function srcChip(which, label, current, ctx) {
  * their own phone should find the same reading in the same place.
  */
 const APPLE_CARDS = [
-  ['steps',  'Activity',          '#FC7A2E', 'steps'],
-  ['kcal',   'Activity',          '#FA3E5B', 'flame'],
-  ['rhr',    'Heart',             '#FF375F', 'heart'],
-  ['hrv',    'Heart',             '#FF375F', 'heart'],
-  ['sleepH', 'Sleep',             '#37B9E8', 'bed'],
-  ['spo2',   'Respiratory',       '#4ED9C6', 'lungs'],
-  ['resp',   'Respiratory',       '#4ED9C6', 'lungs'],
-  ['temp',   'Body Measurements', '#A85CFF', 'thermo'],
+  /* metric, Health category, category colour, glyph, chart starts at zero */
+  ['steps',  'Activity',          '#FC7A2E', 'steps',  true],
+  ['kcal',   'Activity',          '#FA3E5B', 'flame',  true],
+  ['rhr',    'Heart',             '#FF375F', 'heart',  false],
+  ['hrv',    'Heart',             '#FF375F', 'heart',  false],
+  ['sleepH', 'Sleep',             '#37B9E8', 'bed',    true],
+  ['spo2',   'Respiratory',       '#4ED9C6', 'lungs',  false],
+  ['resp',   'Respiratory',       '#4ED9C6', 'lungs',  false],
+  ['temp',   'Body Measurements', '#A85CFF', 'thermo', false],
 ];
 
 function appleVitals(s, ctx, scoped, sum) {
@@ -406,7 +407,7 @@ function appleVitals(s, ctx, scoped, sum) {
       el('button.btn.sm.ghost', { onclick: () => openWhoopRelay(ctx) }, 'Sync')));
 
   const cards = [];
-  for (const [key, category, colour, glyph] of APPLE_CARDS) {
+  for (const [key, category, colour, glyph, zero] of APPLE_CARDS) {
     const info = sum.metrics[key];
     if (!info?.latest) continue;                 /* never a blank card */
     const pts = seriesFor(scoped, key, 30);
@@ -430,13 +431,10 @@ function appleVitals(s, ctx, scoped, sum) {
            number without the separator. */
         value.toLocaleString(undefined, { minimumFractionDigits: info.dp, maximumFractionDigits: info.dp }),
         info.unit ? el('span.ah-unit', {}, info.unit) : null),
-      /* A sparkline, not a chart: the range labels a full chart carries
-         collide with themselves at this height, and the card is answering
-         "which way is this going" rather than "what were the extremes".
-         The full chart is still one tap away. */
       pts.length >= 2
-        ? healthBars(pts.map(p => ({ v: p.v, label: `${p.date}: ${p.v.toFixed(info.dp)} ${info.unit}` })),
-            { colour, h: 62, showRange: false, unit: info.unit ? ' ' + info.unit : '', dp: info.dp })
+        ? appleChart(pts.map(p => ({ v: p.v, date: p.date,
+              label: `${p.date}: ${p.v.toFixed(info.dp)} ${info.unit}` })),
+            { colour, h: 96, zero, unit: info.unit, dp: info.dp })
         : el('div.fine', {}, 'First reading. A trend appears once there are a few days.'));
     cards.push(card);
   }

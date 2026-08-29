@@ -570,3 +570,98 @@ export function miniSpark(values, { w = 62, h = 22, colour = 'currentColor' } = 
   }));
   return svg;
 }
+
+/*
+ * A chart in the Health app's idiom.
+ *
+ * Apple draws a daily series in a way that is specific enough to be
+ * recognised on sight, and none of it is decoration: bars are capsules on
+ * a floor rather than columns in a frame; the scale is stated once at the
+ * top and once at the bottom, on the right, where it cannot be mistaken
+ * for data; the dates sit under the plot rather than inside it. Every
+ * gridline that would have crossed the readings is gone.
+ *
+ * The floor is the part that carries meaning. Steps and energy start at
+ * zero, because zero steps is a real day and the bar height is then the
+ * count. Heart rate, oxygen and temperature do not — nobody's resting
+ * heart rate lives near zero, and anchoring there would compress a real
+ * 12 bpm swing into a flat row of identical bars. Those are drawn as
+ * Health draws them: a capsule sitting at the reading, on a scale that
+ * starts just under the lowest one.
+ */
+const acFmt = (v, dp) =>
+  v.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+
+const acDate = (key) => {
+  const [y, m, d] = String(key || '').split('-').map(Number);
+  if (!y) return '';
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
+
+export function appleChart(points, {
+  colour = 'var(--accent)', unit = '', dp = 0, h = 108, zero = false, axis = true,
+} = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ac';
+
+  const vals = points.map(p => p.v).filter(v => v != null && Number.isFinite(v));
+  if (!vals.length) return wrap;
+
+  const hi = Math.max(...vals), lo = Math.min(...vals);
+  /* Pad by the spread, never by the magnitude — a fortnight of blood
+     oxygen moving 1.2% around 96% must still show the 1.2%. */
+  const spread = (hi - lo) || Math.max(Math.abs(hi) * 0.04, 0.1);
+  const top = zero ? (hi || 1) * 1.1 : hi + spread * 0.4;
+  const bot = zero ? 0 : Math.max(0, lo - spread * 0.4);
+  const span = (top - bot) || 1;
+
+  const plot = document.createElement('div');
+  plot.className = 'ac-plot';
+  plot.style.height = h + 'px';
+
+  for (const [v, cls] of [[top, 'ac-hi'], [bot, 'ac-lo']]) {
+    const g = document.createElement('div');
+    g.className = 'ac-grid ' + cls;
+    const lab = document.createElement('span');
+    lab.textContent = acFmt(v, dp) + (unit ? ' ' + unit : '');
+    g.append(lab);
+    plot.append(g);
+  }
+
+  const bars = document.createElement('div');
+  bars.className = 'ac-bars';
+  for (const p of points) {
+    const cell = document.createElement('div');
+    cell.className = 'ac-cell';
+    if (p.v != null && Number.isFinite(p.v)) {
+      const y = Math.max(0, Math.min(1, (p.v - bot) / span));
+      const cap = document.createElement('i');
+      cap.style.background = colour;
+      if (zero) {
+        cap.style.bottom = '0';
+        cap.style.height = `max(3px, ${(y * 100).toFixed(2)}%)`;
+      } else {
+        /* One reading a day is a point, not a range, so Health's range
+           capsule collapses to a short one sitting at the value. */
+        cap.style.height = '10px';
+        cap.style.bottom = `calc(${(y * 100).toFixed(2)}% - 5px)`;
+      }
+      cell.append(cap);
+      if (p.label) cell.title = p.label;
+    }
+    bars.append(cell);
+  }
+  plot.append(bars);
+  wrap.append(plot);
+
+  if (axis) {
+    const ax = document.createElement('div');
+    ax.className = 'ac-axis';
+    const a = document.createElement('span'), b = document.createElement('span');
+    a.textContent = acDate(points[0]?.date);
+    b.textContent = acDate(points[points.length - 1]?.date);
+    ax.append(a, b);
+    wrap.append(ax);
+  }
+  return wrap;
+}
