@@ -181,10 +181,30 @@ export async function syncWhoop({ days = 180 } = {}) {
   const dates = Object.keys(rows).sort();
   if (!dates.length) throw new Error('Whoop returned no days. Is the strap syncing?');
 
-  // Merge rather than replace, so a CSV import from before is not thrown away.
+  /*
+   * Merge per field, not per day.
+   *
+   * This spread the fresh rows over the old ones by date, which replaces
+   * the whole day object — so every Whoop sync silently destroyed the
+   * step count Apple had filled in for that day, along with the record of
+   * where it came from. Whoop's API does not return steps, so nothing
+   * ever put them back, and someone wearing both bands watched their
+   * steps appear after an Apple pull and vanish at the next app launch.
+   *
+   * Nulls are dropped for the same reason: a night Whoop has no blood
+   * oxygen for should leave the earlier reading for that date alone
+   * rather than blanking it.
+   */
   commit(s => {
     const existing = s.whoop?.rows || {};
-    s.whoop = { rows: { ...existing, ...rows }, importedAt: Date.now(), source: 'relay' };
+    const merged = { ...existing };
+    for (const [date, fresh] of Object.entries(rows)) {
+      const prev = existing[date] || {};
+      const measured = Object.fromEntries(
+        Object.entries(fresh).filter(([, v]) => v != null));
+      merged[date] = { ...prev, ...measured, date, by: { ...(prev.by || {}) } };
+    }
+    s.whoop = { rows: merged, importedAt: Date.now(), source: 'relay' };
   }, 'whoop');
 
   return { count: dates.length, from: dates[0], to: dates[dates.length - 1] };

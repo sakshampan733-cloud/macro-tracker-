@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.29-charts';
+export const VERSION = '2026.08.29-fixes';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
@@ -225,10 +225,26 @@ window.addEventListener('hashchange', () => {
   if (ROUTES[r] && r !== ctx.route) { ctx.route = r; draw(); }
 });
 
-/* The day rolls over while the app sits open on a phone overnight. */
+/*
+ * The day rolls over while the app sits open on a phone overnight.
+ *
+ * This used to ask "is the open day yesterday?" and move you to today if
+ * so. But yesterday is exactly the day you land on when you deliberately
+ * go back one to fix a meal you forgot to log — so within sixty seconds
+ * this dragged you to today and redrew the screen underneath you, and
+ * editing a previous day was effectively impossible.
+ *
+ * Rolling over is an event, not a state. Watch for midnight actually
+ * passing, and only follow the clock for someone who was sitting on the
+ * day that just ended.
+ */
+let lastToday = dayKey();
 setInterval(() => {
   const today = dayKey();
-  if ((ctx.route === 'home' || ctx.route === 'detail') && ctx.date !== today && ctx.date === dayKey(new Date(Date.now() - 86400000))) {
+  if (today === lastToday) return;
+  const ended = lastToday;
+  lastToday = today;
+  if ((ctx.route === 'home' || ctx.route === 'detail') && ctx.date === ended) {
     ctx.date = today;
     draw();
   }
@@ -282,14 +298,18 @@ if (get().profile) {
   } else {
     // the Mac helper route, for when the server is running
     autoSyncWhoop().then(changed => { if (changed) draw(); });
-    /* The phone pushes on its own schedule; this is the other half of it.
-       Without it the pipeline ends in somebody remembering to tap a
-       button, which is not a pipeline. */
-    /* Sleep arrived in whatever unit the phone felt like; repair what is
-       already stored before anything renders it as hours. */
-    if (repairSleepUnits()) draw();
-    autoSyncApple().then(changed => { if (changed) draw(); }).catch(() => {});
   }
+
+  /*
+   * Apple runs for everyone, not only for people without Whoop.
+   *
+   * This sat in the else branch, so the one group who most needs it —
+   * somebody wearing both, whose steps only Apple can supply — was the
+   * one group it never ran for. Their steps arrived on a manual pull and
+   * were never refreshed again.
+   */
+  if (repairSleepUnits()) draw();
+  autoSyncApple().then(changed => { if (changed) draw(); }).catch(() => {});
 }
 
 const initial = location.hash.slice(1);
