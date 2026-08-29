@@ -387,9 +387,12 @@ const APPLE_CARDS = [
   /* metric, Health category, category colour, glyph, chart starts at zero */
   ['steps',  'Activity',          '#FC7A2E', 'steps',  true],
   ['kcal',   'Activity',          '#FA3E5B', 'flame',  true],
+  /* Sleep is deliberately not here. It gets its own card lower down with
+     the stage breakdown, and listing it in both places drew the same
+     night twice under two different headings — which reads as the app
+     having two disagreeing numbers for one night. */
   ['rhr',    'Heart',             '#FF375F', 'heart',  false],
   ['hrv',    'Heart',             '#FF375F', 'heart',  false],
-  ['sleepH', 'Sleep',             '#37B9E8', 'bed',    true],
   ['spo2',   'Respiratory',       '#4ED9C6', 'lungs',  false],
   ['resp',   'Respiratory',       '#4ED9C6', 'lungs',  false],
   ['temp',   'Body Measurements', '#A85CFF', 'thermo', false],
