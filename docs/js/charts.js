@@ -665,3 +665,114 @@ export function appleChart(points, {
   }
   return wrap;
 }
+
+/*
+ * The three Activity rings, as an Apple Watch draws them.
+ *
+ * This is the one picture a Watch owner checks every day, and it is the
+ * closest thing Apple has to Whoop's recovery score: a single glance that
+ * says whether today has happened yet. The Whoop view leads with a
+ * recovery dial, so the Apple view leads with these.
+ *
+ * Each ring is its own goal, which is the whole point of there being
+ * three — six hundred calories does not excuse sitting down all day, and
+ * twelve stand hours is not a workout. They are never combined into one
+ * score, because Apple does not combine them either.
+ *
+ * A ring can be overachieved. The arc stops at full so the picture stays
+ * readable, and the number underneath keeps counting, which is what the
+ * Watch does.
+ */
+const RING_DEFS = [
+  ['move',     'Move',     'Cal',  '#FA114F', '#FF5E3A'],
+  ['exercise', 'Exercise', 'Min',  '#76E900', '#B4FF3A'],
+  ['stand',    'Stand',    'Hrs',  '#00D4E8', '#0AF0C8'],
+];
+
+export function activityRings(data, { size = 150, stroke = 15, gap = 5 } = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'rings';
+
+  const present = RING_DEFS.filter(([k]) => data?.[k]?.value != null);
+  if (!present.length) return wrap;
+
+  const svg = svgEl('svg', {
+    viewBox: `0 0 ${size} ${size}`, width: size, height: size,
+    class: 'rings-svg', role: 'img',
+    'aria-label': present.map(([k, label, unit]) =>
+      `${label} ${Math.round(data[k].value)} of ${Math.round(data[k].goal)} ${unit}`).join(', '),
+  });
+  const c = size / 2;
+
+  RING_DEFS.forEach(([key, , , c1, c2], i) => {
+    const d = data?.[key];
+    /* Ring positions are fixed. Move is always outermost, so two people
+       comparing screens are looking at the same ring in the same place
+       even when one of them is not sending stand hours yet. */
+    const r = c - stroke / 2 - i * (stroke + gap);
+    if (r <= stroke) return;
+
+    const track = svgEl('circle', {
+      cx: c, cy: c, r, fill: 'none', 'stroke-width': stroke,
+      stroke: c1, opacity: 0.18,
+    });
+    svg.append(track);
+    if (!d || d.value == null) return;
+
+    const grad = nextId('ring');
+    const lg = svgEl('linearGradient', { id: grad, x1: '0', y1: '0', x2: '0', y2: '1' });
+    lg.append(svgEl('stop', { offset: '0', 'stop-color': c2 }),
+              svgEl('stop', { offset: '1', 'stop-color': c1 }));
+    const defs = svgEl('defs', {});
+    defs.append(lg);
+    svg.append(defs);
+
+    const frac = Math.max(0, Math.min(1, (d.value || 0) / (d.goal || 1)));
+    const circ = 2 * Math.PI * r;
+    const arc = svgEl('circle', {
+      cx: c, cy: c, r, fill: 'none', stroke: `url(#${grad})`,
+      'stroke-width': stroke, 'stroke-linecap': 'round',
+      'stroke-dasharray': `${circ} ${circ}`,
+      'stroke-dashoffset': circ * (1 - frac),
+      transform: `rotate(-90 ${c} ${c})`,
+    });
+    if (!reduced()) {
+      arc.setAttribute('stroke-dashoffset', circ);
+      requestAnimationFrame(() => {
+        arc.style.transition = 'stroke-dashoffset 900ms cubic-bezier(.2,.8,.2,1)';
+        arc.setAttribute('stroke-dashoffset', String(circ * (1 - frac)));
+      });
+    }
+    svg.append(arc);
+  });
+
+  wrap.append(svg);
+
+  const key = document.createElement('div');
+  key.className = 'rings-key';
+  for (const [k, label, unit, c1] of RING_DEFS) {
+    const d = data?.[k];
+    const row = document.createElement('div');
+    row.className = 'rings-row';
+    row.innerHTML = '';
+    const name = document.createElement('span');
+    name.className = 'rings-name';
+    name.style.color = c1;
+    name.textContent = label;
+    const val = document.createElement('span');
+    val.className = 'rings-val';
+    if (!d || d.value == null) {
+      val.className += ' rings-missing';
+      val.textContent = 'not sent';
+    } else {
+      val.textContent = `${acFmt(d.value, d.dp ?? 0)}/${acFmt(d.goal, 0)}`;
+      const u = document.createElement('i');
+      u.textContent = ' ' + unit;
+      val.append(u);
+    }
+    row.append(name, val);
+    key.append(row);
+  }
+  wrap.append(key);
+  return wrap;
+}

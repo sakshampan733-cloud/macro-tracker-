@@ -570,7 +570,15 @@ function entryRow(e, key, ctx) {
       el('div.sub', {},
         `${grams(e.grams)} g`,
         e.brand ? ` · ${e.brand}` : '',
-        ` · ${Math.round(m.p)}P ${Math.round(m.c)}C ${Math.round(m.f)}F`)),
+        ` · ${Math.round(m.p)}P ${Math.round(m.c)}C ${Math.round(m.f)}F`,
+        /* A slice of something eaten over several days says so, because
+           otherwise it reads as a 3 g portion of crisps nobody ate. */
+        e.spread
+          ? el('span.spread-tag', { title:
+              `${grams(e.spread.totalGrams)} g logged once and divided over `
+              + `${e.spread.days} days` },
+              `day ${e.spread.index + 1} of ${e.spread.days}`)
+          : null)),
     el('span', { class: 'conf ' + e.method, title: meth.hint }, meth.short),
     el('span.kcal', {}, kcal(m.kcal)),
   );

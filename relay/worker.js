@@ -98,7 +98,12 @@ function page(title, body) {
  */
 const FIELDS = ['rhr', 'hrv', 'sleepH', 'remH', 'swsH', 'deepH',
                 'kcal', 'activeKcal', 'steps', 'weightKg', 'vo2max',
-                'spo2', 'resp', 'temp'];
+                'spo2', 'resp', 'temp',
+                /* The three Activity rings. Move is active energy — the
+                   same number the red ring fills with — kept separate
+                   from total burn, which the app needs for maintenance
+                   and which includes what you burn asleep. */
+                'exerciseMin', 'standHours', 'moveGoal'];
 
 /*
  * Whatever the phone calls today.

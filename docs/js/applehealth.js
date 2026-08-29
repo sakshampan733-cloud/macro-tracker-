@@ -126,7 +126,8 @@ export const CAPABILITY = {
   whoop: ['recovery', 'strain', 'hrv', 'rhr', 'sleepH', 'remH', 'swsH',
           'kcal', 'spo2', 'resp', 'temp', 'sleepPerf', 'debtH'],
   apple: ['steps', 'hrv', 'rhr', 'sleepH', 'remH', 'swsH', 'kcal',
-          'spo2', 'resp', 'temp', 'vo2max', 'weightKg'],
+          'spo2', 'resp', 'temp', 'vo2max', 'weightKg',
+          'activeKcal', 'exerciseMin', 'standHours'],
 };
 
 /* Which metrics the setup you declared can produce at all. */
@@ -309,6 +310,13 @@ export async function syncApple({ relay, key } = {}) {
       keep('temp', r.temp);
       keep('vo2max', r.vo2max);
       keep('weightKg', r.weightKg);
+      /* The rings. Kept only on the Apple side: they are a Watch's own
+         picture of the day and there is no Whoop equivalent to merge
+         them with. */
+      keep('activeKcal', r.activeKcal);
+      keep('exerciseMin', r.exerciseMin);
+      keep('standHours', r.standHours);
+      keep('moveGoal', r.moveGoal);
       s.appleHealth.rows[r.date] = { ...prevApple, ...raw };
       s.appleHealth.importedAt = Date.now();
 

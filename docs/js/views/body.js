@@ -19,7 +19,7 @@ import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import {
   ring, stageBar, liveDot, recoveryColour,
-  healthBars, healthLine, miniSpark, appleChart,
+  healthBars, healthLine, miniSpark, appleChart, activityRings,
 } from '../charts.js';
 import { haptic } from '../feedback.js';
 import { openReport } from './report.js';
@@ -405,6 +405,35 @@ function appleVitals(s, ctx, scoped, sum) {
         el('h2.ah-title', {}, 'Health'),
         el('div.micro', {}, `Apple Watch · ${latestKey}`)),
       el('button.btn.sm.ghost', { onclick: () => openWhoopRelay(ctx) }, 'Sync')));
+
+  /*
+   * The rings lead, the way recovery leads the Whoop view.
+   *
+   * They are the picture a Watch owner actually checks, and the nearest
+   * thing Apple has to a single daily verdict. Shown as soon as any one
+   * of the three arrives rather than waiting for all of them, with the
+   * missing ones named — "not sent" is a fixable Shortcut problem, and
+   * silently omitting the row hides that there is anything to fix.
+   */
+  const goals = s.settings?.ringGoals || {};
+  const ringData = {
+    move: today.activeKcal != null
+      ? { value: today.activeKcal, goal: today.moveGoal || goals.move || 500 } : null,
+    exercise: today.exerciseMin != null
+      ? { value: today.exerciseMin, goal: goals.exercise || 30 } : null,
+    stand: today.standHours != null
+      ? { value: today.standHours, goal: goals.stand || 12 } : null,
+  };
+  const anyRing = Object.values(ringData).some(v => v);
+  wrap.append(el('div.ah-card.ah-rings', { style: { '--ah': '#FA114F' } },
+    el('div.between', {},
+      el('span.ah-cat', {}, icon('flame', 15), 'Activity'),
+      el('span.ah-when', {}, latestKey === dayKey() ? 'Today' : latestKey)),
+    anyRing
+      ? activityRings(ringData)
+      : el('div.fine', {},
+          'Your Shortcut is not sending the ring data yet. Add Active Energy, '
+          + 'Exercise Minutes and Stand Hours to it and the rings fill in.')));
 
   const cards = [];
   for (const [key, category, colour, glyph, zero] of APPLE_CARDS) {

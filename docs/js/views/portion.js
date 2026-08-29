@@ -22,7 +22,7 @@ import {
 } from '../ui.js';
 import { haptic } from '../feedback.js';
 import {
-  METHODS, GRADE_MULT, macrosFor, addEntry, updateEntry, MEALS,
+  METHODS, shiftDay, GRADE_MULT, macrosFor, addEntry, updateEntry, MEALS,
   mealForNow, dayKey, toggleFavourite, isFavourite, saveFood, get, commit,
 } from '../store.js';
 import { atwater, BY_ID } from '../data/foods.js';
@@ -125,8 +125,20 @@ export function openPortion(food, {
     meal: entry?.meal ?? meal ?? mealForNow(),
     method: entry?.method ?? (servings.length ? (grade === 'B' ? 'label' : 'portion') : 'weighed'),
     manualMethod: !!entry,
+    spreadDays: 1,
   };
 
+  /*
+   * How many days this one amount is spread across.
+   *
+   * A big packet of chips is not a meal, it is a fortnight of small
+   * handfuls, and weighing each handful is a chore nobody sustains — so
+   * the packet goes unlogged entirely, which is worse than logging it
+   * roughly. Logging the whole packet on the day it runs out and dividing
+   * it back over the days it was open puts the calories where they
+   * happened, at the cost of not knowing exactly which day got which
+   * handful.
+   */
   const gramsNow = () => {
     const u = units[state.unit];
     return u.raw ? state.qty : +(state.qty * u.g).toFixed(1);
@@ -370,9 +382,50 @@ export function openPortion(food, {
 
   const check = atwater(food.per100);
 
+  /*
+   * "I finished the packet, but not today."
+   *
+   * Shown only when logging something new — editing one slice of a spread
+   * and silently re-spreading it would multiply the food.
+   */
+  const spreadNote = el('div.fine');
+  const spreadRow = el('div.spread-row', {},
+    el('div.between', {},
+      el('span', {}, 'Eaten over'),
+      el('div.stepper', {},
+        el('button.btn.sm.ghost', {
+          'aria-label': 'Fewer days',
+          onclick: () => setSpread(state.spreadDays - 1),
+        }, '−'),
+        el('span.stepper-val', {}, '1 day'),
+        el('button.btn.sm.ghost', {
+          'aria-label': 'More days',
+          onclick: () => setSpread(state.spreadDays + 1),
+        }, '+'))),
+    spreadNote);
+
+  function setSpread(n) {
+    state.spreadDays = Math.max(1, Math.min(60, Math.round(n) || 1));
+    const val = spreadRow.querySelector('.stepper-val');
+    val.textContent = state.spreadDays === 1 ? '1 day' : `${state.spreadDays} days`;
+    spreadRow.classList.toggle('is-on', state.spreadDays > 1);
+    const gr = gramsNow();
+    if (state.spreadDays === 1) {
+      spreadNote.textContent = 'All of it today.';
+    } else {
+      const per = macrosFor(food.per100, gr / state.spreadDays);
+      const first = shiftDay(dateKey, -(state.spreadDays - 1));
+      spreadNote.textContent =
+        `Split evenly back to ${first} — about ${Math.round(per.kcal)} kcal a day. `
+        + 'The total is what you measured; which day got which handful is not, '
+        + 'so each day is logged as an estimate.';
+    }
+  }
+
   inferMethod();
   syncAmount();
   syncMeal();
+  setSpread(1);
 
   const s = sheet({
     title: food.n || food.name,
@@ -381,6 +434,7 @@ export function openPortion(food, {
       mealRow,
       el('div', { style: { height: '12px' } }),
       amountCard,
+      entry ? null : spreadRow,
       depth,
       el('div.between', { style: { marginTop: '10px' } },
         methodChip,
@@ -438,8 +492,35 @@ export function openPortion(food, {
           /* Logging something scanned should keep it too — otherwise the
              only copy of it is the log line you just wrote. */
           rememberFood();
-          addEntry(dateKey, payload);
-          toast(`${Math.round(macrosFor(food.per100, gr).kcal)} kcal logged.`);
+          const n = state.spreadDays;
+          if (n > 1) {
+            /*
+             * One entry per day, rather than one entry that other screens
+             * have to know how to divide. Every total, target, report and
+             * TDEE calculation in the app already reads a day's entries;
+             * a special kind of entry that spans days would need each of
+             * them taught about it, and each one taught separately is a
+             * place for it to be forgotten.
+             *
+             * The amount you measured is real, so it keeps your method.
+             * Which day got which handful is not, so the per-day slice is
+             * marked estimated — the log should not claim a precision
+             * about Tuesday that nobody has.
+             */
+            const spreadId = 'sp' + Date.now().toString(36);
+            for (let i = 0; i < n; i++) {
+              addEntry(shiftDay(dateKey, -i), {
+                ...payload,
+                grams: gr / n,
+                method: 'estimate',
+                spread: { id: spreadId, days: n, index: i, totalGrams: gr, method: state.method },
+              });
+            }
+            toast(`${Math.round(macrosFor(food.per100, gr).kcal)} kcal split over ${n} days.`);
+          } else {
+            addEntry(dateKey, payload);
+            toast(`${Math.round(macrosFor(food.per100, gr).kcal)} kcal logged.`);
+          }
         }
         haptic('success');
         s.close();
