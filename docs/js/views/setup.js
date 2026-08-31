@@ -19,6 +19,7 @@ import { openGuide } from './guide.js';
 import { openAppleHealth } from './apple.js';
 import { openHealthSetup } from './body.js';
 import { healthSource } from '../applehealth.js';
+import { ORBS, applyOrb } from '../theme.js';
 import { VERSION } from '../app.js';
 import {
   HEIGHT_UNITS, WEIGHT_UNITS, cmToFtIn, ftInToCm, kgToLb, lbToKg,
@@ -522,6 +523,23 @@ export function renderSettings(root, ctx) {
     group(ctx, 'look', 'Appearance',
       'How the app looks.',
       el('div.tile', {},
+        el('div.set-label', { style: { marginBottom: '8px' } },
+          el('span.micro', {}, 'Background glow')),
+        el('div.orb-row', {},
+          ...Object.entries(ORBS).map(([key, o]) => el('button.orb-dot'
+              + ((get().settings.orb || 'none') === key ? '.is-on' : ''), {
+            type: 'button', title: o.label, 'aria-label': o.label,
+            ...(o.dark ? {} : { 'data-none': '' }),
+            style: o.dark ? { '--swatch': `rgb(${o.dark})` } : {},
+            onclick: () => {
+              commit(st => { st.settings.orb = key; }, 'settings');
+              applyOrb(key, document.documentElement.getAttribute('data-theme') || 'dark');
+              ctx.refresh();
+            },
+          }))),
+        el('div.fine', { style: { margin: '8px 0 16px' } },
+          'Off by default — a flat ground is what makes the cards read as objects. '
+          + 'Pick a colour if you would rather the app sat in a lit room.'),
         el('div.theme-row', {},
           ...[
             ['dark',  'Dark'],

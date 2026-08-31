@@ -201,6 +201,29 @@ export function dayKey(d = new Date()) {
  * you still on Tuesday?" on Friday is not a question worth asking, so
  * that case moves on its own.
  */
+/*
+ * Remember which day the app was last used on, so midnight can be noticed.
+ *
+ * The rollover prompt could never fire. It compares the open day against
+ * today, and the open day was only ever written when somebody answered the
+ * prompt — so on a fresh install, or for anybody who had not already used
+ * the feature, there was nothing stored, the getter fell back to today,
+ * and the day rolled at midnight in silence. Which is the exact thing the
+ * whole feature exists to prevent.
+ *
+ * Called once at boot, before anything renders: if there is no open day
+ * yet, the last day the app was used is the honest answer, and that is
+ * what makes "it is tomorrow, are you done?" possible at 00:11.
+ */
+export function noteAppOpen() {
+  const today = dayKey();
+  commit(s => {
+    s.settings = s.settings || {};
+    if (!s.settings.openDay) s.settings.openDay = s.settings.lastOpen || today;
+    s.settings.lastOpen = today;
+  }, 'settings');
+}
+
 export function openDay() {
   const s = get();
   const stored = s.settings?.openDay;

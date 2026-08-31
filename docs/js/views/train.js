@@ -80,7 +80,19 @@ function todayCard(s, key, ctx) {
     return el('div.tile.train-done', {},
       el('div.between', {},
         el('div.flex', {}, icon('check', 18), el('h3', {}, t?.name || 'Session')),
-        el('button.btn.sm.ghost', { onclick: () => openLogger(key, ctx, done) }, 'Edit')),
+        el('div.flex', { style: { gap: '6px' } },
+          /* Undo, in one tap. Removing a session logged by mistake meant
+             Edit, then scroll, then Remove, then confirm — four steps to
+             undo something that took one. */
+          el('button.btn.sm.ghost', {
+            onclick: () => confirmSheet({
+              title: 'Remove this session?',
+              body: 'The day goes back to being a rest day and the rotation holds its place.',
+              confirm: 'Remove', danger: true,
+              onConfirm: () => { removeSession(key); haptic('tap'); toast('Removed.'); ctx.refresh(); },
+            }),
+          }, 'Undo'),
+          el('button.btn.sm.ghost', { onclick: () => openLogger(key, ctx, done) }, 'Edit'))),
       el('div.fine', { style: { marginTop: '6px' } },
         [done.sets ? `${done.sets} hard sets` : null,
          done.effort ? effortById(done.effort)?.label.toLowerCase() : null,

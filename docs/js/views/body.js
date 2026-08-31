@@ -44,7 +44,7 @@ export function renderBody(root, ctx) {
       el('h1', {}, 'Body'),
       el('button.btn.sm.ghost', { onclick: () => openReport(ctx, 7) }, 'Report'))),
     sourceBar(s, ctx) || el('div'),
-    vitalsSection(s, ctx),
+    vitalsSection(s, ctx) || el('div'),
     senseTile(s, ctx) || el('div'),
     checkInTile(s, ctx),
     weightTile(ctx),
@@ -771,6 +771,17 @@ function appleVitals(s, ctx, scoped, sum) {
 }
 
 function vitalsSection(s, ctx) {
+  /*
+   * No band, no section — before anything else.
+   *
+   * This bailed only when there was no data to show, which is not the same
+   * question. Somebody who has told the app they wear nothing can still
+   * have rows in the store from a demo, an old import, or a band they have
+   * since stopped using, and they were shown the whole Vitals panel and a
+   * Sync button for hardware they had just said they do not have.
+   */
+  if (healthSource() === 'none') return null;
+
   /* The hero and the charts read the selected band as well, so choosing
      Apple shows the tab an Apple Watch owner would actually see.
      
@@ -789,6 +800,18 @@ function vitalsSection(s, ctx) {
 
   if (!sum) {
     const mode = healthSource();
+
+    /*
+     * No band, and nothing to apologise for.
+     *
+     * Someone who has said they wear nothing should never see a Vitals
+     * heading, a sync button, or a brand name — the whole section was
+     * telling them, every visit, about a thing they do not have and
+     * cannot use. Everything the app actually does for them is below
+     * this: weight, the trend, maintenance from their own intake, the
+     * log-against-scale check, the report. None of it needs a strap.
+     */
+    if (mode === 'none') return null;
 
     /* Until you say what you wear, the honest screen is the question —
        not a Whoop button aimed at someone who may own an Apple Watch, or

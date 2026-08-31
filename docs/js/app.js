@@ -5,10 +5,11 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.31-detect';
+export const VERSION = '2026.09.01-quiet';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
-import { get, subscribe, dayKey, openDay, pushBackup, setDishDensities, flush } from './store.js';
+import { get, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
+import { applyOrb } from './theme.js';
 import { solveDensities } from './dishes.js';
 import { bestTDEE } from './nutrition.js';
 import { renderToday } from './views/today.js';
@@ -61,6 +62,10 @@ const STICKY_ROUTES = new Set(['add', 'home']);
 /* Home draws its own header — a date you can change — so the wordmark bar
    would only repeat the gear and take the best strip of the screen. */
 const OWN_HEADER = new Set(['home']);
+
+/* Before anything reads the open day: midnight cannot be noticed unless
+   the app has written down which day it last ran on. */
+noteAppOpen();
 
 const ctx = {
   route: 'home',
@@ -150,6 +155,8 @@ function applyTheme(pref) {
 
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', resolved === 'dark' ? '#000000' : '#F2F2F7');
+
+  applyOrb(get().settings?.orb || 'none', resolved);
 
 }
 

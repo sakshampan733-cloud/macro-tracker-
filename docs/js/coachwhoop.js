@@ -144,8 +144,24 @@ function dayShape(store, key, now) {
     : (sched ? ((sched.wake - sched.bed) + 24) % 24 : 7.5);
 
   const hour = now.getHours() + now.getMinutes() / 60;
+  /*
+   * How long you have been awake TODAY, or nothing.
+   *
+   * This used to wrap: before your wake time it counted from yesterday's,
+   * so at eleven minutes past midnight it reported seventeen hours awake
+   * on a day eleven minutes old — and every rule downstream took that as
+   * "most of the day is gone". The result was an app that, the instant the
+   * date changed, announced you were behind on water and had eaten
+   * nothing, and then said it again the moment you actually woke up.
+   *
+   * Between midnight and your wake time there is no honest answer. Either
+   * you are still up from yesterday, which the day-rollover prompt exists
+   * to handle, or you are asleep. Both are better served by saying nothing
+   * than by inventing a number, so this reports null and every rule that
+   * needs it stays quiet.
+   */
   const awake = wakeHour == null ? null
-    : (hour >= wakeHour ? hour - wakeHour : hour + 24 - wakeHour);
+    : (hour >= wakeHour ? hour - wakeHour : null);
 
   /* Bed is a wake time away from tomorrow, minus a night's sleep. */
   const bedHour = wakeHour == null ? null : (wakeHour + 24 - typicalSleep) % 24;
@@ -253,6 +269,8 @@ export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
   }
 
   /* ── water, paced against how long you have been up ───────────────── */
+  /* Not in the first two hours of being up — nobody is behind on water at
+     breakfast, and being told so is how a useful line becomes noise. */
   if (targets.water > 0 && d.awake != null && d.awake > 2) {
     /* Spread across waking hours rather than the clock: someone up at
        five is four hours further into their day at nine than someone who
@@ -310,6 +328,8 @@ export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
    * precisely the day most worth speaking up about. This measures from
    * waking instead.
    */
+  /* Five hours awake AND a real evening still to come. Somebody who has
+     been up an hour is not behind on anything. */
   if (!ate && d.awake != null && d.awake >= 5 && d.toBed != null && d.toBed > 1) {
     add(82, 'warn',
       `${d.awake.toFixed(0)} hours awake, nothing logged`,

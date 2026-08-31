@@ -73,16 +73,16 @@
   --h-recovery: #30D158;
 
   --m-kcal:  #FFFFFF;
-  --m-p:     #56C2FF;
-  --m-c:     #FFB84D;
-  --m-f:     #C08CFF;
-  --m-fib:   #8FD97A;
+  --m-p:     #0A84FF;
+  --m-c:     #FF9F0A;
+  --m-f:     #BF5AF2;
+  --m-fib:   #32D74B;
   --m-water: #4FD9E8;
 
-  --m-p-ink:   #56C2FF;
-  --m-c-ink:   #FFB84D;
-  --m-f-ink:   #C08CFF;
-  --m-fib-ink: #8FD97A;
+  --m-p-ink:   #4FA9FF;
+  --m-c-ink:   #FFB340;
+  --m-f-ink:   #D08BFF;
+  --m-fib-ink: #5BDE7F;
 
   --sans: 'Plex', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --cond: 'PlexCond', 'Plex', -apple-system, system-ui, sans-serif;
@@ -1150,15 +1150,15 @@ body::after {
   --h-recovery: var(--ring-exer);
 
   --m-kcal:  #FFFFFF;
-  --m-p:     #56C2FF;
-  --m-c:     #FFB84D;
-  --m-f:     #C08CFF;
-  --m-fib:   #8FD97A;
+  --m-p:     #0A84FF;
+  --m-c:     #FF9F0A;
+  --m-f:     #BF5AF2;
+  --m-fib:   #32D74B;
   --m-water: #4FD9E8;
-  --m-p-ink:   #56C2FF;
-  --m-c-ink:   #FFB84D;
-  --m-f-ink:   #C08CFF;
-  --m-fib-ink: #8FD97A;
+  --m-p-ink:   #4FA9FF;
+  --m-c-ink:   #FFB340;
+  --m-f-ink:   #D08BFF;
+  --m-fib-ink: #5BDE7F;
 
   --glass:       rgba(20, 20, 24, .44);
   --glass-solid: rgba(10, 10, 12, .82);
@@ -1232,10 +1232,10 @@ body::after {
 
   --m-kcal:  #000000;
   /* The originals, not an approximation of them. */
-  --m-p:     #1787E0;
-  --m-c:     #ED8B08;
-  --m-f:     #8654E8;
-  --m-fib:   #34A047;
+  --m-p:     #0069D9;
+  --m-c:     #C25E00;
+  --m-f:     #8944D6;
+  --m-fib:   #248A3D;
   --m-water: #0FA3B8;
   --m-p-ink:   #0A6FBE;
   --m-c-ink:   #A86A00;
@@ -1311,9 +1311,38 @@ html { background: var(--bg); }
 body::before {
   content: '';
   position: fixed; inset: 0; z-index: -1;
-  background: var(--bg);
+  background: var(--ambient, none), var(--bg);
 }
 body { background: var(--bg); }
+
+/*
+ * The optional wash. Off by default — `--orb` is only ever set when
+ * somebody picks a colour, and without it this resolves to the flat
+ * ground above.
+ */
+:root { --ambient: none; }
+:root:not([data-orb="none"]) {
+  --ambient:
+    radial-gradient(circle 62vmax at 50% 46%,
+                    rgba(var(--orb, 0 0 0), .38) 0%,
+                    rgba(var(--orb, 0 0 0), .17) 34%,
+                    rgba(var(--orb, 0 0 0), .05) 58%,
+                    transparent 76%);
+}
+:root[data-orb="none"] { --ambient: none; }
+
+.orb-row { display: flex; flex-wrap: wrap; gap: 9px; }
+.orb-dot {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line-2); background: var(--swatch, transparent);
+  background-clip: padding-box;
+}
+.orb-dot.is-on { box-shadow: 0 0 0 2px var(--accent); border-color: transparent; }
+.orb-dot[data-none] { background: var(--surface-2); position: relative; }
+.orb-dot[data-none]::after {
+  content: ''; position: absolute; inset: 8px 3px; border-top: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+}
 
 /* ── Real glass ──────────────────────────────────────────────────────── */
 
