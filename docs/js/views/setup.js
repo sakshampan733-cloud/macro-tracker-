@@ -627,6 +627,7 @@ export function renderSettings(root, ctx) {
                   st.supplementsTaken = demo.supplementsTaken;
                   st.medications = demo.medications || [];
                   st.plans = demo.plans || {};
+                  st.train = demo.train || undefined;
                   if (demo.profile) st.profile = { ...(st.profile || {}), ...demo.profile };
                   st.settings.isDemo = true;
                   /* The demo has to exercise what the app now does, or it

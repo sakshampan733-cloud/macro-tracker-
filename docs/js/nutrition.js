@@ -778,12 +778,26 @@ export function planVsActual(store, windowDays = 60) {
    * is the disagreement and nothing else.
    */
   const smoothed = trendWeight(raw, 10);
-  const points = smoothed.map((p, i) => ({
-    date: p.date,
-    expected: p.trend,
-    actual: trendBy.has(p.date) ? trendBy.get(p.date) : null,
-    logged: raw[i].logged,
-  }));
+  /*
+   * The measured line carries forward across days with no weigh-in.
+   *
+   * It is a ten-day trend, not a reading — it does not cease to exist on a
+   * morning you skipped the scale, and breaking the line there produced a
+   * dashed prediction running under a row of disconnected stubs. Held flat
+   * until the next weigh-in updates it, which is what the trend is
+   * actually doing.
+   */
+  let carried = null;
+  const points = smoothed.map((p, i) => {
+    if (trendBy.has(p.date)) carried = trendBy.get(p.date);
+    return {
+      date: p.date,
+      expected: p.trend,
+      actual: carried,
+      measured: trendBy.has(p.date),
+      logged: raw[i].logged,
+    };
+  });
 
   const withBoth = points.filter(p => p.actual != null);
   const last = withBoth[withBoth.length - 1] || null;

@@ -125,6 +125,20 @@ export function generateDemo({ years = 2, seed = 20260820 } = {}) {
 
   const days = {};
   const whoop = {};
+  /*
+   * A training history, on the days the strap already says were hard.
+   *
+   * Generating sessions independently of strain would produce a demo where
+   * the intensity readings contradict the band on half the days — which is
+   * the one thing that screen exists to notice, so seeing it fire
+   * constantly on fake data would teach the wrong lesson. Sessions land on
+   * days the generator already decided were training days, and how hard
+   * they were follows the strain those days got.
+   */
+  const trainSessions = {};
+  const rotation = ['d-back-bi', 'd-chest-tri', 'd-shoulders', 'd-legs'];
+  let rotIdx = 0;
+
   let weight = 91.0;
   let hrvBase = 52;
 
@@ -165,8 +179,35 @@ export function generateDemo({ years = 2, seed = 20260820 } = {}) {
       /* Steps come from the phone, not the strap — Whoop's API withholds
          them. Marked per field so the Vitals panel can say so. */
       steps: Math.round(6800 + strain * 420 + (r() - 0.5) * 3000),
-      by: { steps: 'apple' },
+      /* The Activity rings, which only a watch reports. Move is active
+         energy alone — the strap's kcal above is the whole day's burn,
+         and conflating the two would put a resting metabolism inside the
+         red ring. */
+      activeKcal: Math.round(240 + strain * 34 + (r() - 0.5) * 120),
+      exerciseMin: Math.round(trainingDay ? 34 + r() * 40 : 6 + r() * 18),
+      standHours: Math.round(8 + r() * 5),
+      moveGoal: 520,
+      by: { steps: 'apple', activeKcal: 'apple', exerciseMin: 'apple', standHours: 'apple' },
     };
+
+    /* ── The session, when there was one ── */
+    if (trainingDay && r() < 0.92) {
+      const type = rotation[rotIdx % rotation.length];
+      rotIdx++;
+      /* Effort follows strain, with the honest amount of slack: a strap
+         reading and how a session felt agree most of the time and not
+         always, which is exactly the case the app is built to handle. */
+      const slip = (r() - 0.5) * 4;
+      const eff = strain + slip >= 16 ? 'hard' : strain + slip >= 12 ? 'solid' : 'easy';
+      trainSessions[key] = {
+        date: key, type,
+        sets: Math.round(12 + (strain - 10) * 1.4 + (r() - 0.5) * 5),
+        minutes: Math.round(48 + (strain - 10) * 3 + (r() - 0.5) * 18),
+        effort: eff,
+        strain: +strain.toFixed(1),
+        source: r() < 0.35 ? 'whoop' : 'manual',
+      };
+    }
 
     /* ── Weight, most mornings, with real scale noise ── */
     weight += phase.drift + (r() - 0.5) * 0.10;
@@ -337,9 +378,40 @@ export function generateDemo({ years = 2, seed = 20260820 } = {}) {
     ].filter(Boolean),
   };
 
+  /*
+   * A bro split rather than push/pull/legs, with the exercises written out
+   * on two of them and left blank on the others — because that is what the
+   * app actually has to render: some workouts detailed, most not.
+   */
+  const train = {
+    rotation,
+    sessions: trainSessions,
+    types: [
+      { id: 'd-back-bi', name: 'Back & Biceps', groups: ['back', 'biceps'], minutes: 65,
+        plan: [
+          { exerciseId: 'pullup', sets: 4 },
+          { exerciseId: 'row-bb', sets: 4 },
+          { exerciseId: 'pulldown', sets: 3 },
+          { exerciseId: 'curl-bb', sets: 3 },
+          { exerciseId: 'curl-hammer', sets: 3 },
+        ] },
+      { id: 'd-chest-tri', name: 'Chest & Triceps', groups: ['chest', 'triceps'], minutes: 60,
+        plan: [
+          { exerciseId: 'bench-incline', sets: 4 },
+          { exerciseId: 'press-machine', sets: 3 },
+          { exerciseId: 'pec-deck', sets: 3 },
+          { exerciseId: 'pushdown', sets: 3 },
+          { exerciseId: 'skullcrusher', sets: 3 },
+        ] },
+      { id: 'd-shoulders', name: 'Shoulders', groups: ['shoulders'], minutes: 45 },
+      { id: 'd-legs', name: 'Legs', groups: ['legs', 'core'], minutes: 70 },
+      { id: 'd-run', name: 'Run', groups: [], cardio: true, minutes: 35 },
+    ],
+  };
+
   return {
     days, whoop: { rows: whoop, importedAt: Date.now(), source: 'demo' },
-    blood, meals, library, medications, plans,
+    blood, meals, library, medications, plans, train,
     supplementsTaken: ['vitamin-d3', 'creatine', 'multivitamin', 'omega3'],
     /* The demo carries its own profile. Without one the whole app renders
        targets of zero — every macro reads "of 0" — because BMR needs a
@@ -352,6 +424,9 @@ export function generateDemo({ years = 2, seed = 20260820 } = {}) {
     settings: {
       healthSource: 'both',
       sleepGoal: { bed: 22.75, wake: 6.5, setAt: addedAt },
+      /* So the "did you train today?" card on Home has a time to appear
+         after — otherwise the demo hides a feature it is meant to show. */
+      workoutHour: 19,
     },
     stats: { days: total, years },
   };
