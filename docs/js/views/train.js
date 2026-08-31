@@ -17,7 +17,7 @@
 import { el, clear, icon, sheet, toast, append, confirmSheet } from '../ui.js';
 import { haptic } from '../feedback.js';
 import {
-  get, dayKey, shiftDay, trainState, trainTypes, typeById, saveType, removeType,
+  get, commit, dayKey, shiftDay, trainState, trainTypes, typeById, saveType, removeType,
   rotation, setRotation, sessionFor, logSession, removeSession,
   sessions, nextUp, trainStats, trainGrid,
 } from '../store.js';
@@ -136,6 +136,28 @@ function todayCard(s, key, ctx) {
   }
 
   const t = typeById(suggestion);
+  const skipped = s.settings?.workoutAsked === key && key === dayKey();
+
+  /*
+   * Said no already.
+   *
+   * A rest day needs no declaring in a rotation, but a card asking about
+   * it all evening is still a thing to have to ignore. "Skip" quietens it
+   * without recording anything: the rotation does not advance, nothing is
+   * marked missed, and logging stays one tap away if the evening turns out
+   * differently.
+   */
+  if (skipped) {
+    return el('div.tile', {},
+      el('h3', {}, 'Rest day'),
+      el('div.fine', { style: { marginTop: '5px' } },
+        `${t?.name || 'Your next session'} stays next in the rotation. Nothing is marked `
+        + 'missed — a rotation has nothing to be late for.'),
+      el('button.btn.ghost', { style: { marginTop: '12px' },
+        onclick: () => openLogger(key, ctx, { type: suggestion, ...(band?.data || {}) }),
+      }, 'I trained after all'));
+  }
+
   return el('div.tile.train-today', {},
     el('div.micro', {}, 'Next up'),
     el('h2', { style: { margin: '2px 0 4px' } }, t?.name || 'Anything'),
@@ -154,7 +176,15 @@ function todayCard(s, key, ctx) {
            opens the same logger with no workout preselected, which is what
            you want when today was not the one that came up next. */
         onclick: () => openLogger(key, ctx, { ...(band?.data || {}), pick: true }),
-      }, 'A different one')));
+      }, 'A different one'),
+      /* The skip lived only on the Home card, which is not where somebody
+         looking at their training goes to say "not today". */
+      key === dayKey()
+        ? el('button.btn.ghost', {
+            onclick: () => { commit(st => { st.settings.workoutAsked = key; }, 'settings');
+              haptic('tap'); ctx.refresh(); },
+          }, 'Skip')
+        : null));
 }
 
 /* What the strap saw today, as a sentence — never as a verdict. */
@@ -164,10 +194,14 @@ function bandNotice(s, key) {
   const row = rowsFor(s, mode === 'apple' ? 'apple' : 'all')?.[key];
   if (!row) return null;
   const strain = row.strain, mins = row.exerciseMin;
-  if (!((strain != null && strain >= 10) || (mins != null && mins >= 20))) return null;
+  const bigStrain = strain != null && strain >= 10;
+  const bigMins = mins != null && mins >= 20;
+  if (!bigStrain && !bigMins) return null;
+  /* Only what crossed the line — naming a figure that did not reads as
+     though it were the evidence. */
   const what = [
-    mins != null ? `${Math.round(mins)} minutes of exercise` : null,
-    strain != null ? `a day strain of ${strain.toFixed(1)}` : null,
+    bigMins ? `${Math.round(mins)} minutes of exercise` : null,
+    bigStrain ? `a day strain of ${strain.toFixed(1)}` : null,
   ].filter(Boolean).join(' and ');
   return {
     line: `${bandName()} recorded ${what} today. It cannot tell what the session was, `

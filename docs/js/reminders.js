@@ -19,7 +19,8 @@
  * marked. Never an instruction to take it.
  */
 
-import { get, dayKey, doseLog } from './store.js';
+import { get, dayKey, doseLog, sessionFor } from './store.js';
+import { rowsFor, healthSource, bandName } from './applehealth.js';
 
 const FIRED = new Set();          /* medId@time@day, to fire once per day */
 
@@ -46,6 +47,53 @@ async function show(title, body, tag) {
     }
     return true;
   } catch { return false; }
+}
+
+
+/*
+ * A workout the band noticed, on a day with nothing logged.
+ *
+ * The fixed hour is a guess about when you usually finish. This is the
+ * other half: your strap already knows the day was hard, and there is no
+ * reason to wait for a clock when the evidence has arrived. Deliberately
+ * conservative — a genuinely hard day, not a brisk walk — because an app
+ * that asks "did you train?" after a long commute stops being asked back.
+ */
+export function detectedWorkout(key = dayKey()) {
+  if (key !== dayKey()) return null;
+  if (sessionFor(key)) return null;
+  const s = get();
+  if (s.settings?.workoutAsked === key) return null;
+  const mode = healthSource();
+  if (!mode) return null;
+  const row = rowsFor(s, mode === 'apple' ? 'apple' : 'all')?.[key];
+  if (!row) return null;
+
+  const strain = row.strain, mins = row.exerciseMin;
+  const bigStrain = strain != null && strain >= 10;
+  const bigMins = mins != null && mins >= 20;
+  if (!bigStrain && !bigMins) return null;
+  /* Name only what actually crossed the line. Reporting "7 minutes of
+     exercise and a strain of 15.4" reads as though seven minutes were the
+     evidence, when the strain was doing all the work. */
+  return {
+    strain, minutes: mins,
+    band: bandName(),
+    what: [bigMins ? `${Math.round(mins)} minutes of exercise` : null,
+           bigStrain ? `a day strain of ${strain.toFixed(1)}` : null]
+          .filter(Boolean).join(' and '),
+    source: mode === 'apple' ? 'apple' : 'whoop',
+  };
+}
+
+/* Is the hour you said you train past, with nothing logged? */
+export function workoutHourDue(now = new Date()) {
+  const s = get();
+  const at = s.settings?.workoutHour;
+  if (at == null) return false;
+  const key = dayKey();
+  if (sessionFor(key) || s.settings?.workoutAsked === key) return false;
+  return now.getHours() + now.getMinutes() / 60 >= at;
 }
 
 /*
@@ -82,9 +130,29 @@ export function startReminders() {
   if (typeof window === 'undefined') return () => {};
 
   const tick = async () => {
-    if (!get().medications?.length) return;
     const key = dayKey();
     const now = new Date();
+
+    /*
+     * Training, once a day at most.
+     *
+     * Fires on whichever comes first: the hour you said you train, or the
+     * band reporting a hard day. Same honesty as the doses — while the app
+     * is open, or the next time it is opened after the moment passed.
+     */
+    const stampW = `workout@${key}`;
+    if (!FIRED.has(stampW)) {
+      const seen = detectedWorkout(key);
+      if (seen || workoutHourDue(now)) {
+        FIRED.add(stampW);
+        await show('Did you train today?',
+          seen ? `${seen.band} recorded ${seen.what}. Tap to log it.`
+               : 'Tap to log your session.',
+          stampW);
+      }
+    }
+
+    if (!get().medications?.length) return;
 
     for (const d of dueNow(key, now)) {
       const stamp = `${d.med.id}@${d.time}@${key}`;

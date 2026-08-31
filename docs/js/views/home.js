@@ -17,7 +17,7 @@ import { EFFORT } from '../data/exercises.js';
 import { openMealLogger } from './meallog.js';
 import { openMealBuilder } from './meal.js';
 import { whoopAdvice } from '../coachwhoop.js';
-import { overdueNote } from '../reminders.js';
+import { overdueNote, detectedWorkout, workoutHourDue } from '../reminders.js';
 import { caffeineNote } from './supplements.js';
 import { bandName } from '../applehealth.js';
 import {
@@ -106,14 +106,22 @@ export function renderHome(root, ctx) {
  */
 function workoutAsk(key, ctx) {
   const s = get();
-  const at = s.settings?.workoutHour;
-  if (at == null) return null;
   if (key !== dayKey()) return null;
   if (sessionFor(key)) return null;
   if (s.settings?.workoutAsked === key) return null;
 
-  const now = new Date().getHours() + new Date().getMinutes() / 60;
-  if (now < at) return null;
+  /*
+   * Two ways in, whichever happens first.
+   *
+   * The hour you set is a guess about when you usually finish. The band is
+   * evidence that it already happened — and when the strap has recorded a
+   * hard day there is no reason to sit waiting for a clock. Either one
+   * opens the card; the strap's version says what it saw, because "did you
+   * train?" out of nowhere is a worse question than "your Whoop recorded
+   * 47 minutes — was that your session?"
+   */
+  const seen = detectedWorkout(key);
+  if (!seen && !workoutHourDue()) return null;
 
   const rot = trainState().rotation || [];
   const next = rot.length ? nextUp() : null;
@@ -121,10 +129,15 @@ function workoutAsk(key, ctx) {
 
   return el('div.tile.ask-card', {},
     el('div.flex', {}, icon('barbell', 17), el('h3', {}, 'Did you train today?')),
+    seen
+      ? el('div.fine', { style: { marginTop: '5px' } },
+          `${seen.band} recorded ${seen.what} today. It cannot tell what the session was, `
+          + 'so nothing has been written down.')
+      : null,
     t ? el('div.fine', { style: { marginTop: '5px' } }, `${t.name} is next in your rotation.`) : null,
     el('div.btn-row', { style: { marginTop: '12px' } },
       t ? el('button.btn.confirm.grow', {
-        onclick: () => openEffortAsk(key, next, ctx),
+        onclick: () => openEffortAsk(key, next, ctx, seen),
       }, `Yes — ${t.name}`) : null,
       el('button.btn.ghost' + (t ? '' : '.grow'), {
         onclick: () => ctx.go('train', {}),
@@ -143,7 +156,7 @@ function workoutAsk(key, ctx) {
  * supply, and asking here costs a second while the session is still fresh
  * — far better than the honest alternative, which is never being asked.
  */
-function openEffortAsk(key, typeId, ctx) {
+function openEffortAsk(key, typeId, ctx, seen = null) {
   const sh = sheet({
     title: typeById(typeId)?.name || 'Session',
     body: el('div', {},
@@ -151,9 +164,12 @@ function openEffortAsk(key, typeId, ctx) {
       el('div', {}, ...EFFORT.map(e => el('button.row', {
         onclick: () => {
           logSession(key, { type: typeId, effort: e.id,
-            minutes: typeById(typeId)?.minutes || null,
+            /* Keep the strap's own numbers on the session — they are the
+               half of the intensity reading you cannot supply. */
+            minutes: seen?.minutes ?? typeById(typeId)?.minutes ?? null,
+            strain: seen?.strain ?? null,
             sets: (typeById(typeId)?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null,
-            source: 'manual' });
+            source: seen?.source || 'manual' });
           haptic('success'); sh.close(); toast('Logged.'); ctx.refresh();
         },
       },
@@ -163,9 +179,11 @@ function openEffortAsk(key, typeId, ctx) {
         icon('chevron', 14)))),
       el('button.btn.ghost', { style: { marginTop: '12px', width: '100%' },
         onclick: () => {
-          logSession(key, { type: typeId, minutes: typeById(typeId)?.minutes || null,
+          logSession(key, { type: typeId,
+            minutes: seen?.minutes ?? typeById(typeId)?.minutes ?? null,
+            strain: seen?.strain ?? null,
             sets: (typeById(typeId)?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null,
-            source: 'manual' });
+            source: seen?.source || 'manual' });
           haptic('success'); sh.close(); toast('Logged.'); ctx.refresh();
         },
       }, 'Skip — just log it')),

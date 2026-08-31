@@ -447,10 +447,13 @@ export function renderSettings(root, ctx) {
             el('div', { style: { fontWeight: '500' } }, 'Ask me at'),
             el('div.fine', { style: { marginTop: '3px' } },
               get().settings?.workoutHour != null
-                ? `After ${clockText(get().settings.workoutHour)}, Home asks whether you trained. `
-                  + 'One tap logs it with the next session in your rotation.'
-                : 'Not set. Set the hour you usually finish training and Home will ask, '
-                  + 'rather than you having to remember to open the Train tab.')),
+                ? `After ${clockText(get().settings.workoutHour)}, Home asks whether you trained — `
+                  + 'and sooner if your band records a hard day before then. One tap logs it '
+                  + 'with the next session in your rotation. Skip, and it stops asking until '
+                  + 'tomorrow.'
+                : 'Not set. Your band can still prompt you when it records a hard day; set an '
+                  + 'hour as well and Home asks then too, rather than you having to remember '
+                  + 'to open the Train tab.')),
           el('select.sel', {
             onchange: e => {
               const v = e.target.value;
