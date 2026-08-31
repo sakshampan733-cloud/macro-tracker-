@@ -259,6 +259,10 @@ const PATHS = {
   /* Health-category glyphs. Apple files a reading under a category before
      it shows you the number, and the category is carried by its icon —
      a heart, a pair of lungs, a bed — so the Apple view needs them. */
+  /* Two figures mid-lift: a barbell. The Body tab already owns the
+     standing figure, and two tabs sharing a glyph is two tabs nobody can
+     tell apart at a glance. */
+  barbell: 'M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10M2 11v2M22 11v2',
   heart:   'M12 20.3 4.6 13a4.8 4.8 0 0 1 6.8-6.8l.6.6.6-.6A4.8 4.8 0 0 1 19.4 13z',
   lungs:   'M12 3v9M9 12c0-2-1.6-3.6-3-3.6S3 9.7 3 12v4a3 3 0 0 0 4.6 2.5L9 17.6zM15 12c0-2 1.6-3.6 3-3.6S21 9.7 21 12v4a3 3 0 0 1-4.6 2.5L15 17.6z',
   steps:   'M8 3.6c1.6 0 2.4 1.2 2.4 3 0 1.7-.5 3-.5 4.4 0 1.4.4 2.2.4 3.3 0 1.4-.8 2.2-2.3 2.2s-2.4-.9-2.4-2.4c0-1.3.3-2 .3-3.2 0-1.5-.5-2.6-.5-4.3 0-1.8.9-3 2.6-3zM16.4 8c1.4 0 2.2 1 2.2 2.6 0 1.5-.5 2.6-.5 3.8 0 1.2.4 1.9.4 2.9 0 1.2-.8 2-2.1 2s-2.2-.8-2.2-2.1c0-1.1.3-1.8.3-2.8 0-1.3-.5-2.3-.5-3.8 0-1.6.9-2.6 2.4-2.6z',

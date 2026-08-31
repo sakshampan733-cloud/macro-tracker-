@@ -981,3 +981,86 @@ export function reset() {
   persist();
   emit('reset', state);
 }
+
+/* ── Training ───────────────────────────────────────────────────────── */
+
+/*
+ * A week you set once, and the sessions you actually did.
+ *
+ * Kept apart on purpose. The plan is what you intended; the sessions are
+ * what happened. Every useful question here is the difference between the
+ * two, and a design that overwrote the plan as you logged would delete the
+ * only thing it could be measured against.
+ */
+export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+export function trainState() {
+  const s = get();
+  return s.train || { plan: {}, sessions: {} };
+}
+
+export function weekdayOf(key) {
+  /* Monday-first, because a training week starts on Monday everywhere
+     except a calendar. */
+  return WEEKDAYS[(new Date(key + 'T12:00:00').getDay() + 6) % 7];
+}
+
+export function plannedFor(key) {
+  return trainState().plan?.[weekdayOf(key)] || null;
+}
+
+export function setPlanDay(weekday, workoutId) {
+  commit(s => {
+    s.train = s.train || { plan: {}, sessions: {} };
+    if (workoutId) s.train.plan[weekday] = workoutId;
+    else delete s.train.plan[weekday];
+  }, 'train');
+}
+
+export function sessionFor(key) {
+  return trainState().sessions?.[key] || null;
+}
+
+export function logSession(key, session) {
+  commit(s => {
+    s.train = s.train || { plan: {}, sessions: {} };
+    s.train.sessions[key] = {
+      ...(s.train.sessions[key] || {}),
+      ...session,
+      loggedAt: Date.now(),
+    };
+  }, 'train');
+}
+
+export function removeSession(key) {
+  commit(s => { if (s.train?.sessions) delete s.train.sessions[key]; }, 'train');
+}
+
+/*
+ * The last N days as planned-versus-done.
+ *
+ * "Missed" is only ever said about a day that had a plan and no session.
+ * A day with no plan and no session is a day off, and calling that a miss
+ * would make the record meaningless for anyone who trains four days a
+ * week. Today is never counted as missed — the day is not over.
+ */
+export function adherence(days = 28) {
+  const t = trainState();
+  const today = dayKey();
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const key = shiftDay(today, -i);
+    const planned = t.plan?.[weekdayOf(key)] || null;
+    const done = t.sessions?.[key] || null;
+    out.push({
+      key,
+      planned: planned === 'rest' ? null : planned,
+      rest: planned === 'rest',
+      done,
+      missed: !!planned && planned !== 'rest' && !done && key !== today,
+      extra: !!done && !planned,
+      today: key === today,
+    });
+  }
+  return out;
+}

@@ -2733,3 +2733,52 @@ button.src-tag { cursor: pointer; }
 .dl-key .dl-dash { border-top-style: dashed; color: var(--muted); }
 .dl-key .dl-solid { color: var(--accent); }
 .hchart .dl-band { color: var(--accent); }
+
+/* ── Train ───────────────────────────────────────────────────────────
+   The week is a row of seven, because that is the shape a week has and
+   any other layout makes you count. State is carried by fill, not by a
+   label, so a glance answers "did I go" without reading. */
+.train-today { border-color: var(--accent-2); }
+.train-done { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+.train-done .flex svg { color: var(--good); }
+.train-detect { border-color: color-mix(in srgb, var(--caution) 40%, var(--line)); }
+.train-detect .flex svg { color: var(--caution); }
+.train-today h2 { font-size: 27px; letter-spacing: -.02em; }
+
+.wk-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.wk-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 9px 2px; border-radius: var(--r-sm);
+  background: var(--bg-2); border: 1px solid var(--line);
+  color: var(--text-2); cursor: pointer; min-width: 0;
+}
+.wk-cell.is-done { background: color-mix(in srgb, var(--good) 18%, var(--bg-2));
+                   border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+.wk-cell.is-missed { background: color-mix(in srgb, var(--warn) 14%, var(--bg-2));
+                     border-color: color-mix(in srgb, var(--warn) 38%, var(--line)); }
+.wk-cell.is-today { outline: 2px solid var(--accent); outline-offset: -1px; }
+.wk-day { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.wk-what { font-size: 11px; text-align: center; line-height: 1.2;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+.adh-grid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; }
+.adh { display: block; aspect-ratio: 1; border-radius: 3px; background: var(--surface-2); }
+.adh.is-done { background: var(--good); }
+.adh.is-missed { background: var(--warn); }
+.adh.is-rest { background: var(--line-2); }
+.adh.is-today { outline: 1.5px solid var(--accent); outline-offset: 1px; }
+
+.bal-rows { display: grid; gap: 7px; margin-bottom: 12px; }
+.bal-row { display: grid; grid-template-columns: 74px 1fr auto; align-items: center; gap: 10px; }
+.bal-name { font-size: 13px; color: var(--text-2); }
+.bal-pips { display: flex; gap: 3px; }
+.bal-pips i { width: 13px; height: 6px; border-radius: 99px; background: var(--surface-2); }
+.bal-pips i.on { background: var(--accent); }
+
+.chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px; }
+.chip {
+  padding: 7px 12px; border-radius: 99px; font-size: 13px;
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--text-2);
+  cursor: pointer;
+}
+.chip.is-on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

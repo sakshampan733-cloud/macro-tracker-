@@ -15,6 +15,7 @@ import { renderToday } from './views/today.js';
 import { renderHome } from './views/home.js';
 import { renderAdd } from './views/add.js';
 import { renderPlan } from './views/plan.js';
+import { renderTrain } from './views/train.js';
 import { renderBody } from './views/body.js';
 import { renderFoods } from './views/foods.js';
 import { renderOnboarding, renderSettings } from './views/setup.js';
@@ -41,13 +42,17 @@ const TABS = [
   { id: 'home',   label: 'Home',   icon: 'plus',  render: renderHome },
   { id: 'detail', label: 'Detail', icon: 'today', render: renderToday },
   { id: 'body',   label: 'Body',   icon: 'body',  render: renderBody },
-  { id: 'plan',   label: 'Plan',   icon: 'coach', render: renderPlan },
+  /* Train replaces Plan. Plan was advice already read; this answers a
+     question that changes daily. The old screen stays reachable so its
+     content is not lost, it simply no longer holds a tab. */
+  { id: 'train',  label: 'Train',  icon: 'barbell', render: renderTrain },
 ];
 
 const ROUTES = Object.fromEntries(TABS.map(t => [t.id, t.render]));
 ROUTES.settings = renderSettings;
 ROUTES.add = renderAdd;      // no tab; kept for old links and the shortcut
 ROUTES.foods = renderFoods;  // reached from Settings, not a tab of its own
+ROUTES.plan = renderPlan;    // no longer a tab; still reachable from Body and old links
 ROUTES.today = renderToday;  // old bookmarks land on Detail
 
 /* Screens that pin their own header. The brand bar scrolls away on these
