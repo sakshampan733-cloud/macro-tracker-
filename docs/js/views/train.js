@@ -1,27 +1,30 @@
 /*
  * Training.
  *
- * This replaces the Plan tab, which was advice you had already read. The
- * question this screen answers instead is one that changes daily and that
- * nothing else in the app could answer: is the week you are training the
- * week you meant to train.
+ * Replaces the Plan tab, which was advice you had already read.
  *
- * Three things, in the order you need them. What today is meant to be.
- * What the last four weeks actually looked like. What the plan itself is
- * missing — because a schedule you set once in January can quietly have
- * no legs in it, and nothing will tell you.
+ * The shape of this screen comes from one correction: people do not train
+ * to a calendar. The plan is a rotation that advances when you train, so
+ * doing Wednesday's session on Thursday is not a miss and a stray extra —
+ * it is Thursday. Nothing here is ever late, and rest needs no declaring,
+ * because a rest day is simply a day without a session.
+ *
+ * What the app owes you in return for that freedom is an honest account of
+ * what you actually did: how often, what has not come round in a while,
+ * and whether the effort you wrote down matches the effort your strap saw.
  */
 
 import { el, clear, icon, sheet, toast, append, confirmSheet } from '../ui.js';
 import { haptic } from '../feedback.js';
 import {
-  get, dayKey, shiftDay, WEEKDAYS, weekdayOf, trainState, plannedFor,
-  setPlanDay, sessionFor, logSession, removeSession, adherence,
+  get, dayKey, shiftDay, trainState, trainTypes, typeById, saveType, removeType,
+  rotation, setRotation, sessionFor, logSession, removeSession,
+  sessions, nextUp, trainStats, trainGrid,
 } from '../store.js';
-import { WORKOUTS, WORKOUT_LIST, weekBalance, QUALITIES } from '../data/workouts.js';
-import { rowsFor, healthSource } from '../applehealth.js';
-
-const DAY_LABEL = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
+import {
+  GROUPS, GROUP_LABEL, coverage, sessionLoad, loadMismatch,
+} from '../data/workouts.js';
+import { rowsFor, healthSource, bandName } from '../applehealth.js';
 
 export function renderTrain(root, ctx) {
   const s = get();
@@ -32,239 +35,227 @@ export function renderTrain(root, ctx) {
   append(root,
     el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Train'),
-      el('button.btn.sm.ghost', { onclick: () => openPlanEditor(ctx) }, 'Edit week')),
+      el('button.btn.sm.ghost', { onclick: () => openRotation(ctx) }, 'My split')),
     todayCard(s, key, ctx),
-    detectedCard(s, key, ctx),
-    weekStrip(ctx),
-    historyTile(),
-    balanceTile(ctx),
+    historyTile(ctx),
+    coverageTile(ctx),
   );
 }
 
-/* ── Today ──────────────────────────────────────────────────────────── */
-
-function todayCard(s, key, ctx) {
-  const planned = plannedFor(key);
-  const done = sessionFor(key);
-  const plan = trainState().plan || {};
-  const hasPlan = Object.keys(plan).length > 0;
-
-  if (!hasPlan) {
-    return el('div.tile', {},
-      el('h3', {}, 'No week set yet'),
-      el('div.fine', { style: { margin: '6px 0 12px' } },
-        'Tell the app what a normal week looks like — Monday push, Tuesday pull, '
-        + 'whatever yours is. It can then tell you what today is for, and notice '
-        + 'when a muscle group quietly drops out of your month.'),
-      el('button.btn.primary', { onclick: () => openPlanEditor(ctx) }, 'Set my week'));
-  }
-
-  if (done) {
-    const w = WORKOUTS[done.type];
-    return el('div.tile.train-done', {},
-      el('div.between', {},
-        el('div.flex', {}, icon('check', 18), el('h3', {}, `${w?.name || done.type} — done`)),
-        el('button.btn.sm.ghost', { onclick: () => openLogger(key, ctx, done) }, 'Edit')),
-      el('div.fine', { style: { marginTop: '6px' } },
-        [done.minutes ? `${done.minutes} min` : null,
-         done.strain != null ? `strain ${done.strain.toFixed(1)}` : null,
-         done.source === 'whoop' ? 'confirmed from Whoop'
-           : done.source === 'apple' ? 'confirmed from Apple Health' : 'logged by hand',
-        ].filter(Boolean).join(' · ')),
-      done.note ? el('div.fine', { style: { marginTop: '4px' } }, done.note) : null);
-  }
-
-  if (planned === 'rest') {
-    return el('div.tile', {},
-      el('h3', {}, 'Rest day'),
-      el('div.fine', { style: { marginTop: '6px' } },
-        'On the plan, not an absence. Training is the stimulus; this is where the '
-        + 'adaptation happens.'),
-      el('button.btn.ghost', { style: { marginTop: '12px' },
-        onclick: () => openLogger(key, ctx) }, 'I trained anyway'));
-  }
-
-  if (!planned) {
-    return el('div.tile', {},
-      el('h3', {}, 'Nothing planned today'),
-      el('div.fine', { style: { marginTop: '6px' } }, 'Log a session if you did one.'),
-      el('button.btn.ghost', { style: { marginTop: '12px' },
-        onclick: () => openLogger(key, ctx) }, 'Log a session'));
-  }
-
-  const w = WORKOUTS[planned];
-  return el('div.tile.train-today', {},
-    el('div.micro', {}, 'Today'),
-    el('h2', { style: { margin: '2px 0 6px' } }, w?.name || planned),
-    w ? el('div.fine', {}, w.how) : null,
-    el('div.btn-row', { style: { marginTop: '13px' } },
-      el('button.btn.primary.grow', {
-        onclick: () => openLogger(key, ctx, { type: planned }),
-      }, 'Did it'),
-      el('button.btn.ghost', {
-        onclick: () => { logSession(key, { type: 'rest', skipped: true, source: 'manual' });
-          haptic('tap'); toast('Marked as skipped.'); ctx.refresh(); },
-      }, 'Skipped')));
-}
-
-/* ── What the band noticed ──────────────────────────────────────────── */
+/* ── One card, not two ──────────────────────────────────────────────── */
 
 /*
- * Suggested, never assumed.
- *
- * A strap reports a hard hour; it cannot report that the hour was legs, or
- * that it was carrying furniture rather than training. Writing that into
- * the record unasked would turn the adherence history into fiction, which
- * is the one thing that would make this screen worth less than nothing.
- * So it offers what it saw and waits.
+ * "Did you train?" and "your strap noticed something" were two tiles
+ * asking the same question a centimetre apart. They are one question, and
+ * what the band saw is context for answering it rather than a separate
+ * matter — so it is a line inside this card, never its own card.
  */
-function detectedCard(s, key, ctx) {
-  if (sessionFor(key)) return null;
+function todayCard(s, key, ctx) {
+  const done = sessionFor(key);
+  const rot = rotation();
+  const suggestion = nextUp();
+  const band = bandNotice(s, key);
+
+  if (done) {
+    const t = typeById(done.type);
+    const load = sessionLoad(done);
+    const mism = loadMismatch(load);
+    return el('div.tile.train-done', {},
+      el('div.between', {},
+        el('div.flex', {}, icon('check', 18), el('h3', {}, t?.name || 'Session')),
+        el('button.btn.sm.ghost', { onclick: () => openLogger(key, ctx, done) }, 'Edit')),
+      el('div.fine', { style: { marginTop: '6px' } },
+        [done.sets ? `${done.sets} hard sets` : null,
+         done.minutes ? `${done.minutes} min` : null,
+         done.strain != null ? `strain ${done.strain.toFixed(1)}` : null,
+         done.source === 'manual' ? null : `confirmed from ${done.source === 'apple' ? 'Apple Health' : 'Whoop'}`,
+        ].filter(Boolean).join(' · ')),
+      done.note ? el('div.fine', { style: { marginTop: '3px' } }, done.note) : null,
+      mism ? el('div.note.info', { style: { marginTop: '10px' } }, el('div', {},
+        mism === 'sets-high'
+          ? 'You logged a lot of work, but your day was an easy one by the strap. '
+            + 'Either the sets were lighter than they felt, or the session was short '
+            + 'enough not to move the day.'
+          : 'Your strap saw a hard day and the log has very little in it. Worth adding '
+            + 'the rest before you forget it — this is the number the coverage below reads.'))
+        : null);
+  }
+
+  if (!rot.length) {
+    return el('div.tile', {},
+      el('h3', {}, 'What is your split?'),
+      el('div.fine', { style: { margin: '6px 0 12px' } },
+        'List the sessions you rotate through — back and biceps, chest and triceps, '
+        + 'whatever yours is. No days attached: it moves on when you train, so taking '
+        + 'a rest day never puts you behind.'),
+      band ? el('div.fine', { style: { marginBottom: '12px' } }, band.line) : null,
+      el('div.btn-row', {},
+        el('button.btn.primary.grow', { onclick: () => openRotation(ctx) }, 'Set my split'),
+        el('button.btn.ghost', { onclick: () => openLogger(key, ctx) }, 'Just log it')));
+  }
+
+  const t = typeById(suggestion);
+  return el('div.tile.train-today', {},
+    el('div.micro', {}, 'Next up'),
+    el('h2', { style: { margin: '2px 0 4px' } }, t?.name || 'Anything'),
+    el('div.fine', {}, groupLine(t)),
+    band ? el('div.note.info', { style: { marginTop: '10px' } },
+      el('div', {}, band.line)) : null,
+    el('div.btn-row', { style: { marginTop: '13px' } },
+      el('button.btn.primary.grow', {
+        onclick: () => openLogger(key, ctx, { type: suggestion, ...(band?.data || {}) }),
+      }, band ? `Yes — ${t?.name || 'log it'}` : `Log ${t?.name || 'session'}`),
+      el('button.btn.ghost', {
+        onclick: () => openLogger(key, ctx, { ...(band?.data || {}) }),
+      }, 'Something else')));
+}
+
+/* What the strap saw today, as a sentence — never as a verdict. */
+function bandNotice(s, key) {
   const mode = healthSource();
   if (!mode) return null;
-
-  const rows = rowsFor(s, mode === 'apple' ? 'apple' : 'all');
-  const row = rows?.[key];
+  const row = rowsFor(s, mode === 'apple' ? 'apple' : 'all')?.[key];
   if (!row) return null;
-
-  const strain = row.strain;
-  const mins = row.exerciseMin;
-  const hard = (strain != null && strain >= 10) || (mins != null && mins >= 20);
-  if (!hard) return null;
-
-  const planned = plannedFor(key);
+  const strain = row.strain, mins = row.exerciseMin;
+  if (!((strain != null && strain >= 10) || (mins != null && mins >= 20))) return null;
   const what = [
     mins != null ? `${Math.round(mins)} minutes of exercise` : null,
     strain != null ? `a day strain of ${strain.toFixed(1)}` : null,
   ].filter(Boolean).join(' and ');
-  const band = mode === 'apple' ? 'Your Apple Watch' : 'Your Whoop';
-
-  return el('div.tile.train-detect', {},
-    el('div.flex', {}, icon('bolt', 16), el('h3', {}, 'Did you train today?')),
-    el('div.fine', { style: { margin: '6px 0 12px' } },
-      `${band} recorded ${what}. It cannot tell what the session was, so nothing `
-      + 'has been written down.'),
-    el('div.btn-row', {},
-      planned && planned !== 'rest'
-        ? el('button.btn.primary.grow', {
-            onclick: () => { logSession(key, { type: planned, minutes: mins ? Math.round(mins) : null,
-              strain, source: mode === 'apple' ? 'apple' : 'whoop' });
-              haptic('success'); toast(`${WORKOUTS[planned]?.name} logged.`); ctx.refresh(); },
-          }, `Yes — ${WORKOUTS[planned]?.name || planned}`)
-        : null,
-      el('button.btn.ghost.grow', {
-        onclick: () => openLogger(key, ctx, { minutes: mins ? Math.round(mins) : null, strain,
-          source: mode === 'apple' ? 'apple' : 'whoop' }),
-      }, planned && planned !== 'rest' ? 'Something else' : 'Yes, log it')));
+  return {
+    line: `${bandName()} recorded ${what} today. It cannot tell what the session was, `
+        + 'so nothing has been written down.',
+    data: { minutes: mins != null ? Math.round(mins) : null, strain: strain ?? null,
+            source: mode === 'apple' ? 'apple' : 'whoop' },
+  };
 }
 
-/* ── The week at a glance ───────────────────────────────────────────── */
+const groupLine = t => !t ? 'Log whatever you did.'
+  : t.cardio || !t.groups?.length ? 'Cardio — tracked, but it does not count towards muscle coverage.'
+  : t.groups.map(g => GROUP_LABEL[g] || g).join(' · ');
 
-function weekStrip(ctx) {
-  const today = dayKey();
-  const monday = shiftDay(today, -((new Date(today + 'T12:00:00').getDay() + 6) % 7));
-  const cells = [];
-  for (let i = 0; i < 7; i++) {
-    const key = shiftDay(monday, i);
-    const wd = WEEKDAYS[i];
-    const planned = trainState().plan?.[wd];
-    const done = sessionFor(key);
-    const future = key > today;
-    const missed = planned && planned !== 'rest' && !done && !future && key !== today;
-    cells.push(el('button.wk-cell'
-        + (done && !done.skipped ? '.is-done' : '')
-        + (missed || done?.skipped ? '.is-missed' : '')
-        + (key === today ? '.is-today' : ''), {
-      onclick: () => openLogger(key, ctx, done || (planned ? { type: planned } : undefined)),
-      title: `${key} — ${planned ? WORKOUTS[planned]?.name || planned : 'nothing planned'}`,
-    },
-      el('span.wk-day', {}, DAY_LABEL[wd]),
-      el('span.wk-what', {}, done && !done.skipped ? (WORKOUTS[done.type]?.name || '—')
-        : planned === 'rest' ? 'Rest'
-        : planned ? WORKOUTS[planned]?.name || planned : '—')));
-  }
-  return el('div.tile', {},
-    el('div.tile-head', {}, el('h3', {}, 'This week')),
-    el('div.wk-strip', {}, ...cells));
-}
+/* ── Four weeks, and a year behind it ───────────────────────────────── */
 
-/* ── Four weeks of it ───────────────────────────────────────────────── */
+function historyTile(ctx) {
+  const grid = trainGrid(28);
+  const st = trainStats(28);
+  const trained = grid.filter(d => d.session).length;
 
-function historyTile() {
-  const days = adherence(28);
-  const planned = days.filter(d => d.planned).length;
-  const hit = days.filter(d => d.planned && d.done && !d.done.skipped).length;
-  const missed = days.filter(d => d.missed).length;
-  const extra = days.filter(d => d.extra && !d.done.skipped).length;
+  return el('div.tile.tappable', {
+    role: 'button', tabIndex: 0,
+    onclick: () => openCalendar(ctx),
+    onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCalendar(ctx); } },
+  },
+    el('div.between', { style: { marginBottom: '10px' } },
+      el('h3', {}, 'Last four weeks', icon('chevron', 13)),
+      el('span.micro', {}, `${trained} session${trained === 1 ? '' : 's'}`)),
 
-  if (!planned && !extra) {
-    return el('div.tile', {},
-      el('div.tile-head', {}, el('h3', {}, 'Last four weeks')),
-      el('div.fine', {}, 'Nothing to compare yet. Set a week and log a session or two.'));
-  }
-
-  const pct = planned ? Math.round((hit / planned) * 100) : null;
-  return el('div.tile', {},
-    el('div.tile-head', {},
-      el('h3', {}, 'Last four weeks'),
-      pct != null ? el('span.micro', {}, `${hit} of ${planned} sessions`) : null),
-
-    el('div.adh-grid', {}, ...days.map(d => el('i.adh'
-      + (d.done && !d.done.skipped ? '.is-done' : d.missed || d.done?.skipped ? '.is-missed'
-        : d.rest ? '.is-rest' : '')
-      + (d.today ? '.is-today' : ''), {
-      title: `${d.key} — ${d.done && !d.done.skipped ? (WORKOUTS[d.done.type]?.name || 'trained')
-        : d.missed ? 'missed ' + (WORKOUTS[d.planned]?.name || '') : d.rest ? 'rest' : 'nothing planned'}`,
+    el('div.adh-grid', {}, ...grid.map(d => el('i.adh'
+      + (d.session ? '.is-done' : '') + (d.today ? '.is-today' : ''), {
+      title: d.session ? `${d.key} — ${typeById(d.session.type)?.name || 'trained'}`
+                       : `${d.key} — rest`,
     }))),
 
     el('div.fine', { style: { marginTop: '10px' } },
-      pct != null
-        ? `You did ${pct}% of what you planned.`
-          + (missed ? ` ${missed} session${missed === 1 ? '' : 's'} missed.` : '')
-          + (extra ? ` ${extra} session${extra === 1 ? '' : 's'} you had not planned.` : '')
-        : `${extra} session${extra === 1 ? '' : 's'} logged, none of them planned.`));
+      trained
+        ? `${st.perWeek} a week. `
+          + (st.daysSince === 0 ? 'Trained today.'
+            : `Last session ${st.daysSince} day${st.daysSince === 1 ? '' : 's'} ago.`)
+          + (st.longestGap >= 5 ? ` Longest break was ${st.longestGap} days.` : '')
+        : 'Nothing logged yet. Tap for the full calendar.'));
 }
 
-/* ── What the plan itself is missing ────────────────────────────────── */
-
 /*
- * A schedule set once can quietly have no legs in it, and nothing in a
- * training app usually says so — it will happily record perfect adherence
- * to a bad week. This reads the plan rather than the log, because that is
- * where the omission actually lives.
+ * The calendar, one tap in rather than always on screen.
+ *
+ * A month grid is the right shape for "what did I do on the 14th" and the
+ * wrong shape for "am I training enough", which is the question the tab
+ * itself has to answer at a glance. So the squares stay on the tab and
+ * this holds the detail.
  */
-function balanceTile(ctx) {
-  const plan = trainState().plan || {};
-  const ids = WEEKDAYS.map(d => plan[d]).filter(Boolean);
-  if (!ids.length) return null;
+function openCalendar(ctx) {
+  let offset = 0;
+  const body = el('div');
 
-  const b = weekBalance(ids);
+  const draw = () => {
+    clear(body);
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const label = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    const lead = (first.getDay() + 6) % 7;           /* Monday-first */
+
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push(el('i.cal-pad'));
+    let trained = 0;
+    for (let d = 1; d <= daysIn; d++) {
+      const key = `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const sess = sessionFor(key);
+      const future = key > dayKey();
+      if (sess) trained++;
+      cells.push(el('button.cal-day'
+          + (sess ? '.is-done' : '') + (key === dayKey() ? '.is-today' : '')
+          + (future ? '.is-future' : ''), {
+        disabled: future,
+        title: sess ? typeById(sess.type)?.name || 'trained' : key,
+        onclick: () => { sh.close(); openLogger(key, ctx, sess || undefined); },
+      },
+        el('span.cal-n', {}, String(d)),
+        sess ? el('span.cal-tag', {}, (typeById(sess.type)?.name || '·').slice(0, 8)) : null));
+    }
+
+    body.append(
+      el('div.between', { style: { marginBottom: '10px' } },
+        el('button.btn.sm.ghost', { onclick: () => { offset--; draw(); } }, '‹'),
+        el('h3', {}, label),
+        el('button.btn.sm.ghost', {
+          disabled: offset >= 0,
+          onclick: () => { if (offset < 0) { offset++; draw(); } },
+        }, '›')),
+      el('div.cal-head', {}, ...['M', 'T', 'W', 'T', 'F', 'S', 'S']
+        .map(d => el('span.micro', {}, d))),
+      el('div.cal-grid', {}, ...cells),
+      el('div.fine', { style: { marginTop: '10px' } },
+        `${trained} session${trained === 1 ? '' : 's'} this month. Tap any day to log or edit it.`));
+  };
+  draw();
+  const sh = sheet({ title: 'Training calendar', body });
+  return sh;
+}
+
+/* ── What has not come round lately ─────────────────────────────────── */
+
+function coverageTile(ctx) {
+  const recent = sessions(14);
+  if (!recent.length) return null;
+  const c = coverage(recent, trainTypes(), 14);
+
   const lines = [];
-  if (b.untrained.length)
+  if (c.untrained.length)
     lines.push(el('div.note.warn', {}, el('div', {},
-      el('b', {}, `Nothing in your week trains ${listOf(b.untrained)}.`),
-      ' A week you follow perfectly still leaves that untrained — the plan is what '
-      + 'needs changing, not your adherence.')));
-  if (b.thin.length)
+      el('b', {}, `${cap(listOf(c.untrained.map(g => GROUP_LABEL[g])))} not trained in a fortnight.`),
+      ' Not a rule you have broken — a rotation drifts, and this is the drift.')));
+  else if (c.thin.length)
     lines.push(el('div.note.info', {}, el('div', {},
-      `${cap(listOf(b.thin))} ${b.thin.length === 1 ? 'gets' : 'get'} one session a week. `
-      + 'That holds what you have. Twice is where growth reliably starts.')));
-  if (!lines.length)
+      `${cap(listOf(c.thin.map(g => GROUP_LABEL[g])))} came round once in two weeks. `
+      + 'Once holds what you have; twice is where growth reliably starts.')));
+  else
     lines.push(el('div.note', {}, el('div', {},
-      `Every group gets at least two sessions across ${b.sessions} training days. `
-      + 'Nothing is being quietly skipped.')));
+      `Every group has come round at least twice in the last fortnight, across `
+      + `${c.total} session${c.total === 1 ? '' : 's'}. Nothing is drifting.`)));
 
   return el('div.tile', {},
     el('div.tile-head', {},
-      el('h3', {}, 'What your week covers'),
-      el('span.micro', {}, `${b.sessions} training day${b.sessions === 1 ? '' : 's'}`)),
+      el('h3', {}, 'Last fortnight'),
+      el('span.micro', {}, `${c.total} session${c.total === 1 ? '' : 's'}`)),
     el('div.bal-rows', {},
-      ...Object.entries(b.hits).filter(([g]) => g !== 'full body').map(([g, n]) =>
-        el('div.bal-row', {},
-          el('span.bal-name', {}, cap(g)),
-          el('span.bal-pips', {}, ...Array.from({ length: Math.max(3, n) }, (_, i) =>
-            el('i' + (i < n ? '.on' : '')))),
-          el('span.micro', {}, n === 0 ? 'none' : `${n}×`)))),
+      ...GROUPS.map(g => el('div.bal-row', {},
+        el('span.bal-name', {}, GROUP_LABEL[g]),
+        el('span.bal-pips', {}, ...Array.from({ length: Math.max(3, c.hits[g]) }, (_, i) =>
+          el('i' + (i < c.hits[g] ? '.on' : '')))),
+        el('span.micro', {}, c.hits[g] === 0 ? 'none' : `${c.hits[g]}×`)))),
+    c.cardio ? el('div.fine', { style: { marginBottom: '10px' } },
+      `Plus ${c.cardio} cardio session${c.cardio === 1 ? '' : 's'}, which do not count towards muscle coverage.`) : null,
     ...lines);
 }
 
@@ -272,51 +263,140 @@ const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const listOf = a => a.length === 1 ? a[0]
   : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
 
-/* ── Editing the week ───────────────────────────────────────────────── */
+/* ── The split ──────────────────────────────────────────────────────── */
 
-function openPlanEditor(ctx) {
+function openRotation(ctx) {
   const body = el('div');
   const draw = () => {
     clear(body);
-    const plan = trainState().plan || {};
-    for (const wd of WEEKDAYS) {
-      const cur = plan[wd];
-      body.append(el('button.row', {
-        onclick: () => openPicker(wd, () => { draw(); ctx.refresh(); }),
-      },
+    const rot = rotation();
+    if (!rot.length) {
+      body.append(el('div.fine', { style: { marginBottom: '12px' } },
+        'Nothing in your rotation yet.'));
+    }
+    rot.forEach((id, i) => {
+      const t = typeById(id);
+      body.append(el('div.row', {},
+        el('span.rot-n', {}, String(i + 1)),
         el('span.grow', {},
-          el('div.title', {}, DAY_LABEL[wd]),
-          el('div.sub', {}, cur ? (WORKOUTS[cur]?.name || cur) : 'nothing set')),
-        icon('chevron', 14)));
+          el('div.title', {}, t?.name || 'Deleted workout'),
+          el('div.sub', {}, groupLine(t))),
+        el('button.btn.sm.ghost', {
+          disabled: i === 0, 'aria-label': 'Move up',
+          onclick: () => { const n = rot.slice(); [n[i - 1], n[i]] = [n[i], n[i - 1]];
+            setRotation(n); draw(); ctx.refresh(); },
+        }, '↑'),
+        el('button.btn.sm.ghost', {
+          'aria-label': 'Remove from rotation',
+          onclick: () => { setRotation(rot.filter((_, j) => j !== i)); draw(); ctx.refresh(); },
+        }, '×')));
+    });
+    body.append(
+      el('div.btn-row', { style: { marginTop: '12px' } },
+        el('button.btn.ghost.grow', {
+          onclick: () => openTypePicker(id => {
+            setRotation([...rotation(), id]); draw(); ctx.refresh();
+          }, ctx, draw),
+        }, icon('plus', 15), 'Add to rotation')));
+  };
+  draw();
+  const sh = sheet({
+    title: 'My split',
+    body: el('div', {},
+      el('div.fine', { style: { marginBottom: '12px' } },
+        'The order you cycle through. It advances when you train, not when the date '
+        + 'changes — skip a day, take a week off, and the next one up is still the next '
+        + 'one up.'),
+      body),
+  });
+  return sh;
+}
+
+function openTypePicker(onPick, ctx, refreshParent) {
+  const list = el('div');
+  const draw = () => {
+    clear(list);
+    for (const t of trainTypes()) {
+      list.append(el('div.row', {},
+        el('button.grow', { class: 'row-main', onclick: () => { onPick(t.id); haptic('tap'); sh.close(); } },
+          el('div.title', {}, t.name),
+          el('div.sub', {}, groupLine(t))),
+        el('button.btn.sm.ghost', {
+          'aria-label': `Edit ${t.name}`,
+          onclick: () => openTypeEditor(t, () => { draw(); refreshParent?.(); ctx.refresh(); }),
+        }, icon('edit', 14))));
     }
   };
   draw();
-  return sheet({
-    title: 'Your week',
-    body: el('div', {},
-      el('div.fine', { style: { marginBottom: '12px' } },
-        'Set it once. Rest days count — putting them on the plan is what lets the app '
-        + 'tell a day off from a missed session.'),
-      body),
+  const sh = sheet({
+    title: 'Choose a workout',
+    body: el('div', {}, list,
+      el('button.btn.ghost', { style: { marginTop: '12px', width: '100%' },
+        onclick: () => openTypeEditor(null, () => { draw(); refreshParent?.(); ctx.refresh(); }),
+      }, icon('plus', 15), 'Build a new one')),
   });
+  return sh;
 }
 
-function openPicker(weekday, after) {
-  const s = sheet({
-    title: DAY_LABEL[weekday],
+/*
+ * Building a workout.
+ *
+ * A name and the groups it covers, and nothing else is required — the
+ * groups are the only part the app reasons about, and asking for more
+ * before you can log anything is how a training tab goes unused.
+ */
+function openTypeEditor(existing, after) {
+  const state = {
+    name: existing?.name || '',
+    groups: new Set(existing?.groups || []),
+    cardio: !!existing?.cardio,
+  };
+  const nameIn = el('input', { type: 'text', placeholder: 'Chest & Triceps', value: state.name });
+  const chips = el('div.chip-wrap');
+  const drawChips = () => {
+    clear(chips);
+    for (const g of GROUPS) {
+      chips.append(el('button.chip' + (state.groups.has(g) ? '.is-on' : ''), {
+        disabled: state.cardio,
+        onclick: () => { state.groups.has(g) ? state.groups.delete(g) : state.groups.add(g);
+          drawChips(); },
+      }, GROUP_LABEL[g]));
+    }
+    chips.append(el('button.chip' + (state.cardio ? '.is-on' : ''), {
+      onclick: () => { state.cardio = !state.cardio; if (state.cardio) state.groups.clear(); drawChips(); },
+    }, 'Cardio'));
+  };
+  drawChips();
+
+  const sh = sheet({
+    title: existing ? 'Edit workout' : 'New workout',
     body: el('div', {},
-      el('button.row', {
-        onclick: () => { setPlanDay(weekday, null); s.close(); after(); },
-      }, el('span.grow', {}, el('div.title', {}, 'Nothing set'))),
-      ...WORKOUT_LIST.map(w => el('button.row', {
-        onclick: () => { setPlanDay(weekday, w.id); haptic('tap'); s.close(); after(); },
-      },
-        el('span.grow', {},
-          el('div.title', {}, w.name),
-          el('div.sub', {}, w.quality ? QUALITIES[w.quality] : w.why)),
-        icon('chevron', 14)))),
+      nameIn,
+      el('div.section-label', { style: { marginTop: '14px' } },
+        el('span.micro', {}, 'What it trains')),
+      chips,
+      el('div.fine', {}, 'Pick every group the session covers. Cardio is tracked but does '
+        + 'not count towards muscle coverage — it is not a muscle group.')),
+    foot: el('div.btn-row', {},
+      existing && !existing.id.startsWith('p-') ? el('button.btn.ghost', {
+        onclick: () => confirmSheet({
+          title: `Delete ${existing.name}?`,
+          body: 'Sessions you already logged with it are kept.',
+          confirm: 'Delete',
+          onConfirm: () => { removeType(existing.id); sh.close(); after(); },
+        }),
+      }, 'Delete') : null,
+      el('button.btn.primary.grow', {
+        onclick: () => {
+          const name = nameIn.value.trim();
+          if (!name) { toast('Give it a name.', 'err'); return; }
+          if (!state.cardio && !state.groups.size) { toast('Pick at least one group.', 'err'); return; }
+          saveType({ id: existing?.id, name, groups: [...state.groups], cardio: state.cardio });
+          haptic('success'); sh.close(); after();
+        },
+      }, 'Save')),
   });
-  return s;
+  return sh;
 }
 
 /* ── Logging one session ────────────────────────────────────────────── */
@@ -324,65 +404,110 @@ function openPicker(weekday, after) {
 function openLogger(key, ctx, prefill = {}) {
   const existing = sessionFor(key);
   const state = {
-    type: prefill.type || existing?.type || plannedFor(key) || 'fullbody',
-    minutes: prefill.minutes ?? existing?.minutes ?? '',
-    note: existing?.note || '',
+    type: prefill.type || existing?.type || nextUp() || trainTypes()[0]?.id,
+    detail: !!existing?.exercises?.length,
+    exercises: (existing?.exercises || []).slice(),
   };
 
   const typeRow = el('div.chip-wrap');
+  const groupsLine = el('div.fine');
   const drawTypes = () => {
     clear(typeRow);
-    for (const w of WORKOUT_LIST) {
-      typeRow.append(el('button.chip' + (state.type === w.id ? '.is-on' : ''), {
-        onclick: () => { state.type = w.id; drawTypes(); drawWhy(); },
-      }, w.name));
+    for (const t of trainTypes()) {
+      typeRow.append(el('button.chip' + (state.type === t.id ? '.is-on' : ''), {
+        onclick: () => { state.type = t.id; drawTypes(); },
+      }, t.name));
     }
+    groupsLine.textContent = groupLine(typeById(state.type));
   };
-  const why = el('div.fine');
-  const drawWhy = () => {
-    const w = WORKOUTS[state.type];
-    why.textContent = w ? w.why : '';
-  };
-  drawTypes(); drawWhy();
+  drawTypes();
 
-  const mins = el('input.num-in', {
-    type: 'number', inputmode: 'numeric', min: '0', max: '600',
-    placeholder: 'minutes', value: state.minutes,
-  });
-  const note = el('input', { type: 'text', placeholder: 'Note (optional)', value: state.note });
+  const setsIn = el('input.num-in', { type: 'number', inputmode: 'numeric', min: '0', max: '100',
+    placeholder: 'hard sets', value: existing?.sets ?? '' });
+  const minsIn = el('input.num-in', { type: 'number', inputmode: 'numeric', min: '0', max: '600',
+    placeholder: 'minutes', value: prefill.minutes ?? existing?.minutes ?? '' });
+  const noteIn = el('input', { type: 'text', placeholder: 'Note (optional)', value: existing?.note || '' });
+
+  /*
+   * The exercise list is folded away on purpose.
+   *
+   * Hard sets is the number that drives everything the app says about
+   * load, and it takes three seconds. Exercises, reps and weights give a
+   * fuller picture to the few who will enter them every single time, and
+   * nothing at all from everyone else — so they are here for whoever
+   * wants them and never in the way of logging.
+   */
+  const exWrap = el('div.ex-list');
+  const drawEx = () => {
+    clear(exWrap);
+    state.exercises.forEach((ex, i) => {
+      exWrap.append(el('div.ex-row', {},
+        el('input', { type: 'text', placeholder: 'Exercise', value: ex.name || '',
+          oninput: e => { state.exercises[i].name = e.target.value; } }),
+        el('input.num-in', { type: 'number', inputmode: 'numeric', placeholder: 'sets',
+          value: ex.sets ?? '', oninput: e => { state.exercises[i].sets = +e.target.value || null; } }),
+        el('input.num-in', { type: 'text', inputmode: 'decimal', placeholder: 'kg × reps',
+          value: ex.detail || '', oninput: e => { state.exercises[i].detail = e.target.value; } }),
+        el('button.btn.sm.ghost', { 'aria-label': 'Remove',
+          onclick: () => { state.exercises.splice(i, 1); drawEx(); } }, '×')));
+    });
+    exWrap.append(el('button.btn.sm.ghost', {
+      onclick: () => { state.exercises.push({ name: '', sets: null, detail: '' }); drawEx(); },
+    }, icon('plus', 14), 'Add exercise'));
+  };
+  drawEx();
+
+  const detailBlock = el('div', { style: { display: state.detail ? 'block' : 'none' } },
+    el('div.section-label', { style: { marginTop: '14px' } },
+      el('span.micro', {}, 'Exercises')),
+    exWrap);
 
   const sh = sheet({
     title: key === dayKey() ? 'Log today' : `Log ${key}`,
     body: el('div', {},
       el('div.section-label', {}, el('span.micro', {}, 'What was it')),
       typeRow,
-      why,
-      el('div', { style: { height: '14px' } }),
-      el('div.section-label', {}, el('span.micro', {}, 'How long')),
-      mins,
+      groupsLine,
+      el('div.section-label', { style: { marginTop: '14px' } },
+        el('span.micro', {}, 'How much')),
+      el('div.flex', { style: { gap: '8px' } }, setsIn, minsIn),
+      el('div.fine', { style: { marginTop: '5px' } },
+        'Hard sets is the one that matters — sets taken close to failure. Leave it blank '
+        + 'if you would rather not count.'),
       el('div', { style: { height: '12px' } }),
-      note),
+      noteIn,
+      el('button.btn.sm.ghost', { style: { marginTop: '12px' },
+        onclick: e => {
+          state.detail = !state.detail;
+          detailBlock.style.display = state.detail ? 'block' : 'none';
+          e.currentTarget.textContent = state.detail ? 'Hide exercises' : 'Add exercises';
+        },
+      }, state.detail ? 'Hide exercises' : 'Add exercises'),
+      detailBlock),
     foot: el('div.btn-row', {},
       existing ? el('button.btn.ghost', {
         onclick: () => confirmSheet({
           title: 'Remove this session?',
-          body: 'The day goes back to whatever the plan says.',
+          body: 'The day goes back to being a rest day.',
           confirm: 'Remove',
           onConfirm: () => { removeSession(key); sh.close(); toast('Removed.'); ctx.refresh(); },
         }),
       }, 'Remove') : null,
       el('button.btn.primary.grow', {
         onclick: () => {
+          const kept = state.exercises.filter(e => (e.name || '').trim());
+          const setsFromEx = kept.reduce((a, e) => a + (e.sets || 0), 0);
           logSession(key, {
             type: state.type,
-            minutes: mins.value ? +mins.value : null,
+            sets: setsIn.value ? +setsIn.value : (setsFromEx || null),
+            minutes: minsIn.value ? +minsIn.value : null,
             strain: prefill.strain ?? existing?.strain ?? null,
-            note: note.value.trim(),
+            note: noteIn.value.trim(),
+            exercises: kept,
             source: prefill.source || existing?.source || 'manual',
-            skipped: false,
           });
           haptic('success');
-          toast(`${WORKOUTS[state.type]?.name} logged.`);
+          toast(`${typeById(state.type)?.name || 'Session'} logged.`);
           sh.close();
           ctx.refresh();
         },

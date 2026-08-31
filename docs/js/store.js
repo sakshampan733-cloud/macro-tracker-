@@ -9,6 +9,7 @@
 import { per100For, STYLES } from './dishes.js';
 import { MICROS, NUTRIENTS } from './data/nutrients.js';
 import { supplementMicros } from './data/supplements.js';
+import { PRESETS as PRESET_TYPES } from './data/workouts.js';
 
 const KEY = 'basal.v1';
 const LEGACY_KEYS = ['assay.v1'];   // the app was called Assay before this
@@ -982,85 +983,142 @@ export function reset() {
   emit('reset', state);
 }
 
+
 /* ── Training ───────────────────────────────────────────────────────── */
 
 /*
- * A week you set once, and the sessions you actually did.
+ * A rotation, not a timetable.
  *
- * Kept apart on purpose. The plan is what you intended; the sessions are
- * what happened. Every useful question here is the difference between the
- * two, and a design that overwrote the plan as you logged would delete the
- * only thing it could be measured against.
+ * The first version of this bound workouts to weekdays, which quietly
+ * asserted that Wednesday means legs and that a Wednesday without legs is
+ * a failure. Plenty of people — including the person this was built for —
+ * train in a cycle instead: back, then chest, then shoulders, with rest
+ * taken when it is needed rather than when the calendar says. Under a
+ * weekday plan, doing Wednesday's session on Thursday is recorded as one
+ * miss and one unplanned extra. It was neither. It was Thursday.
+ *
+ * So the plan is an ordered list that advances when you train, and the
+ * calendar has no opinion about it. Skip three days and the next one up is
+ * still the next one up. Nothing is ever "late".
  */
-export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+const seedTypes = () => PRESET_TYPES.map(t => ({ ...t }));
 
 export function trainState() {
   const s = get();
-  return s.train || { plan: {}, sessions: {} };
+  const t = s.train || {};
+  return {
+    types: t.types?.length ? t.types : seedTypes(),
+    rotation: t.rotation || [],
+    sessions: t.sessions || {},
+  };
 }
 
-export function weekdayOf(key) {
-  /* Monday-first, because a training week starts on Monday everywhere
-     except a calendar. */
-  return WEEKDAYS[(new Date(key + 'T12:00:00').getDay() + 6) % 7];
-}
-
-export function plannedFor(key) {
-  return trainState().plan?.[weekdayOf(key)] || null;
-}
-
-export function setPlanDay(weekday, workoutId) {
+function mutTrain(fn, evt = 'train') {
   commit(s => {
-    s.train = s.train || { plan: {}, sessions: {} };
-    if (workoutId) s.train.plan[weekday] = workoutId;
-    else delete s.train.plan[weekday];
-  }, 'train');
+    s.train = s.train || {};
+    if (!s.train.types?.length) s.train.types = seedTypes();
+    s.train.rotation = s.train.rotation || [];
+    s.train.sessions = s.train.sessions || {};
+    fn(s.train);
+  }, evt);
 }
 
-export function sessionFor(key) {
-  return trainState().sessions?.[key] || null;
+export const trainTypes = () => trainState().types;
+export const typeById = id => trainState().types.find(t => t.id === id) || null;
+
+export function saveType(type) {
+  mutTrain(t => {
+    const i = t.types.findIndex(x => x.id === type.id);
+    if (i >= 0) t.types[i] = { ...t.types[i], ...type };
+    else t.types.push({ ...type, id: type.id || 'w' + uid() });
+  });
 }
+
+export function removeType(id) {
+  mutTrain(t => {
+    t.types = t.types.filter(x => x.id !== id);
+    t.rotation = t.rotation.filter(x => x !== id);
+    /* Sessions keep their type id deliberately. Deleting a workout should
+       not rewrite what you did last month into something you did not do. */
+  });
+}
+
+export const rotation = () => trainState().rotation;
+export function setRotation(ids) { mutTrain(t => { t.rotation = ids.slice(); }); }
+
+export const sessionFor = key => trainState().sessions?.[key] || null;
 
 export function logSession(key, session) {
-  commit(s => {
-    s.train = s.train || { plan: {}, sessions: {} };
-    s.train.sessions[key] = {
-      ...(s.train.sessions[key] || {}),
-      ...session,
-      loggedAt: Date.now(),
-    };
-  }, 'train');
+  mutTrain(t => {
+    t.sessions[key] = { ...(t.sessions[key] || {}), ...session, date: key, loggedAt: Date.now() };
+  });
 }
 
 export function removeSession(key) {
-  commit(s => { if (s.train?.sessions) delete s.train.sessions[key]; }, 'train');
+  mutTrain(t => { delete t.sessions[key]; });
+}
+
+/* Every session, newest last, optionally limited to a recent window. */
+export function sessions(days = null) {
+  const all = Object.values(trainState().sessions)
+    .filter(s => s && s.type)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!days) return all;
+  const from = shiftDay(dayKey(), -(days - 1));
+  return all.filter(s => s.date >= from);
 }
 
 /*
- * The last N days as planned-versus-done.
+ * What comes next in the cycle.
  *
- * "Missed" is only ever said about a day that had a plan and no session.
- * A day with no plan and no session is a day off, and calling that a miss
- * would make the record meaningless for anyone who trains four days a
- * week. Today is never counted as missed — the day is not over.
+ * Read from the last thing actually trained rather than from a counter,
+ * so logging a session out of order, editing one, or deleting one all
+ * leave the rotation pointing somewhere sensible without any repair step.
  */
-export function adherence(days = 28) {
-  const t = trainState();
-  const today = dayKey();
+export function nextUp() {
+  const { rotation: rot } = trainState();
+  if (!rot.length) return null;
+  const past = sessions().filter(s => rot.includes(s.type));
+  if (!past.length) return rot[0];
+  const last = past[past.length - 1];
+  return rot[(rot.indexOf(last.type) + 1) % rot.length];
+}
+
+/*
+ * How often, not how obedient.
+ *
+ * With no timetable there is nothing to be behind on, so the honest
+ * measure is frequency and the gaps between sessions. A rest day is
+ * simply a day without one — it needs no declaring, which is the whole
+ * point of dropping the calendar.
+ */
+export function trainStats(days = 28) {
+  const from = shiftDay(dayKey(), -(days - 1));
+  const list = sessions().filter(s => s.date >= from);
+  const perWeek = list.length ? +(list.length / (days / 7)).toFixed(1) : 0;
+
+  let longestGap = 0, currentGap = 0;
+  const have = new Set(list.map(s => s.date));
+  for (let i = 0; i < days; i++) {
+    const key = shiftDay(dayKey(), -i);
+    if (have.has(key)) break;
+    currentGap++;
+  }
+  let run = 0;
+  for (let i = days - 1; i >= 0; i--) {
+    if (have.has(shiftDay(dayKey(), -i))) run = 0;
+    else { run++; longestGap = Math.max(longestGap, run); }
+  }
+  return { sessions: list.length, days, perWeek, daysSince: currentGap, longestGap };
+}
+
+/* The day grid: one entry per day, newest last. */
+export function trainGrid(days = 28, endKey = dayKey()) {
   const out = [];
   for (let i = days - 1; i >= 0; i--) {
-    const key = shiftDay(today, -i);
-    const planned = t.plan?.[weekdayOf(key)] || null;
-    const done = t.sessions?.[key] || null;
-    out.push({
-      key,
-      planned: planned === 'rest' ? null : planned,
-      rest: planned === 'rest',
-      done,
-      missed: !!planned && planned !== 'rest' && !done && key !== today,
-      extra: !!done && !planned,
-      today: key === today,
-    });
+    const key = shiftDay(endKey, -i);
+    out.push({ key, session: trainState().sessions?.[key] || null, today: key === dayKey() });
   }
   return out;
 }
