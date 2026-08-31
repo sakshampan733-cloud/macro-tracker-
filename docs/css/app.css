@@ -2799,3 +2799,33 @@ button.src-tag { cursor: pointer; }
 .ex-list { display: grid; gap: 6px; }
 .ex-row { display: grid; grid-template-columns: 1fr 62px 92px auto; gap: 6px; align-items: center; }
 .ex-row input { min-width: 0; }
+
+/* The exercise plan, and how much work it comes to. */
+.plan-list { display: grid; gap: 7px; }
+.plan-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--bg-2);
+}
+.plan-row .title { font-size: 14px; }
+.plan-row .sub { font-size: 11px; color: var(--muted); }
+.plan-row .stepper .btn { min-width: 28px; padding: 4px 0; }
+.plan-row .stepper-val { min-width: 54px; font-size: 13px; }
+
+.vol-rows { display: grid; gap: 8px; }
+.vol-row { display: grid; grid-template-columns: 76px 1fr auto; gap: 10px; align-items: center; }
+.vol-name { font-size: 13px; color: var(--text-2); }
+.vol-num { font-size: 11px; font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+.vol-track {
+  position: relative; height: 9px; border-radius: 99px;
+  background: var(--surface-2); overflow: hidden;
+}
+/* The band is the target, drawn behind the bar rather than as a number
+   beside it — "am I inside it" should not require arithmetic. */
+.vol-band { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.vol-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 99px; }
+.vol-fill.is-none, .vol-fill.is-low { background: var(--warn); }
+.vol-fill.is-under { background: var(--caution); }
+.vol-fill.is-in { background: var(--good); }
+.vol-fill.is-over { background: var(--caution); }
+.vol-fill.is-high { background: var(--warn); }

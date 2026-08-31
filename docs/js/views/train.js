@@ -24,6 +24,10 @@ import {
 import {
   GROUPS, GROUP_LABEL, coverage, sessionLoad, loadMismatch,
 } from '../data/workouts.js';
+import {
+  EXERCISES, exerciseById, exercisesFor, setsByGroup, volumeBand, bandVerdict,
+  EFFORT, effortById,
+} from '../data/exercises.js';
 import { rowsFor, healthSource, bandName } from '../applehealth.js';
 
 export function renderTrain(root, ctx) {
@@ -66,6 +70,7 @@ function todayCard(s, key, ctx) {
         el('button.btn.sm.ghost', { onclick: () => openLogger(key, ctx, done) }, 'Edit')),
       el('div.fine', { style: { marginTop: '6px' } },
         [done.sets ? `${done.sets} hard sets` : null,
+         done.effort ? effortById(done.effort)?.label.toLowerCase() : null,
          done.minutes ? `${done.minutes} min` : null,
          done.strain != null ? `strain ${done.strain.toFixed(1)}` : null,
          done.source === 'manual' ? null : `confirmed from ${done.source === 'apple' ? 'Apple Health' : 'Whoop'}`,
@@ -106,8 +111,11 @@ function todayCard(s, key, ctx) {
         onclick: () => openLogger(key, ctx, { type: suggestion, ...(band?.data || {}) }),
       }, band ? `Yes — ${t?.name || 'log it'}` : `Log ${t?.name || 'session'}`),
       el('button.btn.ghost', {
-        onclick: () => openLogger(key, ctx, { ...(band?.data || {}) }),
-      }, 'Something else')));
+        /* "Something else" told you nothing about what would happen. This
+           opens the same logger with no workout preselected, which is what
+           you want when today was not the one that came up next. */
+        onclick: () => openLogger(key, ctx, { ...(band?.data || {}), pick: true }),
+      }, 'A different one')));
 }
 
 /* What the strap saw today, as a sentence — never as a verdict. */
@@ -128,6 +136,15 @@ function bandNotice(s, key) {
     data: { minutes: mins != null ? Math.round(mins) : null, strain: strain ?? null,
             source: mode === 'apple' ? 'apple' : 'whoop' },
   };
+}
+
+/* What a workout is, in one line: its groups, plus its plan if it has one. */
+function planLine(t) {
+  if (!t) return 'No longer in your library.';
+  const plan = t.plan || [];
+  if (!plan.length) return groupLine(t);
+  const sets = plan.reduce((a, x) => a + (x.sets || 0), 0);
+  return `${plan.length} exercise${plan.length === 1 ? '' : 's'} · ${sets} sets`;
 }
 
 const groupLine = t => !t ? 'Log whatever you did.'
@@ -276,11 +293,16 @@ function openRotation(ctx) {
     }
     rot.forEach((id, i) => {
       const t = typeById(id);
+      /* The whole row opens the workout. Editing what a session consists
+         of was previously reachable only by starting to add a second copy
+         of it to the rotation, which is not a place anyone would look. */
       body.append(el('div.row', {},
         el('span.rot-n', {}, String(i + 1)),
-        el('span.grow', {},
-          el('div.title', {}, t?.name || 'Deleted workout'),
-          el('div.sub', {}, groupLine(t))),
+        el('button.row-main.grow', {
+          onclick: () => t && openTypeEditor(t, () => { draw(); ctx.refresh(); }),
+        },
+          el('div.title', {}, t?.name || 'Deleted workout', icon('chevron', 12)),
+          el('div.sub', {}, planLine(t))),
         el('button.btn.sm.ghost', {
           disabled: i === 0, 'aria-label': 'Move up',
           onclick: () => { const n = rot.slice(); [n[i - 1], n[i]] = [n[i], n[i - 1]];
@@ -339,46 +361,163 @@ function openTypePicker(onPick, ctx, refreshParent) {
 }
 
 /*
- * Building a workout.
+ * Building a workout, in as much detail as you want.
  *
- * A name and the groups it covers, and nothing else is required — the
- * groups are the only part the app reasons about, and asking for more
- * before you can log anything is how a training tab goes unused.
+ * Two levels, and the first one is complete on its own. A name and the
+ * groups it covers is a whole workout, and for most people it always will
+ * be. Below that, for anyone who wants to write down that chest day is
+ * four sets of incline press, three of pec deck and three of cable fly,
+ * the exercises and their sets — and once those exist the app can say
+ * something about the amount of work, which it could never do from a name.
  */
 function openTypeEditor(existing, after) {
   const state = {
     name: existing?.name || '',
     groups: new Set(existing?.groups || []),
     cardio: !!existing?.cardio,
+    plan: (existing?.plan || []).map(p => ({ ...p })),
   };
+
   const nameIn = el('input', { type: 'text', placeholder: 'Chest & Triceps', value: state.name });
   const chips = el('div.chip-wrap');
+  const planWrap = el('div.plan-list');
+  const meter = el('div');
+
   const drawChips = () => {
     clear(chips);
     for (const g of GROUPS) {
       chips.append(el('button.chip' + (state.groups.has(g) ? '.is-on' : ''), {
         disabled: state.cardio,
         onclick: () => { state.groups.has(g) ? state.groups.delete(g) : state.groups.add(g);
-          drawChips(); },
+          drawChips(); drawMeter(); },
       }, GROUP_LABEL[g]));
     }
     chips.append(el('button.chip' + (state.cardio ? '.is-on' : ''), {
-      onclick: () => { state.cardio = !state.cardio; if (state.cardio) state.groups.clear(); drawChips(); },
+      onclick: () => { state.cardio = !state.cardio;
+        if (state.cardio) { state.groups.clear(); state.plan = []; }
+        drawChips(); drawPlan(); drawMeter(); },
     }, 'Cardio'));
   };
-  drawChips();
+
+  const drawPlan = () => {
+    clear(planWrap);
+    if (state.cardio) return;
+    state.plan.forEach((item, i) => {
+      const ex = exerciseById(item.exerciseId);
+      planWrap.append(el('div.plan-row', {},
+        el('span.grow', {},
+          el('div.title', {}, ex?.name || 'Unknown'),
+          el('div.sub', {}, [...(ex?.primary || []), ...(ex?.secondary || []).map(g => g + ' (some)')]
+            .map(g => GROUP_LABEL[g.replace(' (some)', '')] + (g.includes('(some)') ? ' ·' : ''))
+            .join(' · '))),
+        el('div.stepper', {},
+          el('button.btn.sm.ghost', { 'aria-label': 'Fewer sets',
+            onclick: () => { item.sets = Math.max(1, (item.sets || 1) - 1); drawPlan(); drawMeter(); } }, '−'),
+          el('span.stepper-val', {}, `${item.sets || 0} sets`),
+          el('button.btn.sm.ghost', { 'aria-label': 'More sets',
+            onclick: () => { item.sets = Math.min(20, (item.sets || 0) + 1); drawPlan(); drawMeter(); } }, '+')),
+        el('button.btn.sm.ghost', { 'aria-label': 'Remove',
+          onclick: () => { state.plan.splice(i, 1); drawPlan(); drawMeter(); } }, '×')));
+    });
+    planWrap.append(el('button.btn.sm.ghost', { style: { marginTop: '4px' },
+      onclick: () => openExercisePicker([...state.groups], id => {
+        if (!state.plan.some(p => p.exerciseId === id)) state.plan.push({ exerciseId: id, sets: 3 });
+        drawPlan(); drawMeter();
+      }),
+    }, icon('plus', 14), 'Add exercise'));
+  };
+
+  /*
+   * The meter.
+   *
+   * Sets per muscle in this session, and what that comes to across a week
+   * at the rate this workout actually comes round in the rotation — which
+   * is the number the evidence is about. A session in isolation says very
+   * little; six sets of chest is thin once a week and plenty three times.
+   */
+  const drawMeter = () => {
+    clear(meter);
+    if (state.cardio || !state.plan.length) return;
+
+    const s = get();
+    const rot = rotation();
+    const rotLen = Math.max(1, rot.length);
+    const st = trainStats(28);
+    /*
+     * How often this workout comes round, from what actually happened
+     * rather than from the plan — someone training twice a week on a
+     * four-workout rotation sees each one every fortnight.
+     *
+     * With no history there is nothing to measure, and the old fallback
+     * assumed one session a week in total, which told a brand-new user
+     * that a perfectly normal chest day was a quarter of the work they
+     * needed. Four sessions a week is the neutral assumption, and the
+     * caption says it is an assumption.
+     */
+    const measured = st.perWeek > 0;
+    const perWeek = (measured ? st.perWeek : 4) / rotLen;
+
+    const recent = rowsFor(s, 'all');
+    const recoveries = Object.values(recent || {}).map(r => r.recovery)
+      .filter(v => v != null).slice(-7);
+    const avgRec = recoveries.length
+      ? recoveries.reduce((a, b) => a + b, 0) / recoveries.length : null;
+
+    const band = volumeBand(s.profile, { recovery: avgRec });
+    const perSession = setsByGroup(state.plan);
+
+    const rows = Object.entries(perSession)
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([g, n]) => {
+        const weekly = n * perWeek;
+        const v = bandVerdict(weekly, band);
+        const pct = Math.min(100, (weekly / (band.max * 1.4)) * 100);
+        const lo = (band.min / (band.max * 1.4)) * 100;
+        const hi = (band.max / (band.max * 1.4)) * 100;
+        return el('div.vol-row', {},
+          el('span.vol-name', {}, GROUP_LABEL[g]),
+          el('span.vol-track', {},
+            el('i.vol-band', { style: { left: lo + '%', width: (hi - lo) + '%' } }),
+            el('i.vol-fill' + '.is-' + v.level, { style: { width: pct + '%' } })),
+          el('span.vol-num', {}, `${round1(n)} → ${round1(weekly)}/wk`));
+      });
+
+    meter.append(
+      el('div.section-label', { style: { marginTop: '16px' } },
+        el('span.micro', {}, 'How much work this is')),
+      el('div.vol-rows', {}, ...rows),
+      el('div.fine', { style: { marginTop: '8px' } },
+        'Sets in this session, then what they come to weekly at '
+        + (measured
+            ? `how often you are actually training — ${round1(st.perWeek)} sessions a week over the last month`
+            : 'four sessions a week, which is a guess until you have logged a few')
+        + `. Your band is ${band.min}–${band.max} sets a week per muscle. `
+        + band.why),
+      el('div.fine', { style: { marginTop: '6px' } },
+        'A set of a compound counts fully for what it mainly trains and half for what '
+        + 'it helps — a bench press is not a full set of triceps work.'));
+  };
+
+  drawChips(); drawPlan(); drawMeter();
 
   const sh = sheet({
-    title: existing ? 'Edit workout' : 'New workout',
+    title: existing ? existing.name || 'Edit workout' : 'New workout',
     body: el('div', {},
       nameIn,
       el('div.section-label', { style: { marginTop: '14px' } },
         el('span.micro', {}, 'What it trains')),
       chips,
-      el('div.fine', {}, 'Pick every group the session covers. Cardio is tracked but does '
-        + 'not count towards muscle coverage — it is not a muscle group.')),
+      el('div.fine', {}, 'Cardio is tracked but does not count towards muscle coverage.'),
+      el('div.section-label', { style: { marginTop: '16px' } },
+        el('span.micro', {}, 'Exercises — optional')),
+      el('div.fine', { style: { marginBottom: '8px' } },
+        'Leave this empty and the workout still works. Fill it in and the app can tell '
+        + 'you whether the amount of work is where it should be.'),
+      planWrap,
+      meter),
     foot: el('div.btn-row', {},
-      existing && !existing.id.startsWith('p-') ? el('button.btn.ghost', {
+      existing && !String(existing.id).startsWith('p-') ? el('button.btn.ghost', {
         onclick: () => confirmSheet({
           title: `Delete ${existing.name}?`,
           body: 'Sessions you already logged with it are kept.',
@@ -391,11 +530,57 @@ function openTypeEditor(existing, after) {
           const name = nameIn.value.trim();
           if (!name) { toast('Give it a name.', 'err'); return; }
           if (!state.cardio && !state.groups.size) { toast('Pick at least one group.', 'err'); return; }
-          saveType({ id: existing?.id, name, groups: [...state.groups], cardio: state.cardio });
+          saveType({ id: existing?.id, name, groups: [...state.groups],
+                     cardio: state.cardio, plan: state.plan });
           haptic('success'); sh.close(); after();
         },
       }, 'Save')),
   });
+  return sh;
+}
+
+const round1 = n => (Math.round(n * 10) / 10).toString().replace(/\.0$/, '');
+
+/*
+ * Picking an exercise.
+ *
+ * Filtered to the groups the workout covers, because a chest day does not
+ * need to scroll past leg curls — with everything still reachable, since
+ * plenty of people put a set of something unrelated on the end.
+ */
+function openExercisePicker(groups, onPick) {
+  const list = el('div');
+  const search = el('input', { type: 'search', placeholder: 'Search exercises', autocomplete: 'off',
+    oninput: e => draw(e.target.value) });
+  let showAll = !groups.length;
+
+  const draw = (q = '') => {
+    clear(list);
+    const needle = q.trim().toLowerCase();
+    let pool = showAll || needle ? EXERCISES : exercisesFor(groups);
+    if (needle) pool = pool.filter(e => e.name.toLowerCase().includes(needle));
+    if (!pool.length) {
+      list.append(el('div.fine', {}, `Nothing matches "${q}".`));
+      return;
+    }
+    for (const ex of pool) {
+      list.append(el('button.row', {
+        onclick: () => { onPick(ex.id); haptic('tap'); sh.close(); },
+      },
+        el('span.grow', {},
+          el('div.title', {}, ex.name),
+          el('div.sub', {},
+            ex.primary.map(g => GROUP_LABEL[g]).join(' · ')
+            + (ex.secondary.length ? ` · also ${ex.secondary.map(g => GROUP_LABEL[g]).join(', ')}` : ''))),
+        icon('plus', 14)));
+    }
+    if (!showAll && !needle) {
+      list.append(el('button.btn.sm.ghost', { style: { marginTop: '10px' },
+        onclick: () => { showAll = true; draw(); } }, 'Show every exercise'));
+    }
+  };
+  draw();
+  const sh = sheet({ title: 'Add an exercise', body: el('div', {}, el('div.field', {}, search), list) });
   return sh;
 }
 
@@ -404,7 +589,8 @@ function openTypeEditor(existing, after) {
 function openLogger(key, ctx, prefill = {}) {
   const existing = sessionFor(key);
   const state = {
-    type: prefill.type || existing?.type || nextUp() || trainTypes()[0]?.id,
+    type: prefill.pick ? null : (prefill.type || existing?.type || nextUp() || trainTypes()[0]?.id),
+    effort: existing?.effort || null,
     detail: !!existing?.exercises?.length,
     exercises: (existing?.exercises || []).slice(),
   };
@@ -422,11 +608,41 @@ function openLogger(key, ctx, prefill = {}) {
   };
   drawTypes();
 
+  /* If the workout has a plan, its set count is the obvious default —
+     the person already said what the session consists of, and retyping it
+     every time is the sort of friction that stops people logging. */
+  const plannedSets = (() => {
+    const t = typeById(state.type);
+    return (t?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null;
+  })();
   const setsIn = el('input.num-in', { type: 'number', inputmode: 'numeric', min: '0', max: '100',
-    placeholder: 'hard sets', value: existing?.sets ?? '' });
+    placeholder: plannedSets ? `${plannedSets} planned` : 'hard sets',
+    value: existing?.sets ?? '' });
   const minsIn = el('input.num-in', { type: 'number', inputmode: 'numeric', min: '0', max: '600',
     placeholder: 'minutes', value: prefill.minutes ?? existing?.minutes ?? '' });
   const noteIn = el('input', { type: 'text', placeholder: 'Note (optional)', value: existing?.note || '' });
+
+  /*
+   * How it actually went, which nothing else can supply.
+   *
+   * Two identical sessions on paper are different sessions if one was
+   * taken to failure and the other was phoned in. No strap and no set
+   * count knows the difference — only the person does. One tap, never
+   * required, and tapping it again clears it.
+   */
+  const effortRow = el('div.chip-wrap');
+  const effortNote = el('div.fine');
+  const drawEffort = () => {
+    clear(effortRow);
+    for (const e of EFFORT) {
+      effortRow.append(el('button.chip' + (state.effort === e.id ? '.is-on' : ''), {
+        onclick: () => { state.effort = state.effort === e.id ? null : e.id; drawEffort(); },
+      }, e.label));
+    }
+    effortNote.textContent = state.effort ? effortById(state.effort).note
+      : 'Optional. It is the one part of a session a strap cannot see.';
+  };
+  drawEffort();
 
   /*
    * The exercise list is folded away on purpose.
@@ -474,6 +690,10 @@ function openLogger(key, ctx, prefill = {}) {
       el('div.fine', { style: { marginTop: '5px' } },
         'Hard sets is the one that matters — sets taken close to failure. Leave it blank '
         + 'if you would rather not count.'),
+      el('div.section-label', { style: { marginTop: '14px' } },
+        el('span.micro', {}, 'How it went')),
+      effortRow,
+      effortNote,
       el('div', { style: { height: '12px' } }),
       noteIn,
       el('button.btn.sm.ghost', { style: { marginTop: '12px' },
@@ -497,9 +717,11 @@ function openLogger(key, ctx, prefill = {}) {
         onclick: () => {
           const kept = state.exercises.filter(e => (e.name || '').trim());
           const setsFromEx = kept.reduce((a, e) => a + (e.sets || 0), 0);
+          if (!state.type) { toast('Pick what it was first.', 'err'); return; }
           logSession(key, {
             type: state.type,
-            sets: setsIn.value ? +setsIn.value : (setsFromEx || null),
+            sets: setsIn.value ? +setsIn.value : (setsFromEx || plannedSets || null),
+            effort: state.effort,
             minutes: minsIn.value ? +minsIn.value : null,
             strain: prefill.strain ?? existing?.strain ?? null,
             note: noteIn.value.trim(),
