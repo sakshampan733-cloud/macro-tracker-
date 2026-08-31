@@ -8,7 +8,7 @@
 
 import {
   el, clear, icon, kcal, g, distribution, toast, sheet, field,
-  segmented, empty, dateLabel, confirmSheet, explain, replaceKids, sortable } from '../ui.js';
+  segmented, empty, dateLabel, confirmSheet, explain, replaceKids } from '../ui.js';
 import { get, commit, dayKey, shiftDay, setWeight, clearWeight, peekDay, weightSeries, totals } from '../store.js';
 import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
@@ -74,7 +74,6 @@ function bodyOrder(s) {
 export function renderBody(root, ctx) {
   const s = get();
   clear(root);
-  const editing = !!ctx.dashEdit;
 
   const built = {
     vitals: vitalsSection(s, ctx),
@@ -87,46 +86,80 @@ export function renderBody(root, ctx) {
     'food-recovery': correlationTile(s),
   };
 
-  const list = el('div.dash' + (editing ? '.dash-edit' : ''));
+  const list = el('div.dash');
   for (const id of bodyOrder(s)) {
     const node = built[id];
     if (!node) continue;
     list.append(el('div.dash-item', { dataset: { id } }, node));
   }
 
-  if (editing) {
-    sortable(list, {
-      onReorder: ids => commit(st => { st.settings.bodyOrder = ids; }, 'settings'),
-    });
-  }
-
   root.append(
     (root.classList.add('stagger'), el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Body'),
       el('div.flex', { style: { gap: '8px' } },
-        el('button.btn.sm.ghost', {
-          onclick: () => {
-            ctx.dashEdit = !ctx.dashEdit;
-            if (!ctx.dashEdit) haptic('success');
-            ctx.refresh();
-          },
-        }, editing ? 'Done' : 'Arrange'),
-        editing
-          ? el('button.btn.sm.ghost', {
-              onclick: () => {
-                commit(st => { delete st.settings.bodyOrder; }, 'settings');
-                toast('Back to the default order.');
-                ctx.refresh();
-              },
-            }, 'Reset')
-          : el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report')))),
+        el('button.btn.sm.ghost', { onclick: () => openArrange(ctx) }, 'Arrange'),
+        el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report')))),
     sourceBar(s, ctx) || el('div'),
-    editing
-      ? el('div.note.info', { style: { marginBottom: '12px' } },
-          el('div', {}, 'Drag any card to move it. The order is yours and it is remembered.'))
-      : el('div'),
     list,
   );
+}
+
+const SECTION_NAMES = {
+  vitals: 'Vitals', sense: 'Is it working?', checkin: 'Check-in',
+  weight: 'Weight', tdee: 'Maintenance calories', dishes: 'Home dishes',
+  blood: 'Blood panel', 'food-recovery': 'Food against recovery',
+};
+
+/*
+ * Arranging, in a panel rather than by dragging the page.
+ *
+ * Dragging a full-width card around a scrolling page is a phone gesture
+ * that a laptop does not have and a trackpad does badly — you lose the
+ * card under the pointer the moment the page scrolls to follow you. A
+ * short list with move buttons works with a finger, a mouse, a trackpad
+ * and a keyboard, and you can see the whole order at once, which is the
+ * thing you were actually trying to change.
+ */
+function openArrange(ctx) {
+  const body = el('div');
+  const draw = () => {
+    clear(body);
+    const order = bodyOrder(get());
+    order.forEach((id, i) => {
+      body.append(el('div.row.arrange-row', {},
+        el('span.arr-n', {}, String(i + 1)),
+        el('span.grow', {}, el('div.title', {}, SECTION_NAMES[id] || id)),
+        el('button.btn.sm.ghost', {
+          disabled: i === 0, 'aria-label': `Move ${SECTION_NAMES[id]} up`,
+          onclick: () => {
+            const n = order.slice(); [n[i - 1], n[i]] = [n[i], n[i - 1]];
+            commit(st => { st.settings.bodyOrder = n; }, 'settings');
+            haptic('tap'); draw(); ctx.refresh();
+          },
+        }, '↑'),
+        el('button.btn.sm.ghost', {
+          disabled: i === order.length - 1, 'aria-label': `Move ${SECTION_NAMES[id]} down`,
+          onclick: () => {
+            const n = order.slice(); [n[i + 1], n[i]] = [n[i], n[i + 1]];
+            commit(st => { st.settings.bodyOrder = n; }, 'settings');
+            haptic('tap'); draw(); ctx.refresh();
+          },
+        }, '↓')));
+    });
+  };
+  draw();
+  return sheet({
+    title: 'Arrange',
+    body: el('div', {},
+      el('div.fine', { style: { marginBottom: '12px' } },
+        'The order of your Body tab. It is remembered, and anything the app grows '
+        + 'later joins the bottom rather than hiding.'),
+      body),
+    foot: el('button.btn.ghost', { style: { width: '100%' },
+      onclick: () => { commit(st => { delete st.settings.bodyOrder; }, 'settings');
+        toast('Back to the default order.'); draw(); ctx.refresh(); },
+    }, 'Reset to default'),
+  });
 }
 
 /* ── Check-in ───────────────────────────────────────────────────────── */

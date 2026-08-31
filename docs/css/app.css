@@ -42,8 +42,17 @@
   --dim:       #636366;
 
   /* System blue. An action colour, not a mood. */
-  --accent:    #0A84FF;
-  --accent-2:  #0060DF;
+  /*
+   * The Move ring's red.
+   *
+   * Teal, then blue, then green — the hue was never the problem, one
+   * colour doing every job on screen was. This is the action colour and
+   * only that: buttons, the current tab, focus, selection. What a reading
+   * means is still the category palette's job, and green stays reserved
+   * for "this is going well" rather than for "you can press this".
+   */
+  --accent:    #FA114F;
+  --accent-2:  #B80B39;
   --accent-ink:#FFFFFF;
 
   --warn:      #FF453A;
@@ -55,12 +64,12 @@
    * what it measures — so they are never borrowed for decoration.
    */
   --h-move:     #FF9F0A;
-  --h-energy:   #FF375F;
+  --h-energy:   #FA114F;
   --h-heart:    #FF375F;
-  --h-sleep:    #5E5CE6;
-  --h-resp:     #40C8E0;
+  --h-sleep:    #7A5CFF;
+  --h-resp:     #00E5D1;
   --h-body:     #BF5AF2;
-  --h-strain:   #0A84FF;
+  --h-strain:   #A6F900;
   --h-recovery: #30D158;
 
   --m-kcal:  #FFFFFF;
@@ -1063,23 +1072,50 @@ body::after {
    * rather than a set of readings. An accent should mark what you can
    * press. What data means is the category palette's job.
    */
-  --accent:    #0A84FF;
-  --accent-2:  #0060DF;
+  /*
+   * Green, but only where you can press.
+   *
+   * Blue was the wrong call — it went everywhere the teal had gone and
+   * felt colder without being any more restrained. The problem was never
+   * the hue, it was that one colour was doing every job on screen. Green
+   * is back as the action colour and nothing else: buttons, the current
+   * tab, focus. Every reading takes its colour from what it measures.
+   */
+  /*
+   * The Move ring's red.
+   *
+   * Teal, then blue, then green — the hue was never the problem, one
+   * colour doing every job on screen was. This is the action colour and
+   * only that: buttons, the current tab, focus, selection. What a reading
+   * means is still the category palette's job, and green stays reserved
+   * for "this is going well" rather than for "you can press this".
+   */
+  --accent:    #FA114F;
+  --accent-2:  #B80B39;
   --accent-ink:#FFFFFF;
 
   --warn:      #FF453A;
-  --good:      #30D158;
+  --good:      #32D74B;
   --caution:   #FF9F0A;
 
-  /* Health categories: a reading wears the colour of what it measures. */
+  /*
+   * The Activity ring family, which is the palette that made this look
+   * good in the first place: a hot pink-red, an acid green, a bright
+   * cyan. Everything else in the category set is tuned to sit beside
+   * those three rather than against them.
+   */
+  --ring-move: #FA114F;
+  --ring-exer: #A6F900;
+  --ring-stand:#00E5D1;
+
   --h-move:     #FF9F0A;
-  --h-energy:   #FF375F;
+  --h-energy:   #FA114F;
   --h-heart:    #FF375F;
-  --h-sleep:    #5E5CE6;
-  --h-resp:     #40C8E0;
+  --h-sleep:    #7A5CFF;
+  --h-resp:     #00E5D1;
   --h-body:     #BF5AF2;
-  --h-strain:   #0A84FF;
-  --h-recovery: #30D158;
+  --h-strain:   #A6F900;
+  --h-recovery: #32D74B;
 
   --m-kcal:  #FFFFFF;
   --m-p:     #0A84FF;
@@ -2653,7 +2689,9 @@ button.src-tag { cursor: pointer; }
 
 .adh-grid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; }
 .adh { display: block; aspect-ratio: 1; border-radius: 3px; background: var(--surface-2); }
-.adh.is-done { background: var(--good); }
+/* A day you trained wears the Move ring's colour, which is what a closed
+   ring looks like on the watch this borrows from. */
+.adh.is-done { background: var(--ring-move); }
 .adh.is-missed { background: var(--warn); }
 .adh.is-rest { background: var(--line-2); }
 .adh.is-today { outline: 1.5px solid var(--accent); outline-offset: 1px; }
@@ -2841,3 +2879,67 @@ button.src-tag { cursor: pointer; }
 .stat-cell { background: var(--surface); padding: 11px 13px; }
 .stat-v { font-family: var(--cond), var(--sans); font-size: 19px; color: var(--text); margin-top: 2px; }
 .metric-verdict { font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
+
+/*
+ * Selection, and the blue that came with the browser.
+ *
+ * Highlighting a number turned it Chrome's default blue, which after the
+ * palette work was the only blue left in the app and looked like a bug.
+ */
+::selection { background: color-mix(in srgb, var(--accent) 34%, transparent); color: var(--text); }
+::-moz-selection { background: color-mix(in srgb, var(--accent) 34%, transparent); color: var(--text); }
+:root { accent-color: var(--accent); caret-color: var(--accent); }
+
+/*
+ * Motion.
+ *
+ * The app drew everything instantly, which on a screen of live readings
+ * made it feel like a printed page rather than a set of instruments. None
+ * of this is decoration: a card that rises as it arrives tells you the
+ * screen is finished drawing, and a bar that grows tells you which
+ * direction it grew from. All of it collapses to nothing under
+ * prefers-reduced-motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .ah-grid > .ah-card {
+    animation: cardIn .46s cubic-bezier(.22,1,.36,1) backwards;
+  }
+  .ah-grid > .ah-card:nth-child(1) { animation-delay: .02s }
+  .ah-grid > .ah-card:nth-child(2) { animation-delay: .05s }
+  .ah-grid > .ah-card:nth-child(3) { animation-delay: .08s }
+  .ah-grid > .ah-card:nth-child(4) { animation-delay: .11s }
+  .ah-grid > .ah-card:nth-child(5) { animation-delay: .14s }
+  .ah-grid > .ah-card:nth-child(6) { animation-delay: .17s }
+  .ah-grid > .ah-card:nth-child(7) { animation-delay: .20s }
+  .ah-grid > .ah-card:nth-child(8) { animation-delay: .23s }
+  .ah-grid > .ah-card:nth-child(n+9) { animation-delay: .26s }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(14px) scale(.97); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* Bars grow from their own baseline, so the floor reads as the floor. */
+  .ac-cell i { animation: barUp .5s cubic-bezier(.22,1,.36,1) backwards; transform-origin: bottom; }
+  @keyframes barUp { from { transform: scaleY(.05); opacity: .3 } }
+
+  .adh { animation: pipIn .34s cubic-bezier(.22,1,.36,1) backwards; }
+  @keyframes pipIn { from { opacity: 0; transform: scale(.5) } }
+
+  .scrim { animation: scrimIn .24s ease-out; }
+  @keyframes scrimIn { from { opacity: 0 } }
+}
+
+/* Press feedback everywhere something is pressable. */
+.ah-card.tappable, .tile.tappable, .sess-row, .wk-cell, .cal-day, .vital {
+  transition: transform .14s cubic-bezier(.2,.8,.2,1), background-color .14s ease;
+}
+.ah-card.tappable:active, .tile.tappable:active,
+.sess-row:active, .cal-day:active { transform: scale(.975); }
+.btn { transition: transform .12s cubic-bezier(.2,.8,.2,1), filter .12s ease; }
+.btn:active { transform: scale(.96); }
+.arrange-row .arr-n {
+  flex: none; width: 22px; height: 22px; border-radius: 6px; margin-right: 4px;
+  background: var(--surface-2); color: var(--muted);
+  display: grid; place-items: center;
+  font-family: var(--cond), var(--sans); font-size: 12px; font-variant-numeric: tabular-nums;
+}

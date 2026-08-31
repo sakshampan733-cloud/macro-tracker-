@@ -409,8 +409,41 @@ export function generateDemo({ years = 2, seed = 20260820 } = {}) {
     ],
   };
 
+  /*
+   * Apple's own rows, kept separately.
+   *
+   * On two bands the merge deliberately keeps Whoop's version of anything
+   * both measure, so the merged store alone cannot answer "what did my
+   * watch record" — and the demo's Apple view came up empty, which showed
+   * a feature that works as one that does not. This is the same fortnight
+   * seen from the other wrist: a different resting heart rate, a different
+   * HRV scale, and the readings only the watch has.
+   */
+  const appleRows = {};
+  {
+    const keys = Object.keys(whoop).sort().slice(-45);
+    for (const k of keys) {
+      const w = whoop[k];
+      appleRows[k] = {
+        date: k, src: 'apple',
+        steps: w.steps,
+        activeKcal: w.activeKcal, exerciseMin: w.exerciseMin,
+        standHours: w.standHours, moveGoal: w.moveGoal,
+        kcal: Math.round(w.kcal * 0.97),
+        /* Apple reports SDNN and Whoop reports RMSSD; they are different
+           measures of the same thing and never the same number. */
+        hrv: Math.round(w.hrv * 1.35 + 6),
+        rhr: Math.round(w.rhr + 3),
+        sleepH: +(w.sleepH * 0.96).toFixed(2),
+        remH: w.remH, swsH: w.swsH,
+        spo2: w.spo2, resp: w.resp, temp: +(w.temp + 0.4).toFixed(1),
+      };
+    }
+  }
+
   return {
     days, whoop: { rows: whoop, importedAt: Date.now(), source: 'demo' },
+    appleHealth: { rows: appleRows, importedAt: Date.now() },
     blood, meals, library, medications, plans, train,
     supplementsTaken: ['vitamin-d3', 'creatine', 'multivitamin', 'omega3'],
     /* The demo carries its own profile. Without one the whole app renders
