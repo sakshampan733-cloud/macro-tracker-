@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.31-demo';
+export const VERSION = '2026.08.31-redesign';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, openDay, pushBackup, setDishDensities, flush } from './store.js';
@@ -120,44 +120,22 @@ function drawHeader() {
 /*
  * Theme.
  *
- * 'auto' used to mean "set no attribute and let prefers-color-scheme
- * decide". That worked for the colour tokens and nothing else: the app
- * has 32 rules scoped to [data-theme="light"] — the header edge, the
- * grain level, pane shadows, the orb tint — and none of them can match
- * while the attribute is absent. The result was light tokens wearing dark
- * corrections, which is the mixed appearance System mode showed.
- *
- * So auto RESOLVES now. The stored preference stays 'auto' and keeps
- * following the system, but the attribute on the root is always a real
- * 'dark' or 'light', and every rule in the stylesheet works as written.
+ * There is one. The light theme was a second palette maintained alongside
+ * the real one and it never looked like the app — the tokens inverted but
+ * the thirty-odd corrections that made dark work did not, so it read as
+ * dark-mode-with-the-lights-on. Rather than maintain two, this commits to
+ * the one that works: a true black ground with the Health palette on top,
+ * which on an OLED screen is genuinely unlit pixels and lets the cards
+ * read as objects floating in nothing.
  */
-function systemPrefersDark() {
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true;
-}
-
-function applyTheme(pref) {
+function applyTheme() {
   const root = document.documentElement;
-  const resolved = (!pref || pref === 'auto')
-    ? (systemPrefersDark() ? 'dark' : 'light')
-    : pref;
-
-  root.setAttribute('data-theme', resolved);
-
+  root.setAttribute('data-theme', 'dark');
+  root.style.colorScheme = 'dark';
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#000000' : '#EFEFF1');
-
-  /* colorScheme still advertises both on auto, so scrollbars and form
-     controls keep tracking the system rather than being pinned. */
-  root.style.colorScheme = (!pref || pref === 'auto') ? 'light dark' : resolved;
-
-  applyOrb(get().settings?.orb || 'red', resolved);
+  if (meta) meta.setAttribute('content', '#000000');
+  applyOrb(get().settings?.orb || 'none', 'dark');
 }
-
-/* React to the system flipping while the app is open, on 'auto'. */
-window.matchMedia?.('(prefers-color-scheme: dark)')
-  .addEventListener?.('change', () => {
-    if ((get().settings?.theme || 'dark') === 'auto') applyTheme('auto');
-  });
 
 /*
  * Re-solve the home-dish densities before drawing.
@@ -183,7 +161,7 @@ function refreshDensities() {
 
 function draw() {
   const s = get();
-  applyTheme(s.settings?.theme || 'dark');
+  applyTheme();
   setExplanations(s.settings?.explain !== false);
   refreshDensities();
   clear(main);

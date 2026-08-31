@@ -17,57 +17,63 @@
 @font-face { font-family: 'PlexMono'; src: url('../fonts/ibm-plex-mono-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
 
 :root {
-  --bg:        #0E1216;
-  --bg-2:      #11161B;
-  --surface:   #161C22;
-  --surface-2: #1D242B;
-  --raised:    #232C34;
-  --line:      #262F38;
-  --line-2:    #35434F;
+  /*
+   * Apple's dark system palette, because it is the one that made the
+   * Health screens work and there was never a reason to keep a second,
+   * worse one alongside it.
+   *
+   * The old ground was a blue-black with a neon teal on top of it, and the
+   * accent ended up on everything — buttons, charts, rails, tags — so a
+   * screen full of unrelated numbers all read as the same colour. Here the
+   * ground is neutral and nearly black, the accent is used for actions,
+   * and data takes its colour from what it measures.
+   */
+  --bg:        #000000;
+  --bg-2:      #0C0C0E;
+  --surface:   #1C1C1E;
+  --surface-2: #2C2C2E;
+  --raised:    #3A3A3C;
+  --line:      #2E2E31;
+  --line-2:    #48484A;
 
-  --text:      #E9EEF3;
-  --text-2:    #A6B2BE;
-  --muted:     #78868F;
-  --dim:       #55616B;
+  --text:      #FFFFFF;
+  --text-2:    #AEAEB2;
+  --muted:     #8E8E93;
+  --dim:       #636366;
 
-  --accent:    #3DDBC4;
-  --accent-2:  #1E6B60;
-  --accent-ink:#062A26;
-  --warn:      #FF6B5B;
-  --good:      #5FD08A;
-  --caution:   #FFC14D;
+  /* System blue. An action colour, not a mood. */
+  --accent:    #0A84FF;
+  --accent-2:  #0060DF;
+  --accent-ink:#FFFFFF;
 
+  --warn:      #FF453A;
+  --good:      #30D158;
+  --caution:   #FF9F0A;
 
   /*
-   * Health categories.
-   *
-   * These began as the Apple view's colours and are now the app's, because
-   * they turned out to be the better system: a reading carries the colour
-   * of what it measures rather than one accent shared by everything, so
-   * heart data looks like heart data on any screen it appears on. They are
-   * category identities, not decoration — never reused for anything else.
+   * Health categories. These carry meaning — a reading wears the colour of
+   * what it measures — so they are never borrowed for decoration.
    */
-  --h-move:     #FC7A2E;
-  --h-energy:   #FA3E5B;
+  --h-move:     #FF9F0A;
+  --h-energy:   #FF375F;
   --h-heart:    #FF375F;
-  --h-sleep:    #37B9E8;
-  --h-resp:     #4ED9C6;
-  --h-body:     #A85CFF;
-  --h-strain:   #4F8DF5;
-  --h-recovery: #5FD08A;
+  --h-sleep:    #5E5CE6;
+  --h-resp:     #40C8E0;
+  --h-body:     #BF5AF2;
+  --h-strain:   #0A84FF;
+  --h-recovery: #30D158;
 
-  --m-kcal:  #E9EEF3;
-  --m-p:     #56C2FF;
-  --m-c:     #FFB84D;
-  --m-f:     #C08CFF;
-  --m-fib:   #8FD97A;
-  --m-water: #7C8CFF;
+  --m-kcal:  #FFFFFF;
+  --m-p:     #0A84FF;
+  --m-c:     #FF9F0A;
+  --m-f:     #BF5AF2;
+  --m-fib:   #30D158;
+  --m-water: #5E5CE6;
 
-  /* On black the fill colour is already the legible one. */
-  --m-p-ink:   #56C2FF;
-  --m-c-ink:   #FFB84D;
-  --m-f-ink:   #C08CFF;
-  --m-fib-ink: #8FD97A;
+  --m-p-ink:   #4FA9FF;
+  --m-c-ink:   #FFB340;
+  --m-f-ink:   #D08BFF;
+  --m-fib-ink: #5BDE7F;
 
   --sans: 'Plex', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --cond: 'PlexCond', 'Plex', -apple-system, system-ui, sans-serif;
@@ -543,24 +549,15 @@ input.num-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 @keyframes fade { from { opacity: 0 } }
 
 .sheet {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 61;
-  max-height: 92dvh;
+  position: fixed; left: 0; right: 0; z-index: 61;
   display: flex; flex-direction: column;
   background: var(--surface);
-  border-top: 1px solid var(--line-2);
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-  animation: rise .26s cubic-bezier(.2,.9,.3,1);
-  padding-bottom: var(--safe-b);
-}
-@keyframes rise { from { transform: translateY(100%) } }
-@media (min-width: 640px) {
-  .sheet { max-width: 620px; margin: 0 auto; border-radius: var(--r-lg); bottom: 20px; left: 20px; right: 20px; }
+  border: 1px solid var(--line-2);
+  border-radius: 26px;
+  overflow: hidden;
 }
 
-.sheet-grip {
-  width: 34px; height: 4px; border-radius: 2px; background: var(--line-2);
-  margin: 9px auto 2px; flex: none;
-}
+.sheet-grip { display: none; }
 .sheet-head {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 16px 12px;
@@ -985,7 +982,7 @@ input.num-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 }
 .btn.sm { border-radius: var(--r-sm); }
 
-.sheet { border-radius: var(--r-lg) var(--r-lg) 0 0; }
+
 input, select, textarea { border-radius: var(--r-sm); }
 .metric { border-radius: var(--r); }
 
@@ -1057,9 +1054,43 @@ body::after {
   --muted:     #76767D;
   --dim:       #55555C;
 
-  --accent:    #3DDBC4;
-  --accent-2:  #1E6B60;
-  --accent-ink:#04231F;
+  /*
+   * System blue, not neon teal.
+   *
+   * The old accent was a bright green-teal and it ended up on everything —
+   * buttons, chart fills, rails, tags, tab bar — so a screen of unrelated
+   * numbers all read as one colour and the app looked like a single mood
+   * rather than a set of readings. An accent should mark what you can
+   * press. What data means is the category palette's job.
+   */
+  --accent:    #0A84FF;
+  --accent-2:  #0060DF;
+  --accent-ink:#FFFFFF;
+
+  --warn:      #FF453A;
+  --good:      #30D158;
+  --caution:   #FF9F0A;
+
+  /* Health categories: a reading wears the colour of what it measures. */
+  --h-move:     #FF9F0A;
+  --h-energy:   #FF375F;
+  --h-heart:    #FF375F;
+  --h-sleep:    #5E5CE6;
+  --h-resp:     #40C8E0;
+  --h-body:     #BF5AF2;
+  --h-strain:   #0A84FF;
+  --h-recovery: #30D158;
+
+  --m-kcal:  #FFFFFF;
+  --m-p:     #0A84FF;
+  --m-c:     #FF9F0A;
+  --m-f:     #BF5AF2;
+  --m-fib:   #30D158;
+  --m-water: #5E5CE6;
+  --m-p-ink:   #4FA9FF;
+  --m-c-ink:   #FFB340;
+  --m-f-ink:   #D08BFF;
+  --m-fib-ink: #5BDE7F;
 
   --glass:       rgba(20, 20, 24, .44);
   --glass-solid: rgba(10, 10, 12, .82);
@@ -1074,89 +1105,10 @@ body::after {
   --grain:      .022;
 }
 
-:root[data-theme="light"] {
-  /* Bone, not paper. The ambient field below tints through the panes. */
-  --bg:        #E9E0D3;
-  --bg-2:      rgba(255, 255, 255, .38);
-  --surface:   rgba(255, 255, 255, .52);
-  --surface-2: rgba(255, 255, 255, .34);
-  --raised:    rgba(255, 255, 255, .78);
-  --line:      rgba(60, 45, 30, .10);
-  --line-2:    rgba(60, 45, 30, .17);
 
-  --text:      #131316;
-  --text-2:    #4B4B55;
-  --muted:     #6E6E7A;
-  --dim:       #9A9AA6;
-
-  /* The teal has to darken considerably to stay legible on white. */
-  --accent:    #0E9C8E;
-  --accent-2:  #0A7A6F;
-  --accent-ink:#FFFFFF;
-
-  --good:      #12855F;
-  --warn:      #C4362B;
-  --caution:   #A66A00;
-
-  /*
-   * Macro colours, light mode.
-   *
-   * These were darkened wholesale so they would read as text on white.
-   * But they are overwhelmingly used as FILLS — the cups, the chart bars —
-   * and a fill that has been darkened for legibility just looks dull.
-   * Carbohydrate suffered worst: #A66A00 is mustard, against a genuinely
-   * bright amber in dark mode.
-   *
-   * Vivid values now, with a separate darker ink for the few places the
-   * colour carries text, so nothing loses contrast where it matters.
-   */
-
-  /* The same categories, pulled down just enough to hold their own on a
-     light ground. Same hues — a card should be recognisably the same
-     category in either theme. */
-  --h-move:     #D2621B;
-  --h-energy:   #D81E45;
-  --h-heart:    #DA1E4A;
-  --h-sleep:    #0E86BC;
-  --h-resp:     #109384;
-  --h-body:     #7A31D8;
-  --h-strain:   #2C63C9;
-  --h-recovery: #128455;
-
-  --m-p:       #1787E0;
-  --m-c:       #ED8B08;
-  --m-f:       #8654E8;
-  --m-fib:     #34A047;
-  --m-water:   #4C61D6;
-
-  --m-p-ink:   #14639F;
-  --m-c-ink:   #9A5A05;
-  --m-f-ink:   #6438C4;
-  --m-fib-ink: #227235;
-
-  --glass:       rgba(255, 255, 255, .74);
-  --glass-solid: rgba(255, 255, 255, .97);
-  --glass-line:  rgba(19, 19, 22, .10);
-  --glass-hi:    rgba(255, 255, 255, .85);
-  --glass-active:rgba(19, 19, 22, .06);
-
-  /* Light surfaces catch shade, not sheen — a white highlight on white is
-     invisible, and the depth has to come from the shadow instead. */
-  --sheen:      linear-gradient(150deg, rgba(19,19,22,.018), rgba(19,19,22,0) 44%);
-  --edge-light: inset 0 1px 0 rgba(255,255,255,.9);
-  --lift:       0 1px 2px rgba(19,19,22,.06), 0 8px 20px -12px rgba(19,19,22,.18);
-  --lift-lg:    0 2px 6px rgba(19,19,22,.07), 0 20px 44px -20px rgba(19,19,22,.22);
-  --grain:      0;          /* grain only reads as texture against black */
-
-  --teal-glow:  color-mix(in srgb, var(--accent) 14%, transparent);
-}
 
 /* Following the system, when no explicit choice has been made. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]):not([data-theme="light"]) {
-    color-scheme: light;
-  }
-}
+
 
 body::after { opacity: var(--grain); }
 
@@ -1164,32 +1116,9 @@ body::after { opacity: var(--grain); }
 :root[data-theme="dark"] .tabs { border: 1px solid var(--line); }
 
 /* Charts read differently on white: the track needs weight, the fills less. */
-:root[data-theme="light"] .rail-track { background: var(--raised); }
-:root[data-theme="light"] .stage-bar  { background: var(--raised); }
-:root[data-theme="light"] .bar-fill   { opacity: .92; }
 
-/* Theme picker in Settings. */
-.theme-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.theme-opt {
-  border: 1px solid var(--line-2);
-  border-radius: var(--r);
-  padding: 11px 8px 9px;
-  display: flex; flex-direction: column; align-items: center; gap: 7px;
-  background: var(--surface-2);
-}
-.theme-opt[aria-pressed="true"] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.theme-swatch {
-  width: 100%; height: 30px; border-radius: 7px;
-  border: 1px solid var(--line);
-  /* Never let a fill paint under a translucent border. */
-  background-clip: padding-box;
-}
-.theme-swatch.dark  { background: linear-gradient(140deg, #000, #16161a); }
-.theme-swatch.light { background: linear-gradient(140deg, #fff, #e9e9ee); }
-.theme-swatch.auto  { background: #0a0a0c; }
+
+
 
 /* ═══ Remodel: glass, warmth, depth ════════════════════════════════════
    The previous pass added shadows but everything still sat on a flat
@@ -1228,60 +1157,7 @@ body::after { opacity: var(--grain); }
                     transparent 76%);
 }
 
-:root[data-theme="light"] {
-  /* Warm off-white, not clinical white — the reference light direction is
-     bone and sand, with colour bleeding through, never a flat sheet. */
-  /* Bright, with separation.
-     Dropping the ground to sand did give the panes something to sit on,
-     but it made the whole screen dull — light mode should read as light.
-     The ground is bright and very slightly cool now, and the separation
-     comes from the panes being near-white with a real edge rather than
-     from darkening everything behind them. */
-  --bg:        #EFEFF1;
-  --bg-2:      rgba(255, 255, 255, .72);
-  --surface:   rgba(255, 255, 255, .80);
-  --surface-2: rgba(255, 255, 255, .62);
-  --raised:    rgba(255, 255, 255, .95);
-  --line:      rgba(28, 30, 38, .10);
-  --line-2:    rgba(28, 30, 38, .18);
 
-  /* Contrast against the pane, not against the page: a .40-alpha white
-     card over a warm orb sits nearer #E8DDD2 than #FFF, so the greys have
-     to come down to keep secondary text readable rather than decorative. */
-  --text:      #14161A;
-  --text-2:    #3D424A;
-  --muted:     #626873;
-  --dim:       #8A909B;
-
-  --accent:    #0A7A6E;
-  --accent-2:  #06584F;
-  --accent-ink:#FFFFFF;
-
-  --glass-bg:     rgba(255, 255, 255, .70);
-  --glass-strong: rgba(255, 255, 255, .84);
-  --glass-brd:    rgba(255, 255, 255, .92);
-  --glass-hi:     rgba(255, 255, 255, 1);
-  --blur:         saturate(180%) blur(26px);
-
-  --sheen:      linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,0) 46%);
-  --edge-light: inset 0 1px 0 rgba(255,255,255,.85);
-  --lift:       0 1px 2px rgba(60,48,40,.05), 0 10px 26px -14px rgba(60,48,40,.20);
-  --lift-lg:    0 2px 8px rgba(60,48,40,.06), 0 26px 56px -24px rgba(60,48,40,.26);
-
-  /* The same circle, warmed for a pale ground. Light mode was washing out
-     because the orb was faint AND the panes were near-white AND the ground
-     was near-white — three pale layers stacked. The orb carries more
-     weight and the ground drops a step so the glass has an edge. */
-  /* A tint, not a wash. At light-mode brightness a strong orb turns the
-     whole page muddy, which is most of why this looked dull. */
-  --orb: 208, 88, 76;
-  --ambient:
-    radial-gradient(circle 58vmax at 50% 44%,
-                    rgba(var(--orb), .22) 0%,
-                    rgba(var(--orb), .11) 36%,
-                    rgba(var(--orb), .04) 60%,
-                    transparent 78%);
-}
 
 /* The wash sits behind everything and does not scroll — the app has a sky. */
 html { background: var(--bg); }
@@ -1323,9 +1199,7 @@ body { background: transparent; }
 .tab[aria-current="page"]::before { opacity: 1; transform: scale(1); }
 .tab[aria-current="page"] .ic { transform: translateY(-1px) scale(1.06); }
 .tab .ic { transition: transform .34s cubic-bezier(.34,1.56,.64,1); }
-:root[data-theme="light"] .tabs {
-  box-shadow: 0 8px 30px -10px rgba(60,48,40,.28), inset 0 1px 0 var(--glass-hi);
-}
+
 
 /* Content must run UNDER the bar for the blur to have anything to do. */
 #app { padding-bottom: calc(var(--tab-h) + 46px); }
@@ -1656,17 +1530,27 @@ i.dot {
   backdrop-filter: saturate(120%) blur(2px);
   -webkit-backdrop-filter: saturate(120%) blur(2px);
 }
-:root[data-theme="light"] .scrim { background: rgba(60, 44, 28, .16); }
+
 
 /* A panel that floats clear of the edges reads as an object sitting in
    front of the app; one welded to the bottom reads as part of the chrome. */
+/*
+ * A panel, centred, rather than a drawer from the bottom.
+ *
+ * A bottom sheet is the right shape for a short list of choices and the
+ * wrong one for reading: it starts at the bottom edge, it is tall and
+ * narrow, and every detail view in the app became a long scroll up a
+ * thin column. Centred and closer to square puts the whole thing in
+ * front of you with the close where the eye already is.
+ */
 .sheet {
-  left: max(8px, env(safe-area-inset-left, 0px));
-  right: max(8px, env(safe-area-inset-right, 0px));
-  bottom: max(8px, env(safe-area-inset-bottom, 0px));
-  max-width: 560px; margin: 0 auto;
-  max-height: 88dvh;
-  border-radius: 30px;
+  left: max(10px, env(safe-area-inset-left, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  top: 50%; bottom: auto;
+  transform: translateY(-50%);
+  max-width: 540px; margin: 0 auto;
+  max-height: min(76dvh, 660px);
+  border-radius: 26px;
   border: 1px solid var(--glass-brd);
   background:
     linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,0) 44%),
@@ -1681,22 +1565,17 @@ i.dot {
   padding-bottom: 0;
   overflow: hidden;
 }
-:root[data-theme="light"] .sheet {
-  box-shadow:
-    inset 0 1px 0 var(--glass-hi),
-    0 2px 8px rgba(70,50,30,.10),
-    0 32px 80px -28px rgba(70,50,30,.40);
-}
+
 
 @keyframes sheetIn {
-  from { opacity: 0; transform: translateY(26px) scale(.97); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translateY(-50%) scale(.94); }
+  to   { opacity: 1; transform: translateY(-50%) scale(1); }
 }
 
 /* A grab handle says "this is a surface you can dismiss" without a label. */
 .sheet-head { position: relative; padding: 20px 20px 14px; border-bottom: 1px solid var(--glass-brd); }
 .sheet-head::before {
-  content: ''; position: absolute; top: 8px; left: 50%;
+  content: none; position: absolute; top: 8px; left: 50%;
   width: 36px; height: 4px; margin-left: -18px; border-radius: 2px;
   background: var(--line-2);
 }
@@ -1774,38 +1653,23 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
    little extra saturation so colour bleeds through the pane rather than
    being washed out by the white.                                       */
 
-:root[data-theme="light"] body::after { opacity: .05; }
 
-:root[data-theme="light"] .tile,
-:root[data-theme="light"] .sheet,
-:root[data-theme="light"] .chip,
-:root[data-theme="light"] .food-cell {
-  backdrop-filter: saturate(230%) blur(34px);
-  -webkit-backdrop-filter: saturate(230%) blur(34px);
-}
+
+
 
 /* One bright hairline along the top edge is what sells a pane as lit from
    above rather than as a flat white rectangle. */
-:root[data-theme="light"] .tile,
-:root[data-theme="light"] .food-cell,
-:root[data-theme="light"] .chip {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .95),
-    inset 0 -1px 0 rgba(120, 92, 54, .05),
-    0 1px 2px rgba(92, 68, 38, .05),
-    0 12px 30px -16px rgba(92, 68, 38, .28);
-}
+
 
 /* Charts were pale because the band and the baseline both leaned on
    currentColor at an opacity tuned for a black background. */
-:root[data-theme="light"] .hchart .hband { opacity: .12; }
-:root[data-theme="light"] .hchart .hlabel { fill: var(--text-2); font-weight: 600; }
-:root[data-theme="light"] .cup-bar { background: rgba(92, 68, 38, .10); }
+
+
+
 
 /* The meal rows on Detail sat on an almost-invisible fill. */
-:root[data-theme="light"] .tile.flush .row,
-:root[data-theme="light"] .mini-row { border-top-color: rgba(74, 54, 30, .13); }
-:root[data-theme="light"] .section-label { color: rgba(74, 54, 30, .62); }
+
+
 
 /* ── Meal logger ─────────────────────────────────────────────────────── */
 .meal-item {
@@ -1870,7 +1734,7 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
   transition: transform .2s cubic-bezier(.34,1.56,.64,1),
               opacity .2s ease, box-shadow .2s ease;
 }
-:root[data-theme="light"] .orb-dot { border-color: rgba(40, 28, 14, .12); }
+
 .orb-dot:hover { opacity: 1; }
 .orb-dot:active { transform: scale(.9); }
 .orb-dot.is-on {
@@ -2031,31 +1895,19 @@ button:focus-visible, .tab:focus-visible, .food-cell:focus-visible,
 
 /* The grain is there to stop OLED banding on black. On a bright ground it
    does nothing but add dirt, which is exactly what "grainy" meant. */
-:root[data-theme="light"] body::after { opacity: .012; }
+
 
 /* The wordmark bar was dissolving into the first card beneath it: two
    near-white translucent surfaces with no edge between them. */
-:root[data-theme="light"] .topbar {
-  background: rgba(255, 255, 255, .74);
-  border-bottom: 1px solid rgba(28, 30, 38, .09);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .9);
-}
-:root[data-theme="light"] .topbar .brand { color: var(--text); }
+
+
 
 /* Panes need a defined edge on a bright page, not a glow. */
-:root[data-theme="light"] .tile,
-:root[data-theme="light"] .food-cell,
-:root[data-theme="light"] .chip,
-:root[data-theme="light"] .set-group {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 1px 2px rgba(28, 30, 38, .06),
-    0 10px 24px -18px rgba(28, 30, 38, .30);
-}
+
 
 /* The action chips were reading as one salmon block. */
-:root[data-theme="light"] .chip { background: rgba(255, 255, 255, .78); }
-:root[data-theme="light"] .chip:hover { background: #fff; }
+
+
 
 .guide-pick { margin: 6px 0 18px; }
 .guide-pick-label {
@@ -2548,8 +2400,8 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 .sched-verdict { text-align: center; font-size: 12.5px; color: var(--dim); margin-top: 4px; line-height: 1.45; }
 .sched-verdict.is-good { color: var(--good); }
 
-:root[data-theme="light"] .dial-band { stroke: var(--text); }
-:root[data-theme="light"] .dial-rib { stroke: #fff; opacity: .5; }
+
+
 
 .caff-card { cursor: pointer; }
 .caff-card .caff-row:last-child { border-bottom: 0; }
@@ -2656,9 +2508,17 @@ button.src-tag { cursor: pointer; }
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;            /* rounder than the app's own cards */
-  padding: 14px 15px 12px;
-  display: grid; gap: 7px;
+  padding: 12px 13px 10px;
+  display: grid; gap: 4px;
+  align-content: start;
+  min-width: 0;
 }
+/* The reading sits at the bottom of the tile whatever the label above it
+   wrapped to, so a column of tiles lines up on the number rather than
+   ragging with the text. */
+.ah-card .ah-value { margin-top: auto; }
+.ah-spark { min-height: 26px; display: flex; align-items: flex-end; opacity: .85; }
+.ah-spark svg { width: 100%; height: 26px; }
 
 .ah-cat {
   display: inline-flex; align-items: center; gap: 6px;
@@ -2668,22 +2528,36 @@ button.src-tag { cursor: pointer; }
 .ah-when { font-size: 12px; color: var(--muted); margin-right: 3px; }
 .ah-card .ah-when + svg { color: var(--dim); }
 
-.ah-name { font-size: 14px; color: var(--text-2); margin-top: -2px; }
+.ah-name {
+  font-size: 12.5px; color: var(--text-2); line-height: 1.25;
+  display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap;
+}
 
 .ah-value {
   font-family: var(--cond), var(--sans);
-  font-size: 34px; line-height: 1; letter-spacing: -1px;
+  font-size: 30px; line-height: 1; letter-spacing: -.9px;
   color: var(--text);
-  display: flex; align-items: baseline; gap: 5px;
+  display: flex; align-items: baseline; gap: 4px;
 }
-.ah-unit { font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.ah-unit { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.ah-cat { font-size: 11.5px; }
 
 .ah-card.tappable { cursor: pointer; }
 .ah-card.tappable:active { background: var(--surface-2); }
 .ah-card:focus-visible { outline: 2px solid var(--ah, var(--accent)); outline-offset: 2px; }
 
-/* Two across once there is room; one per row on a phone, as in Health. */
-@media (min-width: 620px) { .ah-grid { grid-template-columns: 1fr 1fr; } }
+/*
+ * Two across, on a phone as well.
+ *
+ * One per row meant eight numbers took eight screens of scrolling. Two
+ * across is the shape people already read this kind of dashboard in, and
+ * it puts the whole set in a glance rather than a journey.
+ */
+.ah-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 700px) { .ah-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* The rings and the night's sleep carry more than a number, so they take
+   the full width rather than being squeezed into a half-tile. */
+.ah-rings, .ah-card.ah-wide { grid-column: 1 / -1; }
 
 /* Health's own chart furniture: a floor, two labelled edges, dates below.
    The bars stop short of the right-hand scale so a reading never has to
@@ -2922,3 +2796,48 @@ button.src-tag { cursor: pointer; }
    objects, not as rows of a table. */
 .ah-grid > .ah-card { margin: 0; }
 .vital, .vitals, .vitals-head, .vital-note { }
+
+/* Drag to rearrange, the way icons move on a home screen. */
+.dash-edit .dash-item { touch-action: none; cursor: grab; }
+.dash-edit .dash-item > * { pointer-events: none; }
+.dash-item.is-lifted {
+  position: relative; z-index: 40; cursor: grabbing;
+  transform: scale(1.03); opacity: .95;
+  box-shadow: 0 18px 44px -18px rgba(0,0,0,.9);
+  border-radius: 18px;
+}
+.dash-item.is-shifting { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: no-preference) {
+  .dash-edit .dash-item:not(.is-lifted) { animation: jiggle 2.4s ease-in-out infinite; }
+  @keyframes jiggle {
+    0%,100% { transform: rotate(-.22deg); }
+    50%     { transform: rotate(.22deg); }
+  }
+}
+.dash-edit .dash-item { position: relative; }
+.dash-edit .dash-item::after {
+  content: ''; position: absolute; inset: -3px;
+  border: 1.5px dashed var(--line-2); border-radius: 18px; pointer-events: none;
+}
+.dash { display: grid; gap: 0; }
+.dash-item { min-width: 0; }
+
+/* One screen, not a column you climb. */
+.metric-detail { display: grid; gap: 16px; }
+.metric-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.metric-big {
+  font-family: var(--cond), var(--sans);
+  font-size: 52px; line-height: .95; letter-spacing: -2px; color: var(--text);
+  display: flex; align-items: baseline; gap: 6px; margin-top: 2px;
+}
+.metric-unit { font-size: 17px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.metric-place { text-align: right; }
+.metric-pct {
+  font-family: var(--cond), var(--sans); font-size: 26px;
+  color: var(--ah, var(--accent)); letter-spacing: -.5px;
+}
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line);
+             border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.stat-cell { background: var(--surface); padding: 11px 13px; }
+.stat-v { font-family: var(--cond), var(--sans); font-size: 19px; color: var(--text); margin-top: 2px; }
+.metric-verdict { font-size: 13.5px; line-height: 1.5; color: var(--text-2); }

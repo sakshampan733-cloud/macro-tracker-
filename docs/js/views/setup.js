@@ -240,7 +240,7 @@ const stat = (label, value, hue) =>
    you are picking a colour, so the control should be the colour. */
 function orbPicker(ctx) {
   const row = el('div.orb-row');
-  const current = get().settings.orb || 'red';
+  const current = get().settings.orb || 'none';
   for (const [key, o] of Object.entries(ORBS)) {
     const dot = el('button.orb-dot' + (key === current ? '.is-on' : ''), {
       type: 'button', title: o.label, 'aria-label': o.label,
@@ -248,7 +248,7 @@ function orbPicker(ctx) {
       style: { '--swatch': `rgb(${o.dark})` },
       onclick: () => {
         commit(st => { st.settings.orb = key; }, 'settings');
-        applyOrb(key, get().settings.theme || 'dark');
+        applyOrb(key, 'dark');
         [...row.children].forEach(c => {
           c.classList.remove('is-on');
           c.setAttribute('aria-pressed', 'false');
@@ -547,24 +547,11 @@ export function renderSettings(root, ctx) {
       field('Background', orbPicker(ctx),
         'The glow behind the glass. It tints both themes.'),
       el('div.tile', {},
-        el('div.theme-row', {},
-          ...[
-            ['dark',  'Dark',   'dark'],
-            ['light', 'Light',  'light'],
-            ['auto',  'System', 'auto'],
-          ].map(([value, label, swatch]) => el('button.theme-opt', {
-            type: 'button',
-            'aria-pressed': String((s.settings.theme || 'dark') === value),
-            onclick: () => {
-              commit(st => { st.settings.theme = value; });
-              ctx.refresh();
-            },
-          },
-            el('div', { class: 'theme-swatch ' + swatch }),
-            el('span.micro', {}, label)))),
-        el('div.fine', { style: { marginTop: '10px' } },
-          'Dark is true black rather than dark grey — on an OLED screen those pixels are genuinely off, '
-          + 'which saves power and lets the cards read as objects floating in nothing.'))),
+        el('div.fine', {},
+          'Basal is dark only. The light theme was a second palette kept alongside the '
+          + 'real one and it never looked like the app — the colours inverted but the '
+          + 'corrections that make dark work did not. True black rather than dark grey: '
+          + 'on an OLED screen those pixels are genuinely off.'))),
 
     group(ctx, 'read', 'Reading',
       'How much the app explains, and how much to trust it.',

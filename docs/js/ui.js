@@ -411,3 +411,81 @@ export function field(label, input, help) {
 export function empty(title, message, action) {
   return el('div.empty', {}, el('h3', {}, title), el('p', {}, message), action || null);
 }
+
+/*
+ * Drag to rearrange, the way icons move on a home screen.
+ *
+ * Pointer events rather than HTML5 drag-and-drop, which does not fire on
+ * touch at all — the one place this feature is actually wanted. The lifted
+ * element is moved with a transform and never removed from the flow, so
+ * nothing reflows mid-drag and the layout cannot jump under the finger.
+ *
+ * Order is decided by midpoints: when the dragged tile's centre passes
+ * another tile's centre, they swap. That reads correctly in a grid as well
+ * as a column, because it compares both axes.
+ */
+export function sortable(container, { itemSelector = '.dash-item', onReorder } = {}) {
+  let lifted = null, startX = 0, startY = 0, dx = 0, dy = 0;
+  let items = [];
+
+  const rectOf = n => n.getBoundingClientRect();
+  const centre = r => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+
+  const down = e => {
+    if (!container.classList.contains('dash-edit')) return;
+    const item = e.target.closest(itemSelector);
+    if (!item || !container.contains(item)) return;
+    lifted = item;
+    items = [...container.querySelectorAll(itemSelector)];
+    startX = e.clientX; startY = e.clientY; dx = 0; dy = 0;
+    item.classList.add('is-lifted');
+    item.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  };
+
+  const move = e => {
+    if (!lifted) return;
+    dx = e.clientX - startX; dy = e.clientY - startY;
+    lifted.style.transform = `translate(${dx}px, ${dy}px) scale(1.03)`;
+
+    const lc = centre(rectOf(lifted));
+    for (const other of items) {
+      if (other === lifted) continue;
+      const r = rectOf(other);
+      /* Only swap once the centre is genuinely inside the other tile —
+         comparing edges made tiles flicker back and forth along a border. */
+      if (lc.x > r.left && lc.x < r.right && lc.y > r.top && lc.y < r.bottom) {
+        const before = items.indexOf(lifted) < items.indexOf(other);
+        other.classList.add('is-shifting');
+        container.insertBefore(lifted, before ? other.nextSibling : other);
+        /* The element moved under the pointer, so the drag origin has to
+           move with it or the tile leaps away by exactly one slot. */
+        const nr = rectOf(lifted);
+        startX = e.clientX - (nr.left + nr.width / 2 - lc.x) - dx;
+        startY = e.clientY - (nr.top + nr.height / 2 - lc.y) - dy;
+        items = [...container.querySelectorAll(itemSelector)];
+        setTimeout(() => other.classList.remove('is-shifting'), 200);
+        break;
+      }
+    }
+  };
+
+  const up = () => {
+    if (!lifted) return;
+    lifted.style.transform = '';
+    lifted.classList.remove('is-lifted');
+    lifted = null;
+    onReorder?.([...container.querySelectorAll(itemSelector)].map(n => n.dataset.id));
+  };
+
+  container.addEventListener('pointerdown', down);
+  container.addEventListener('pointermove', move);
+  container.addEventListener('pointerup', up);
+  container.addEventListener('pointercancel', up);
+  return () => {
+    container.removeEventListener('pointerdown', down);
+    container.removeEventListener('pointermove', move);
+    container.removeEventListener('pointerup', up);
+    container.removeEventListener('pointercancel', up);
+  };
+}

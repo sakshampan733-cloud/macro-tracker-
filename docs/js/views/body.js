@@ -8,8 +8,8 @@
 
 import {
   el, clear, icon, kcal, g, distribution, toast, sheet, field,
-  segmented, empty, dateLabel, confirmSheet, explain, replaceKids } from '../ui.js';
-import { get, commit, dayKey, setWeight, peekDay, weightSeries, totals } from '../store.js';
+  segmented, empty, dateLabel, confirmSheet, explain, replaceKids, sortable } from '../ui.js';
+import { get, commit, dayKey, shiftDay, setWeight, clearWeight, peekDay, weightSeries, totals } from '../store.js';
 import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
   nutritionVsRecovery, stats,
@@ -35,36 +35,97 @@ import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
 } from '../whooprelay.js';
 
+/*
+ * The order of this screen belongs to whoever is reading it.
+ *
+ * Every arrangement here was an argument — vitals first because they
+ * changed overnight, the verdict above its own evidence — and every one of
+ * those arguments is about a typical person rather than the one holding
+ * the phone. Somebody cutting checks their weight first; somebody deep in
+ * a training block checks recovery. Both are right, and neither needs to
+ * ask.
+ *
+ * So the sections are addressable and their order is stored. The defaults
+ * are still the arguments above; they are now a starting point rather than
+ * a ruling.
+ */
+const BODY_SECTIONS = [
+  ['vitals',  s => null],          /* placeholders: built in renderBody */
+  ['sense',   s => null],
+  ['checkin', s => null],
+  ['weight',  s => null],
+  ['tdee',    s => null],
+  ['dishes',  s => null],
+  ['blood',   s => null],
+  ['food-recovery', s => null],
+];
+const DEFAULT_BODY_ORDER = BODY_SECTIONS.map(([id]) => id);
+
+function bodyOrder(s) {
+  const saved = s.settings?.bodyOrder;
+  if (!Array.isArray(saved) || !saved.length) return DEFAULT_BODY_ORDER;
+  /* Anything new the app has grown since the order was saved goes to the
+     bottom rather than vanishing — a stored layout must never be able to
+     hide a feature that did not exist when it was written. */
+  const known = saved.filter(id => DEFAULT_BODY_ORDER.includes(id));
+  return [...known, ...DEFAULT_BODY_ORDER.filter(id => !known.includes(id))];
+}
+
 export function renderBody(root, ctx) {
   const s = get();
   clear(root);
+  const editing = !!ctx.dashEdit;
+
+  const built = {
+    vitals: vitalsSection(s, ctx),
+    sense: senseTile(s, ctx),
+    checkin: checkInTile(s, ctx),
+    weight: weightTile(ctx),
+    tdee: tdeeTile(s),
+    dishes: calibrationTile(s),
+    blood: bloodTile(s, ctx),
+    'food-recovery': correlationTile(s),
+  };
+
+  const list = el('div.dash' + (editing ? '.dash-edit' : ''));
+  for (const id of bodyOrder(s)) {
+    const node = built[id];
+    if (!node) continue;
+    list.append(el('div.dash-item', { dataset: { id } }, node));
+  }
+
+  if (editing) {
+    sortable(list, {
+      onReorder: ids => commit(st => { st.settings.bodyOrder = ids; }, 'settings'),
+    });
+  }
 
   root.append(
     (root.classList.add('stagger'), el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Body'),
-      el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report'))),
-    /*
-     * The band's readings lead.
-     *
-     * They are what changed overnight and what you opened this tab to
-     * look at. Weight, maintenance and the rest are review — true all
-     * week, and none of it moves while you are reading it. Putting the
-     * weigh-in first meant scrolling past a number you already knew to
-     * reach the one you did not.
-     */
+      el('div.flex', { style: { gap: '8px' } },
+        el('button.btn.sm.ghost', {
+          onclick: () => {
+            ctx.dashEdit = !ctx.dashEdit;
+            if (!ctx.dashEdit) haptic('success');
+            ctx.refresh();
+          },
+        }, editing ? 'Done' : 'Arrange'),
+        editing
+          ? el('button.btn.sm.ghost', {
+              onclick: () => {
+                commit(st => { delete st.settings.bodyOrder; }, 'settings');
+                toast('Back to the default order.');
+                ctx.refresh();
+              },
+            }, 'Reset')
+          : el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report')))),
     sourceBar(s, ctx) || el('div'),
-    vitalsSection(s, ctx),
-    /* The verdict first. Everything below is the evidence for it, and the
-       evidence is only worth reading once you know what it adds up to. */
-    /* Native append stringifies null into the page; senseTile returns
-       null when there is nothing to judge. */
-    senseTile(s, ctx) || el('div'),
-    checkInTile(s, ctx),
-    weightTile(ctx),
-    tdeeTile(s),
-    calibrationTile(s) || el('div'),
-    bloodTile(s, ctx),
-    correlationTile(s),
+    editing
+      ? el('div.note.info', { style: { marginBottom: '12px' } },
+          el('div', {}, 'Drag any card to move it. The order is yours and it is remembered.'))
+      : el('div'),
+    list,
   );
 }
 
@@ -168,8 +229,27 @@ function weightTile(ctx) {
   });
 
   const latest = withTrend[withTrend.length - 1];
-  const first = withTrend[0];
-  const change = latest && first ? latest.trend - first.trend : 0;
+  /*
+   * Two numbers, both named, and a change over a window you can hold in
+   * your head.
+   *
+   * This led with the trend and reported the trend's movement since your
+   * very first weigh-in. Both are defensible and together they were badly
+   * misleading: step on the scale at 90.0 after a fortnight at 91.0 and
+   * the tile answered "90.9, down 0.1" — the smoothed figure against an
+   * anchor two years back, while you were looking at the number you had
+   * just typed.
+   *
+   * The reading you took leads now. The trend sits beside it, labelled,
+   * because it is the one that means something over weeks. And the change
+   * is measured over thirty days rather than over all history.
+   */
+  const scale = latest ? latest.kg : null;
+  const cutoff = shiftDay(key, -30);
+  const monthAgo = withTrend.filter(p => p.date <= cutoff).pop() || withTrend[0];
+  const change = latest && monthAgo ? latest.trend - monthAgo.trend : 0;
+  const spanDays = latest && monthAgo
+    ? Math.round((new Date(latest.date) - new Date(monthAgo.date)) / 86400000) : 0;
 
   /*
    * One weight widget, two lines.
@@ -196,7 +276,9 @@ function weightTile(ctx) {
   return el('div.tile', {},
     el('div.tile-head', {},
       el('h3', {}, 'Weight'),
-      latest ? el('span.micro', {}, `${withTrend.length} weigh-ins`) : null),
+      latest ? el('button.btn.sm.ghost', {
+        onclick: () => openWeightHistory(ctx),
+      }, `${withTrend.length} weigh-ins`) : null),
 
     el('div.flex', {},
       input,
@@ -215,14 +297,25 @@ function weightTile(ctx) {
     latest ? el('div', { style: { marginTop: '14px' } },
       el('div.between', {},
         el('div', {},
-          el('div.micro', {}, 'Trend weight'),
-          el('div.num', { style: { fontSize: '26px', marginTop: '2px' } }, toDisp(latest.trend).toFixed(1),
+          el('div.micro', {}, 'Last weigh-in · ' + dateLabel(latest.date)),
+          el('div.num', { style: { fontSize: '26px', marginTop: '2px' } }, toDisp(scale).toFixed(1),
             el('span', { style: { fontSize: '12px', color: 'var(--muted)', marginLeft: '3px' } }, wu))),
+        el('div', { style: { textAlign: 'center' } },
+          el('div.micro', {}, '10-day trend'),
+          el('div.num', { style: { fontSize: '20px', marginTop: '3px', color: 'var(--text-2)' } },
+            toDisp(latest.trend).toFixed(1))),
         el('div', { style: { textAlign: 'right' } },
-          el('div.micro', {}, 'Since ' + dateLabel(first.date)),
+          el('div.micro', {}, spanDays >= 7 ? `Trend, ${spanDays} days` : 'Trend change'),
           el('div.num', {
             style: { fontSize: '18px', marginTop: '2px', color: change < 0 ? 'var(--good)' : change > 0 ? 'var(--m-c-ink)' : 'var(--text)' },
           }, (change >= 0 ? '+' : '') + toDisp(change).toFixed(1) + ' ' + wu))),
+      Math.abs(scale - latest.trend) > 0.35
+        ? el('div.fine', { style: { marginTop: '6px' } },
+            `The trend is ${toDisp(Math.abs(scale - latest.trend)).toFixed(1)} ${wu} `
+            + `${scale < latest.trend ? 'above' : 'below'} today's reading because it is smoothed over `
+            + 'ten days — one weigh-in moves it about a tenth of the way. That lag is the point: '
+            + 'it is what stops a salty dinner reading as a gain.')
+        : null,
       pv.ready ? el('div.dl-key', { style: { marginTop: '10px' } },
         el('span.micro', {}, el('i.dl-dash'), 'What your log predicts'),
         el('span.micro', {}, el('i.dl-solid'), 'What you weigh')) : null,
@@ -341,6 +434,67 @@ const senseRow = (name, value, ok) => el('div.sense-row', {},
   el('span.sense-dot' + (ok ? '.is-ok' : '')),
   el('span.grow', {}, name),
   el('span.sense-val', {}, value));
+
+/*
+ * Every weigh-in, editable.
+ *
+ * A weight was the one thing in the app you could write and never unwrite
+ * — no list, no edit, no delete. Type 19.0 instead of 91.0 with wet
+ * fingers and it sat in the trend forever, dragging every downstream
+ * figure with it: the trend line, the adaptive maintenance, the gap
+ * between your log and the scale.
+ */
+function openWeightHistory(ctx) {
+  const s = get();
+  const wu = weightUnit(s);
+  const toDisp = kg => (wu === 'lb' ? kgToLb(kg) : kg);
+  const fromDisp = v => (wu === 'lb' ? lbToKg(v) : v);
+
+  const list = el('div');
+  const draw = () => {
+    clear(list);
+    const rows = weightSeries().slice().reverse();
+    if (!rows.length) { list.append(el('div.fine', {}, 'Nothing logged yet.')); return; }
+    const trend = new Map(trendWeight(weightSeries()).map(p => [p.date, p.trend]));
+    for (const r of rows.slice(0, 120)) {
+      const input = el('input.num-in', {
+        type: 'number', inputmode: 'decimal', step: '0.1',
+        value: toDisp(r.kg).toFixed(1),
+      });
+      list.append(el('div.row', {},
+        el('span.grow', {},
+          el('div.title', {}, dateLabel(r.date)),
+          el('div.sub', {}, `trend ${toDisp(trend.get(r.date) ?? r.kg).toFixed(1)} ${wu}`)),
+        input,
+        el('button.btn.sm.ghost', {
+          onclick: () => {
+            const kg = fromDisp(+input.value);
+            if (!(kg > 20 && kg < 400)) { toast(`That does not look like a weight in ${wu}.`, 'err'); return; }
+            setWeight(r.date, kg); haptic('tap'); toast('Updated.'); draw(); ctx.refresh();
+          },
+        }, 'Save'),
+        el('button.btn.sm.ghost.is-danger', {
+          'aria-label': `Delete the weigh-in for ${r.date}`,
+          onclick: () => confirmSheet({
+            title: `Delete ${dateLabel(r.date)}?`,
+            body: `${toDisp(r.kg).toFixed(1)} ${wu} will be removed. The trend and your `
+                + 'maintenance figure both recalculate without it.',
+            confirm: 'Delete', danger: true,
+            onConfirm: () => { clearWeight(r.date); haptic('tap'); toast('Deleted.'); draw(); ctx.refresh(); },
+          }),
+        }, icon('trash', 14))));
+    }
+  };
+  draw();
+  return sheet({
+    title: 'Weigh-ins',
+    body: el('div', {},
+      el('div.fine', { style: { marginBottom: '12px' } },
+        'Newest first. Change a number and save it, or delete one you did not mean to '
+        + 'log — the trend and your maintenance figure both recalculate.'),
+      list),
+  });
+}
 
 function tdeeTile(s) {
   if (!s.profile) return el('div');
@@ -557,6 +711,17 @@ function metricCard(s, ctx, scoped, sum, key, latestKey) {
   const colour = key === 'recovery' ? recoveryColour(value) : `var(${token})`;
   const from = sourceForMetric(s, key);
 
+  /*
+   * Small enough to sit two across on a phone.
+   *
+   * These were full-width cards carrying a labelled chart each, which on a
+   * phone meant scrolling through eight screens of dashboard to see eight
+   * numbers, and roughly a dozen figures on screen at once between the
+   * axis labels and the values. A tile answers one question — what is it
+   * now, and which way is it going — and everything else moves behind the
+   * tap. The chart with its scale, its dates and its distribution is one
+   * touch away and unchanged.
+   */
   return el('div.ah-card.tappable', {
     role: 'button', tabIndex: 0,
     style: { '--ah': colour },
@@ -564,22 +729,17 @@ function metricCard(s, ctx, scoped, sum, key, latestKey) {
     onclick: () => openMetric(s, key, ctx),
     onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, key, ctx); } },
   },
-    el('div.between', {},
-      el('span.ah-cat', {}, icon(glyph, 15), category),
-      el('span.flex', {},
-        from === 'apple' && healthSource() === 'both'
-          ? el('span.from-tag', {}, 'Apple') : null,
-        el('span.ah-when', {}, info.latest.date === latestKey ? 'Today' : info.latest.date),
-        icon('chevron', 13))),
-    el('div.ah-name', {}, info.label),
+    el('span.ah-cat', {}, icon(glyph, 14), category),
+    el('div.ah-name', {}, info.label,
+      from === 'apple' && healthSource() === 'both'
+        ? el('span.from-tag', {}, 'Apple') : null),
     el('div.ah-value', {},
       value.toLocaleString(undefined, { minimumFractionDigits: info.dp, maximumFractionDigits: info.dp }),
       info.unit ? el('span.ah-unit', {}, info.unit) : null),
-    pts.length >= 2
-      ? appleChart(pts.map(p => ({ v: p.v, date: p.date,
-          label: `${p.date}: ${p.v.toFixed(info.dp)} ${info.unit}` })),
-          { colour, h: 96, zero, unit: info.unit, dp: info.dp })
-      : el('div.fine', {}, 'First reading. A trend appears once there are a few days.'));
+    el('div.ah-spark', { style: { color: colour } },
+      pts.length >= 2
+        ? miniSpark(pts.map(p => p.v), { colour, w: 96, h: 26 })
+        : el('span.micro', {}, 'first reading')));
 }
 
 function appleVitals(s, ctx, scoped, sum) {
@@ -1049,50 +1209,58 @@ function sideStat(label, value, unit, dp, store, key, ctx) {
 
 export function openMetric(s, metric, ctx) {
   const info = METRICS[metric];
-  const series = seriesFor(s.whoop, metric);
+  const scoped = { rows: rowsFor(s, effectivePick(s)) };
+  const series = seriesFor(scoped, metric);
+  if (!series.length) return null;
   const latest = series[series.length - 1];
-  const place = placeInRange(s.whoop, metric, latest.v);
-  const base14 = baseline(s.whoop, metric, 14);
+  const place = placeInRange(scoped, metric, latest.v);
+  const base14 = baseline(scoped, metric, 14);
   const st = place.stats;
+  const spec = METRIC_CARDS[metric];
+  const colour = metric === 'recovery' ? recoveryColour(latest.v)
+    : spec ? `var(${spec[1]})` : 'var(--accent)';
+  const zero = spec ? spec[3] : false;
+
+  /*
+   * Dense enough to read without scrolling.
+   *
+   * This was four stacked cards — a readout, a chart, six rows of
+   * statistics and a paragraph — which in a panel is a column you climb.
+   * The question being asked is "what is this number and is it normal for
+   * me", and that fits on one screen: the reading, the shape of the last
+   * two months, and the four figures that actually place it. The rest was
+   * restating the same distribution in three different ways.
+   */
+  const stat = (k, v) => el('div.stat-cell', {},
+    el('div.micro', {}, k),
+    el('div.stat-v', {}, v));
 
   sheet({
     title: info.label,
-    body: el('div', {},
-      el('div.tile', {},
-        el('div.readout', {},
-          el('div', {},
-            el('div.micro', {}, 'Latest · ' + latest.date),
-            el('div.readout-main', {}, latest.v.toFixed(info.dp),
-              el('span.readout-pm', {}, ' ' + info.unit))),
-          el('div.readout-side', {},
-            el('div.micro', {}, 'Your median'),
-            el('div.v', {}, st.p50.toFixed(info.dp)))),
-        el('div', { style: { marginTop: '14px' } },
-          el('div.micro', { style: { marginBottom: '6px' } }, 'Where today sits in your whole history'),
-          distribution({ stats: st, value: latest.v, dp: info.dp }))),
+    body: el('div.metric-detail', { style: { '--ah': colour } },
+      el('div.metric-hero', {},
+        el('div', {},
+          el('div.micro', {}, latest.date),
+          el('div.metric-big', {}, latest.v.toFixed(info.dp),
+            info.unit ? el('span.metric-unit', {}, info.unit) : null)),
+        el('div.metric-place', {},
+          el('div.metric-pct', {}, place.pct + el('span', {}, '').textContent + 'th'),
+          el('div.micro', {}, 'of your own range'))),
 
-      el('div.tile', {},
-        el('div.micro', { style: { marginBottom: '8px' } }, `Last ${Math.min(60, series.length)} days`),
-        healthBars(series.slice(-60).map(p => ({ v: p.v, label: `${p.date}: ${p.v}` })),
-          { h: 140, colour: 'var(--accent)', unit: ' ' + info.unit, dp: info.dp })),
+      appleChart(series.slice(-60).map(p => ({ v: p.v, date: p.date,
+        label: `${p.date}: ${p.v.toFixed(info.dp)} ${info.unit}` })),
+        { colour, h: 150, zero, unit: info.unit, dp: info.dp }),
 
-      el('div.tile', {},
-        ...[
-          ['Range', `${st.min.toFixed(info.dp)} – ${st.max.toFixed(info.dp)} ${info.unit}`],
-          ['Typical middle half', `${st.p25.toFixed(info.dp)} – ${st.p75.toFixed(info.dp)} ${info.unit}`],
-          ['Average', `${st.mean.toFixed(info.dp)} ${info.unit}`],
-          ['Spread', `± ${st.sd.toFixed(info.dp)} ${info.unit}`],
-          ['Last 14 days', `${base14.mean.toFixed(info.dp)} ${info.unit}`],
-          ['Readings', String(st.n)],
-        ].map(([k, v]) => el('div.between', { style: { padding: '7px 0', borderBottom: '1px solid var(--line)' } },
-          el('span', { style: { fontSize: '13.5px', color: 'var(--text-2)' } }, k),
-          el('span.num', { style: { fontSize: '13.5px' } }, v)))),
+      el('div.stat-grid', {},
+        stat('Last 14 days', base14.mean.toFixed(info.dp) + (info.unit ? ' ' + info.unit : '')),
+        stat('All-time average', st.mean.toFixed(info.dp) + (info.unit ? ' ' + info.unit : '')),
+        stat('Usual middle half', `${st.p25.toFixed(info.dp)}–${st.p75.toFixed(info.dp)}`),
+        stat('Full range', `${st.min.toFixed(info.dp)}–${st.max.toFixed(info.dp)}`)),
 
-      el('div.note', {}, el('div', {},
-        `Today is at the ${place.pct}th percentile of everything you've recorded, `
-        + `${Math.abs(place.z).toFixed(1)} standard deviations ${place.z >= 0 ? 'above' : 'below'} your average. `
-        + `Read that as ${place.verdict}.`)),
-    ),
+      el('div.metric-verdict', {},
+        `${Math.abs(place.z).toFixed(1)} standard deviations `
+        + `${place.z >= 0 ? 'above' : 'below'} your average across ${st.n} readings — `
+        + `${place.verdict}.`)),
   });
 }
 

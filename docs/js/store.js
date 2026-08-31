@@ -69,7 +69,7 @@ const EMPTY = () => ({
   cache: {},
   whoop: { rows: {}, importedAt: null },
   settings: {
-    orb: 'red',            // hue of the ambient background circle
+    orb: 'none',           // ambient background wash; off by default
     openGroups: [],        // which settings categories are expanded
     guideSeen: false,      // the first-run walkthrough has been shown
     healthKey: null,       // ties an iPhone Shortcut to this app
@@ -517,6 +517,12 @@ export function eatPlanned(key, id) {
 
 export function setWeight(key, kg) {
   commit(s => { day(key).weight = kg; }, 'weight');
+}
+
+/* A weigh-in typed by mistake had no way back — the only entry in the app
+   that could be written and never unwritten. */
+export function clearWeight(key) {
+  commit(s => { if (s.days?.[key]) delete s.days[key].weight; }, 'weight');
 }
 
 export function weightSeries() {

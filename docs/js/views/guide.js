@@ -107,32 +107,16 @@ const PAGES = [
 function appearancePicker() {
   const wrap = el('div.guide-pick');
 
-  const themes = el('div.theme-row');
-  const setTheme = v => {
-    commit(s => { s.settings.theme = v; }, 'settings');
-    const root = document.documentElement;
-    if (v === 'auto') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', v);
-    applyOrb(get().settings.orb || 'red', v);
-    [...themes.children].forEach(b => b.setAttribute('aria-pressed',
-      String(b.dataset.theme === v)));
-  };
-  for (const [value, label] of [['dark','Dark'], ['light','Light'], ['auto','System']]) {
-    themes.append(el('button.theme-opt', {
-      type: 'button', dataset: { theme: value },
-      'aria-pressed': String((get().settings.theme || 'dark') === value),
-      onclick: () => setTheme(value),
-    }, el('div', { class: 'theme-swatch ' + value }), el('span.micro', {}, label)));
-  }
+  /* No theme picker: the app is dark only now. */
 
   const orbs = el('div.orb-row');
   for (const [key, o] of Object.entries(ORBS)) {
-    const dot = el('button.orb-dot' + ((get().settings.orb || 'red') === key ? '.is-on' : ''), {
+    const dot = el('button.orb-dot' + ((get().settings.orb || 'none') === key ? '.is-on' : ''), {
       type: 'button', title: o.label, 'aria-label': o.label,
       style: { '--swatch': `rgb(${o.dark})` },
       onclick: () => {
         commit(s => { s.settings.orb = key; }, 'settings');
-        applyOrb(key, get().settings.theme || 'dark');
+        applyOrb(key, 'dark');
         [...orbs.children].forEach(c => c.classList.remove('is-on'));
         dot.classList.add('is-on');
       },
@@ -142,9 +126,7 @@ function appearancePicker() {
 
   wrap.append(
     el('div.guide-pick-label', {}, 'Background'),
-    orbs,
-    el('div.guide-pick-label', { style: { marginTop: '18px' } }, 'Theme'),
-    themes);
+    orbs);
   return wrap;
 }
 
