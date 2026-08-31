@@ -1106,8 +1106,12 @@ function vitalsSection(s, ctx) {
       healthBars(recentRec.map(p => ({ v: p.v, label: `${p.date}: ${Math.round(p.v)}%` })), {
         h: 132, unit: '%', dp: 0, colourFor: recoveryColour,
       }),
-      el('div.between', { style: { marginTop: '8px' } },
-        el('span.micro', {}, 'green ≥67 · amber ≥34 · red below')),
+      /* A .between around one long unbreakable line forced the tile wider
+         than the screen, and the chart inside it stretched to match — 81px
+         of horizontal overflow on the Body tab traced back to this caption.
+         It is a caption; it wraps. */
+      el('div.fine', { style: { marginTop: '8px' } },
+        'Green ≥ 67 · amber ≥ 34 · red below'),
     ));
   }
 

@@ -69,7 +69,6 @@ const EMPTY = () => ({
   cache: {},
   whoop: { rows: {}, importedAt: null },
   settings: {
-    orb: 'none',           // ambient background wash; off by default
     openGroups: [],        // which settings categories are expanded
     guideSeen: false,      // the first-run walkthrough has been shown
     healthKey: null,       // ties an iPhone Shortcut to this app

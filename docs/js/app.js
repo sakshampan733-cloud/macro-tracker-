@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.31-session';
+export const VERSION = '2026.08.31-final';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, openDay, pushBackup, setDishDensities, flush } from './store.js';
@@ -24,7 +24,6 @@ import { autoSyncApple, repairSleepUnits } from './applehealth.js';
 import { installFeedback } from './feedback.js';
 import { installPullToRefresh, refreshEverything } from './pulltorefresh.js';
 import { startReminders } from './reminders.js';
-import { applyOrb } from './theme.js';
 import { installSwipe } from './swipe.js';
 import { maybeShowGuide } from './views/guide.js';
 import { guard } from './boot.js';
@@ -137,12 +136,21 @@ function applyTheme(pref) {
     : pref;
 
   root.setAttribute('data-theme', resolved);
-  root.style.colorScheme = (!pref || pref === 'auto') ? 'light dark' : resolved;
+  /*
+   * The resolved scheme, never "light dark".
+   *
+   * Advertising both on System told the browser to paint its own furniture
+   * — scrollbars, form controls, the overscroll gutter — from the OS
+   * setting, while the attribute above had already committed the page to
+   * one theme. On a light Mac with the app in dark that came out split
+   * down the middle: dark content in a white frame. It follows the
+   * resolved value now, and the media listener still tracks the OS.
+   */
+  root.style.colorScheme = resolved;
 
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', resolved === 'dark' ? '#000000' : '#F2F2F7');
 
-  applyOrb(get().settings?.orb || 'none', resolved);
 }
 
 /* The system flipping while the app is open, on 'auto'. */
@@ -188,7 +196,7 @@ function draw() {
 
   nav.classList.remove('hide');
   main.classList.toggle('has-sticky', STICKY_ROUTES.has(ctx.route));
-  /* Lets CSS react to which screen you are on — the orb only beats on Body. */
+  /* Lets CSS react to which screen you are on. */
   document.documentElement.setAttribute('data-route', ctx.route);
   const head = drawHeader();
   if (head) main.append(head);   /* null on screens that draw their own */

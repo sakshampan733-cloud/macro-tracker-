@@ -17,7 +17,6 @@
 
 import { el, sheet, icon, append } from '../ui.js';
 import { get, commit } from '../store.js';
-import { ORBS, applyOrb } from '../theme.js';
 
 const PAGES = [
   {
@@ -107,26 +106,27 @@ const PAGES = [
 function appearancePicker() {
   const wrap = el('div.guide-pick');
 
-  /* No theme picker: the app is dark only now. */
-
-  const orbs = el('div.orb-row');
-  for (const [key, o] of Object.entries(ORBS)) {
-    const dot = el('button.orb-dot' + ((get().settings.orb || 'none') === key ? '.is-on' : ''), {
-      type: 'button', title: o.label, 'aria-label': o.label,
-      style: { '--swatch': `rgb(${o.dark})` },
-      onclick: () => {
-        commit(s => { s.settings.orb = key; }, 'settings');
-        applyOrb(key, 'dark');
-        [...orbs.children].forEach(c => c.classList.remove('is-on'));
-        dot.classList.add('is-on');
-      },
-    });
-    orbs.append(dot);
+  /* The ambient wash is gone, so the only thing left to choose here is the
+     theme — which is worth asking once, since it is the one preference
+     people notice immediately and rarely go looking for. */
+  const row = el('div.theme-row');
+  const set = v => {
+    commit(s => { s.settings.theme = v; }, 'settings');
+    document.documentElement.setAttribute('data-theme',
+      v === 'auto'
+        ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches === false ? 'light' : 'dark')
+        : v);
+    [...row.children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === v)));
+  };
+  for (const [value, label] of [['dark', 'Dark'], ['light', 'Light'], ['auto', 'System']]) {
+    row.append(el('button.theme-opt', {
+      type: 'button', dataset: { theme: value },
+      'aria-pressed': String((get().settings.theme || 'dark') === value),
+      onclick: () => set(value),
+    }, el('div', { class: 'theme-swatch ' + value }), el('span.micro', {}, label)));
   }
 
-  wrap.append(
-    el('div.guide-pick-label', {}, 'Background'),
-    orbs);
+  wrap.append(el('div.guide-pick-label', {}, 'Theme'), row);
   return wrap;
 }
 

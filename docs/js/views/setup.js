@@ -14,7 +14,6 @@ import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
 import { generateDemo } from '../demo.js';
 import { openSleepGoal, sleepSchedule, sleepHours, clockText } from './sleep.js';
-import { ORBS, applyOrb } from '../theme.js';
 import { goalTile } from './goal.js';
 import { openGuide } from './guide.js';
 import { openAppleHealth } from './apple.js';
@@ -238,31 +237,6 @@ const stat = (label, value, hue) =>
 
 /* Six hues, shown as what they are rather than named in a dropdown —
    you are picking a colour, so the control should be the colour. */
-function orbPicker(ctx) {
-  const row = el('div.orb-row');
-  const current = get().settings.orb || 'none';
-  for (const [key, o] of Object.entries(ORBS)) {
-    const dot = el('button.orb-dot' + (key === current ? '.is-on' : ''), {
-      type: 'button', title: o.label, 'aria-label': o.label,
-      'aria-pressed': String(key === current),
-      style: { '--swatch': `rgb(${o.dark})` },
-      onclick: () => {
-        commit(st => { st.settings.orb = key; }, 'settings');
-        applyOrb(key, 'dark');
-        [...row.children].forEach(c => {
-          c.classList.remove('is-on');
-          c.setAttribute('aria-pressed', 'false');
-        });
-        dot.classList.add('is-on');
-        dot.setAttribute('aria-pressed', 'true');
-      },
-    });
-    row.append(dot);
-  }
-  return row;
-}
-
-
 /*
  * A settings group.
  *
@@ -543,9 +517,7 @@ export function renderSettings(root, ctx) {
         : null),
 
     group(ctx, 'look', 'Appearance',
-      'Theme and the glow behind the glass.',
-      field('Background', orbPicker(ctx),
-        'The glow behind the glass. It tints both themes.'),
+      'How the app looks.',
       el('div.tile', {},
         el('div.theme-row', {},
           ...[
