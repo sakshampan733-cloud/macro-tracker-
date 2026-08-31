@@ -209,16 +209,42 @@ export function sheet({ title, body, foot, onClose, wide }) {
   return { close, panel, body: panel.querySelector('.sheet-body') };
 }
 
-export function confirmSheet({ title, message, confirmLabel = 'Confirm', danger }) {
+/*
+ * Confirm something, either way round.
+ *
+ * This was promise-only — `await confirmSheet({ message, confirmLabel })` —
+ * and five call sites had been written in the other obvious shape, passing
+ * `body`, `confirm` and an `onConfirm` callback. Nothing warned them: the
+ * dialog opened, the prose was blank because `message` was undefined, the
+ * button read "Confirm" because `confirmLabel` was, and pressing it closed
+ * the sheet and did nothing at all, because the callback was never
+ * looked at.
+ *
+ * Removing a workout, deleting a weigh-in, deleting a workout type and
+ * removing a medication were all silently inert. Rather than rewrite five
+ * call sites and leave the trap armed for the sixth, both shapes work: the
+ * promise still resolves, and an `onConfirm` is called if one was given.
+ */
+export function confirmSheet({
+  title, message, body, confirmLabel, confirm, danger, onConfirm,
+}) {
+  const prose = message ?? body ?? '';
+  const label = confirmLabel ?? confirm ?? 'Confirm';
   return new Promise(resolve => {
     let done = false;
+    const finish = ok => {
+      done = true;
+      s.close();
+      if (ok) onConfirm?.();
+      resolve(ok);
+    };
     const s = sheet({
       title,
-      body: el('p', { style: { margin: '4px 0 0', color: 'var(--text-2)', lineHeight: '1.5' } }, message),
+      body: el('p', { style: { margin: '4px 0 0', color: 'var(--text-2)', lineHeight: '1.5' } }, prose),
       foot: el('div.btn-row', {},
-        el('button.btn.ghost', { onclick: () => { done = true; s.close(); resolve(false); } }, 'Cancel'),
+        el('button.btn.ghost', { onclick: () => finish(false) }, 'Cancel'),
         el('button', { class: danger ? 'btn danger' : 'btn primary',
-          onclick: () => { done = true; s.close(); resolve(true); } }, confirmLabel)),
+          onclick: () => finish(true) }, label)),
       onClose: () => { if (!done) resolve(false); },
     });
   });
