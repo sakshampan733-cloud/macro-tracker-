@@ -5,10 +5,10 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.29-sleepcard';
+export const VERSION = '2026.08.30-newday';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
-import { get, subscribe, dayKey, pushBackup, setDishDensities, flush } from './store.js';
+import { get, subscribe, dayKey, openDay, pushBackup, setDishDensities, flush } from './store.js';
 import { solveDensities } from './dishes.js';
 import { bestTDEE } from './nutrition.js';
 import { renderToday } from './views/today.js';
@@ -60,7 +60,8 @@ const OWN_HEADER = new Set(['home']);
 
 const ctx = {
   route: 'home',
-  date: dayKey(),
+  /* The day being logged, which after midnight may still be yesterday. */
+  date: openDay(),
   tab: 'mine',
   go(route, props = {}) {
     ctx.route = route;
@@ -93,7 +94,7 @@ function drawNav() {
   for (const t of TABS) {
     nav.append(el('button', {
       'aria-current': ctx.route === t.id ? 'page' : null,
-      onclick: () => ctx.go(t.id, t.id === 'today' ? { date: dayKey() } : {}),
+      onclick: () => ctx.go(t.id, t.id === 'today' ? { date: openDay() } : {}),
     }, icon(t.icon, 21), el('span', {}, t.label)));
   }
 }
@@ -244,10 +245,9 @@ setInterval(() => {
   if (today === lastToday) return;
   const ended = lastToday;
   lastToday = today;
-  if ((ctx.route === 'home' || ctx.route === 'detail') && ctx.date === ended) {
-    ctx.date = today;
-    draw();
-  }
+  /* Redraw so the "start a new day" prompt appears, but do not move the
+     day underneath someone who may still be eating. */
+  if (ctx.route === 'home' || ctx.route === 'detail') draw();
 }, 60000);
 
 let backupTimer;

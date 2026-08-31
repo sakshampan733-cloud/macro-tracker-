@@ -20,7 +20,7 @@ import { overdueNote } from '../reminders.js';
 import { caffeineNote } from './supplements.js';
 import { bandName } from '../applehealth.js';
 import {
-  get, totals, dayKey, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
+  get, totals, dayKey, dayPending, openDay, startNewDay, keepDayOpen, rolloverAsked, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
   scannedFoods, builtFoods, addWater, undoWater, peekDay, dismissNote, noteDismissed,
@@ -50,6 +50,7 @@ export function renderHome(root, ctx) {
      a literal "null" ended up sitting under the readout whenever Whoop
      had nothing to say. */
   append(root,
+    rolloverCard(key, ctx),
     header(key, ctx),
     readout(t, targets, ctx),
     coachCard(s, targets, key, ctx),
@@ -74,6 +75,53 @@ export function renderHome(root, ctx) {
  * that changes through the day makes it feel occupied rather than
  * decorated.
  */
+/*
+ * "It is tomorrow. Are you finished with today?"
+ *
+ * The clock rolls at midnight; people do not. Someone eating at half one
+ * in the morning is still on Friday, and an app that has already moved to
+ * Saturday files that meal on a day that has not happened — leaving
+ * Friday short and Saturday long, both wrong, with nothing on screen to
+ * explain why.
+ *
+ * So the day moves when you say it moves. This is the asking, and it sits
+ * above everything on the screen you log from, because someone opening
+ * the app after midnight needs to know which day they are adding to
+ * before they read a single number.
+ */
+function rolloverCard(key, ctx) {
+  if (!dayPending() || key !== openDay() || rolloverAsked()) return null;
+
+  const nice = d => new Date(d + 'T12:00:00')
+    .toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const weekday = d => new Date(d + 'T12:00:00')
+    .toLocaleDateString(undefined, { weekday: 'long' });
+
+  return el('div.tile.rollover', {},
+    el('div.rollover-head', {}, icon('moon', 17),
+      el('h3', {}, `It is ${nice(dayKey())} now`)),
+    el('div.fine', {},
+      `You are still logging ${nice(key)}. Anything you add goes on that day `
+      + 'until you finish it.'),
+    el('div.btn-row', { style: { marginTop: '12px' } },
+      el('button.btn.ghost.grow', {
+        onclick: () => {
+          /* Written down rather than merely tolerated, so it stops asking
+             for the rest of the night. */
+          keepDayOpen(key);
+          haptic('tap');
+          ctx.refresh();
+        },
+      }, 'Not done yet'),
+      el('button.btn.primary.grow', {
+        onclick: () => {
+          startNewDay();
+          haptic('success');
+          ctx.go('home', { date: dayKey() });
+        },
+      }, `Start ${weekday(dayKey())}`)));
+}
+
 function header(key, ctx) {
   const today = dayKey();
   const isToday = key === today;

@@ -2719,3 +2719,9 @@ button.src-tag { cursor: pointer; }
   border-radius: 99px; background: var(--surface-2); color: var(--text-2);
   font-size: 10.5px; letter-spacing: .01em; white-space: nowrap;
 }
+
+/* "It is tomorrow. Are you finished with today?" */
+.rollover { border-color: var(--accent-2); background: var(--surface); }
+.rollover-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rollover-head svg { color: var(--accent); flex: none; }
+.rollover-head h3 { margin: 0; }

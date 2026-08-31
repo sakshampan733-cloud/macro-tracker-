@@ -6,7 +6,7 @@
  * which is why losing it would cost you nothing but a reconnection.
  */
 
-import { get, commit } from './store.js';
+import { get, commit, dayKey } from './store.js';
 
 const KEY = 'basal.whoop.tokens';
 
@@ -156,8 +156,26 @@ export async function syncWhoop({ days = 180 } = {}) {
     const slp = bySleep[rec.sleep_id] || {};
     const iso = slp.end || cyc.end || rec.created_at;
     if (!iso) continue;
-    const date = String(iso).slice(0, 10);
-    const wake = String(slp.end || '').match(/T(\d{2}):(\d{2})/);
+    /*
+     * Whoop timestamps are UTC. Both of these read the clock off the
+     * string, which is the wrong clock everywhere except Britain in
+     * winter.
+     *
+     * The wake hour was the visible one: someone in India waking at 07:00
+     * has a sleep ending "T01:30Z", the regex read 1.5, and by nine in
+     * the morning the app told them they had been awake for seven and a
+     * half hours. Every wake-relative thing in the app — meal timing, the
+     * caffeine cutoff, bedtime — was shifted by the timezone offset.
+     *
+     * The date had the same fault more quietly: a wake time late enough
+     * in UTC to fall on the next local day filed the whole night under
+     * yesterday.
+     */
+    const ended = new Date(iso);
+    if (Number.isNaN(+ended)) continue;
+    const date = dayKey(ended);
+    const woke = slp.end ? new Date(slp.end) : null;
+    const wakeOk = woke && !Number.isNaN(+woke);
 
     rows[date] = {
       recovery: sc.recovery_score ?? null,
@@ -174,7 +192,7 @@ export async function syncWhoop({ days = 180 } = {}) {
       sleepEff: slp.sleepEff ?? null,
       resp: slp.resp ?? null,
       debtH: null,
-      wakeHour: wake ? +wake[1] + +wake[2] / 60 : null,
+      wakeHour: wakeOk ? woke.getHours() + woke.getMinutes() / 60 : null,
     };
   }
 

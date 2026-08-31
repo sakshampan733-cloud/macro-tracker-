@@ -187,6 +187,52 @@ export function dayKey(d = new Date()) {
   return t.toISOString().slice(0, 10);
 }
 
+/*
+ * The day you are still logging, which is not always the day the clock is on.
+ *
+ * A day ends when you stop eating, not at midnight. Someone finishing
+ * dinner at half past one has not started tomorrow, and an app that rolls
+ * over on the clock puts that meal on a day they have not lived yet — and
+ * then reports both days wrong.
+ *
+ * So the open day is a stored fact, moved only when the person says so.
+ * With one exception: if the clock has run more than a day ahead, they
+ * were not up all night, they simply did not open the app. Asking "are
+ * you still on Tuesday?" on Friday is not a question worth asking, so
+ * that case moves on its own.
+ */
+export function openDay() {
+  const s = get();
+  const stored = s.settings?.openDay;
+  const today = dayKey();
+  if (!stored || stored > today) return today;
+  const gapDays = Math.round(
+    (new Date(today + 'T12:00:00') - new Date(stored + 'T12:00:00')) / 86400000);
+  return gapDays > 1 ? today : stored;
+}
+
+/* True when the clock has passed midnight but the person has not. */
+export function dayPending() {
+  return openDay() !== dayKey();
+}
+
+export function startNewDay() {
+  commit(s => { s.settings.openDay = dayKey(); }, 'settings');
+}
+
+/* Staying put explicitly: the same value the getter already returns, but
+   written down, so the prompt can stop asking for the rest of the night. */
+export function keepDayOpen(key) {
+  commit(s => {
+    s.settings.openDay = key;
+    s.settings.openDayAsked = dayKey();
+  }, 'settings');
+}
+
+export function rolloverAsked() {
+  return get().settings?.openDayAsked === dayKey();
+}
+
 export function shiftDay(key, n) {
   const d = new Date(key + 'T12:00:00');
   d.setDate(d.getDate() + n);
