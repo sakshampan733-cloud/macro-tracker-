@@ -19,10 +19,16 @@
  * marked. Never an instruction to take it.
  */
 
-import { get, dayKey, doseLog, sessionFor } from './store.js';
+import { get, dayKey, doseLog, sessionFor, wasNotified, markNotified } from './store.js';
 import { rowsFor, healthSource, bandName } from './applehealth.js';
 
-const FIRED = new Set();          /* medId@time@day, to fire once per day */
+/*
+ * "Already sent" is a fact about the day, not about this page.
+ *
+ * It used to be a Set here, wiped by every reload, so the same reminder
+ * fired again on every launch. It lives in the store now — see
+ * wasNotified / markNotified — and once a day means once a day.
+ */
 
 export function permissionState() {
   if (typeof Notification === 'undefined') return 'unsupported';
@@ -134,17 +140,23 @@ export function startReminders() {
     const now = new Date();
 
     /*
-     * Training, once a day at most.
+     * Training, once a day at most, and never while you are looking at it.
      *
      * Fires on whichever comes first: the hour you said you train, or the
-     * band reporting a hard day. Same honesty as the doses — while the app
-     * is open, or the next time it is opened after the moment passed.
+     * band reporting a hard day.
+     *
+     * A system alert about the screen already in front of you is the
+     * definition of noise — the card on Home is saying it, and saying it
+     * twice is worse than once. The check comes before the record, not
+     * after: marking it sent while the app was open would mean the
+     * notification never arrived once the app was backgrounded, which is
+     * the only moment it is actually worth anything.
      */
     const stampW = `workout@${key}`;
-    if (!FIRED.has(stampW)) {
+    if (document.visibilityState !== 'visible' && !wasNotified(stampW)) {
       const seen = detectedWorkout(key);
       if (seen || workoutHourDue(now)) {
-        FIRED.add(stampW);
+        markNotified(stampW);
         await show('Did you train today?',
           seen ? `${seen.band} recorded ${seen.what}. Tap to log it.`
                : 'Tap to log your session.',
@@ -156,8 +168,10 @@ export function startReminders() {
 
     for (const d of dueNow(key, now)) {
       const stamp = `${d.med.id}@${d.time}@${key}`;
-      if (FIRED.has(stamp)) continue;
-      FIRED.add(stamp);
+      /* Same order, same reason. */
+      if (document.visibilityState === 'visible') continue;
+      if (wasNotified(stamp)) continue;
+      markNotified(stamp);
       const name = d.med.nickname || d.med.name;
       await show(name, `${d.time}${d.med.mg ? ` · ${d.med.mg} ${d.med.unit}` : ''}`, stamp);
     }
@@ -166,9 +180,10 @@ export function startReminders() {
   tick();
   const id = setInterval(tick, 60 * 1000);
 
-  /* Coming back to the app is the other moment worth checking: the tab may
-     have been asleep across several dose times. */
-  const onWake = () => { if (document.visibilityState === 'visible') tick(); };
+  /* Leaving the app is the moment worth checking now. Coming back is
+     handled by the cards on screen, which say the same thing without a
+     system alert on top of them. */
+  const onWake = () => { if (document.visibilityState === 'hidden') tick(); };
   document.addEventListener('visibilitychange', onWake);
 
   return () => { clearInterval(id); document.removeEventListener('visibilitychange', onWake); };

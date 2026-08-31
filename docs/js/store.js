@@ -1012,6 +1012,34 @@ export function reset() {
 }
 
 
+
+/* ── Notifications already sent ─────────────────────────────────────── */
+
+/*
+ * Which reminders have already gone out today.
+ *
+ * This lived in a Set in module scope, which meant it survived exactly as
+ * long as the page did. Every launch started with an empty memory, found
+ * the same unlogged workout still unlogged, and sent the notification
+ * again — so opening the app five times in an evening produced five
+ * identical alerts about the same session. Written down, it means once.
+ *
+ * Only today is kept. Yesterday's stamps can never match again, and a
+ * record that grows forever to answer a question about today is a leak.
+ */
+export function wasNotified(stamp) {
+  const n = get().notified;
+  return n?.day === dayKey() && !!n.stamps?.[stamp];
+}
+
+export function markNotified(stamp) {
+  commit(s => {
+    const today = dayKey();
+    if (s.notified?.day !== today) s.notified = { day: today, stamps: {} };
+    s.notified.stamps[stamp] = true;
+  }, 'settings');
+}
+
 /* ── Training ───────────────────────────────────────────────────────── */
 
 /*
