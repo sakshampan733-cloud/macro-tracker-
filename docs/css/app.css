@@ -2725,3 +2725,11 @@ button.src-tag { cursor: pointer; }
 .rollover-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .rollover-head svg { color: var(--accent); flex: none; }
 .rollover-head h3 { margin: 0; }
+
+/* Log against scale: two claims about one quantity, and the band between. */
+.dl-key { display: flex; gap: 16px; margin-bottom: 10px; }
+.dl-key i { display: inline-block; width: 15px; height: 0; vertical-align: middle;
+            margin-right: 6px; border-top: 2px solid currentColor; }
+.dl-key .dl-dash { border-top-style: dashed; color: var(--muted); }
+.dl-key .dl-solid { color: var(--accent); }
+.hchart .dl-band { color: var(--accent); }

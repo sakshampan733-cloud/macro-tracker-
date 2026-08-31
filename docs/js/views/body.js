@@ -14,12 +14,12 @@ import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
   nutritionVsRecovery, stats,
 } from '../whoop.js';
-import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict } from '../nutrition.js';
+import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict, planVsActual } from '../nutrition.js';
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import {
   ring, stageBar, liveDot, recoveryColour,
-  healthBars, healthLine, miniSpark, appleChart, activityRings,
+  healthBars, healthLine, miniSpark, appleChart, activityRings, dualLine,
 } from '../charts.js';
 import { haptic } from '../feedback.js';
 import { openReport } from './report.js';
@@ -55,6 +55,7 @@ export function renderBody(root, ctx) {
     vitalsSection(s, ctx),
     checkInTile(s, ctx),
     weightTile(ctx),
+    planTile(s),
     tdeeTile(s),
     calibrationTile(s) || el('div'),
     bloodTile(s, ctx),
@@ -214,6 +215,81 @@ function weightTile(ctx) {
 }
 
 /* ── Maintenance calories ───────────────────────────────────────────── */
+
+/*
+ * Does the log agree with the scale?
+ *
+ * Every food log has the same failure, and it is not lying: it is leaving
+ * things out. The oil the vegetables were cooked in, the handful of nuts,
+ * the second helping. All eaten, none typed in, and the totals on screen
+ * stay reassuring while the scale refuses to move.
+ *
+ * Nothing else in the app can catch that, because everything else is
+ * downstream of the log and inherits whatever the log got wrong. Only the
+ * scale is independent evidence. So: the weight the log predicts, against
+ * the weight actually measured, on one axis.
+ *
+ * The direction of the gap says which of two things is happening, and
+ * they need opposite responses — so the tile names it rather than leaving
+ * the reader to work out which line is which.
+ */
+function planTile(s) {
+  const r = planVsActual(s);
+  const wu = weightUnit(s);
+  const toDisp = kg => (wu === 'lb' ? kgToLb(kg) : kg);
+
+  if (!r.ready) {
+    return el('div.tile', {},
+      el('div.tile-head', {}, el('h3', {}, 'Log against scale')),
+      el('div.fine', {},
+        r.reason === 'no weigh-ins yet'
+          ? 'Weigh in a few times and this compares what your log predicts against what actually happened.'
+          : `Needs ${r.need?.loggedDays ?? 7} logged days and ${r.need?.weighIns ?? 3} weigh-ins. `
+            + `You have ${r.have?.loggedDays ?? 0} and ${r.have?.weighIns ?? 0}.`));
+  }
+
+  const gap = r.gapKg;
+  const drift = Math.abs(gap);
+  /* Half a kilo is inside what a scale and a 7700-per-kilo approximation
+     can disagree about on their own. Calling that a finding would be
+     manufacturing one. */
+  const close = drift < 0.5;
+  const verdict = close ? 'The log and the scale agree.'
+    : gap > 0 ? 'You are heavier than the log predicts.'
+              : 'You are lighter than the log predicts.';
+  const cause = close
+    ? 'That means the calories you are logging are broadly the real ones, and '
+      + 'everything else the app tells you rests on solid ground.'
+    : gap > 0
+      ? `About ${toDisp(drift).toFixed(1)} ${wu} of it. Either food is going unlogged — `
+        + 'oil, snacks, second helpings are the usual ones — or your maintenance is set '
+        + 'higher than it really is.'
+      : `About ${toDisp(drift).toFixed(1)} ${wu} of it. Your maintenance is probably set `
+        + 'lower than it really is, which means your target is stricter than it needs to be.';
+
+  return el('div.tile', {},
+    el('div.tile-head', {},
+      el('h3', {}, 'Log against scale'),
+      el('span.micro', {}, `${r.days} days`)),
+
+    el('div.dl-key', {},
+      el('span.micro', {}, el('i.dl-dash'), 'What the log predicts'),
+      el('span.micro', {}, el('i.dl-solid'), 'What you weigh')),
+
+    dualLine(r.points.map(p => ({
+      a: toDisp(p.expected), b: p.actual == null ? null : toDisp(p.actual),
+    })), { h: 172, aColour: 'var(--muted)', bColour: 'var(--accent)', unit: ' ' + wu, dp: 1 }),
+
+    el('div.note' + (close ? '' : '.info'), {},
+      el('div', {}, el('b', {}, verdict), ' ', cause)),
+
+    el('div.fine', { style: { marginTop: '8px' } },
+      `Maintenance ${kcal(r.maintenance)} kcal, from the ${r.maintenanceSource} figure. `
+      + 'A kilogram of body tissue is taken as 7,700 kcal, which is an approximation — '
+      + 'the gap between the lines is the point, not its last decimal place.'
+      + (r.skipped ? ` ${r.skipped} day${r.skipped === 1 ? '' : 's'} with nothing logged `
+                     + 'contributed nothing to the prediction rather than being assumed.' : '')));
+}
 
 function tdeeTile(s) {
   if (!s.profile) return el('div');

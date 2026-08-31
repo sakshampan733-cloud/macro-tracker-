@@ -776,3 +776,79 @@ export function activityRings(data, { size = 150, stroke = 15, gap = 5 } = {}) {
   wrap.append(key);
   return wrap;
 }
+
+/*
+ * Two series on one scale, for when the comparison is the point.
+ *
+ * Kept separate from healthLine, which draws a raw series behind its own
+ * smoothed version — same shape twice, one faint. Here the two lines are
+ * different claims about the same quantity, and the gap between them is
+ * the finding, so both are drawn at full strength and the band between
+ * them is filled: the eye should land on the divergence, not on either
+ * line's shape.
+ */
+export function dualLine(points, {
+  h = 170, aColour = 'var(--accent)', bColour = 'var(--m-c)',
+  unit = '', dp = 1,
+} = {}) {
+  const svg = svgEl('svg', { class: 'hchart' });
+  svg.setAttribute('height', String(h));
+
+  const usable = points.filter(p => p.a != null || p.b != null);
+  if (usable.length < 2) return svg;
+
+  const w = Math.max(320, usable.length * 9);
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const all = usable.flatMap(p => [p.a, p.b]).filter(v => v != null);
+  const hi = Math.max(...all), lo = Math.min(...all);
+  const range = (hi - lo) || Math.max(Math.abs(hi) * 0.02, 0.2);
+  const top = hi + range * 0.22, bot = lo - range * 0.22;
+
+  const pad = 22;
+  const X = i => (i / (usable.length - 1)) * w;
+  const Y = v => (h - pad) - ((v - bot) / (top - bot)) * (h - pad * 1.4);
+
+  /* The band first, so both lines sit on top of it. Drawn only across the
+     stretch where both series exist — a fill that guesses across a gap
+     would be inventing the very thing this chart exists to measure. */
+  const both = usable.map((p, i) => ({ i, p })).filter(x => x.p.a != null && x.p.b != null);
+  if (both.length > 1) {
+    const up = both.map(x => `${X(x.i).toFixed(1)},${Y(x.p.a).toFixed(1)}`);
+    const dn = both.slice().reverse().map(x => `${X(x.i).toFixed(1)},${Y(x.p.b).toFixed(1)}`);
+    svg.append(svgEl('polygon', {
+      points: [...up, ...dn].join(' '),
+      fill: 'currentColor', opacity: 0.13, class: 'dl-band',
+    }));
+  }
+
+  const line = (pick, colour, dash) => {
+    let d = '', open = false;
+    usable.forEach((p, i) => {
+      const v = pick(p);
+      if (v == null) { open = false; return; }
+      d += `${open ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`;
+      open = true;
+    });
+    if (!d) return;
+    svg.append(svgEl('path', {
+      d, fill: 'none', stroke: colour, 'stroke-width': 2,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      'vector-effect': 'non-scaling-stroke',
+      ...(dash ? { 'stroke-dasharray': '5 4' } : {}),
+    }));
+  };
+
+  line(p => p.a, aColour, true);    /* what the log predicts */
+  line(p => p.b, bColour, false);   /* what the scale says */
+
+  const lastB = [...usable].reverse().find(p => p.b != null);
+  if (lastB) {
+    svg.append(svgEl('circle', {
+      cx: X(usable.indexOf(lastB)).toFixed(1), cy: Y(lastB.b).toFixed(1),
+      r: 3, fill: bColour,
+    }));
+  }
+  return svg;
+}

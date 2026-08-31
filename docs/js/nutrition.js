@@ -1,3 +1,4 @@
+import { entryMacros } from './store.js';
 /*
  * Energy and macro maths.
  *
@@ -699,4 +700,112 @@ export function goalFeasibility(startKg, targetKg, days) {
       ? Math.ceil(Math.abs(targetKg - startKg) / (startKg * 0.0075) * 7)
       : null,
   };
+}
+
+/*
+ * What the log says your weight should be doing, against what it is doing.
+ *
+ * This is the app checking itself, and it is the only check that can catch
+ * the failure mode every food log has: not lying, exactly, but leaving
+ * things out. A handful of nuts, the oil the vegetables were cooked in,
+ * the second helping. None of it gets logged, all of it is eaten, and the
+ * numbers on screen stay reassuring while the scale refuses to move.
+ *
+ * Two lines answer it. One is arithmetic on what you logged: every day's
+ * intake minus that day's maintenance, accumulated, divided by the energy
+ * in a kilogram of body tissue. The other is your actual trend weight.
+ *
+ * When they track together the log is honest and maintenance is right —
+ * and only then does anything else the app tells you mean much. When they
+ * separate, exactly one of two things is true, and the direction says
+ * which: the scale falling behind the plan means the deficit is smaller
+ * than the log claims, which is almost always food that never got typed
+ * in; the scale falling faster than the plan means maintenance is set too
+ * low, and the target is stricter than it needs to be.
+ *
+ * 7700 kcal per kilogram: 3500 per pound, the standard figure for mixed
+ * tissue. It is an approximation and the caption says so — the shape of
+ * the gap is the finding here, not its third significant figure.
+ */
+const KCAL_PER_KG = 7700;
+
+export function planVsActual(store, windowDays = 60) {
+  const maint = bestTDEE(store, store.profile);
+  if (!maint?.kcal) return { ready: false, reason: 'no maintenance figure yet' };
+
+  const cutoff = localDayKey(new Date(Date.now() - windowDays * 86400000));
+  const days = Object.entries(store.days || {})
+    .filter(([date]) => date >= cutoff)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  if (!days.length) return { ready: false, reason: 'nothing logged yet' };
+
+  /* Anchored on the first real weigh-in, because a predicted line has to
+     start somewhere true. Before that there is nothing to predict from. */
+  const firstWeighed = days.find(([, d]) => d.weight > 0);
+  if (!firstWeighed) return { ready: false, reason: 'no weigh-ins yet' };
+  const startDate = firstWeighed[0];
+  const startKg = firstWeighed[1].weight;
+
+  const trend = trendWeight(
+    days.filter(([, d]) => d.weight > 0).map(([date, d]) => ({ date, kg: d.weight })));
+  const trendBy = new Map(trend.map(p => [p.date, p.trend]));
+
+  let cum = 0, logged = 0, skipped = 0;
+  const raw = [];
+  for (const [date, d] of days) {
+    if (date < startDate) continue;
+    const eaten = (d.entries || []).length
+      ? entriesKcal(d.entries)
+      : null;
+    /* A day with nothing logged is not a day at maintenance — it is a day
+       with no information. Carrying the line flat through it would quietly
+       assert something the log never said, so the line pauses and the
+       count of skipped days is reported instead. */
+    if (eaten == null) skipped++;
+    else { cum += eaten - maint.kcal; logged++; }
+    raw.push({ date, kg: startKg + cum / KCAL_PER_KG, logged: eaten != null });
+  }
+
+  /*
+   * Smooth the prediction the same way the scale is smoothed.
+   *
+   * The measured line is a ten-day trend, which by construction lags a
+   * steady change by about ten days' worth of it. Compared against an
+   * unsmoothed prediction, that lag alone opened a gap of nearly a
+   * kilogram on someone logging perfectly — the chart would have accused
+   * an honest person of hiding food, which is the one thing it must never
+   * do. Both lines carry the same lag now, so what is left between them
+   * is the disagreement and nothing else.
+   */
+  const smoothed = trendWeight(raw, 10);
+  const points = smoothed.map((p, i) => ({
+    date: p.date,
+    expected: p.trend,
+    actual: trendBy.has(p.date) ? trendBy.get(p.date) : null,
+    logged: raw[i].logged,
+  }));
+
+  const withBoth = points.filter(p => p.actual != null);
+  const last = withBoth[withBoth.length - 1] || null;
+  const gapKg = last ? +(last.actual - last.expected).toFixed(2) : null;
+
+  return {
+    ready: logged >= 7 && withBoth.length >= 3,
+    need: { loggedDays: 7, weighIns: 3 },
+    have: { loggedDays: logged, weighIns: withBoth.length },
+    points, gapKg, skipped, maintenance: maint.kcal, maintenanceSource: maint.source,
+    startDate, days: points.length,
+  };
+}
+
+/*
+ * Kilocalories on a day, resolved the way the rest of the app resolves
+ * them — a home-dish entry stores grams and a style, and its density is
+ * worked out at read time, so reconstructing the arithmetic here would
+ * quietly disagree with the number on the day's own tile.
+ */
+function entriesKcal(entries) {
+  let sum = 0;
+  for (const e of entries) sum += entryMacros(e).kcal;
+  return sum;
 }
