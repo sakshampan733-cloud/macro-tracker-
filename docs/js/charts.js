@@ -24,6 +24,38 @@ const nextId = p => `${p}-${++uid}`;
 const reduced = () =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
+
+/*
+ * Un-stretch the labels on a chart that scales non-uniformly.
+ *
+ * These charts set preserveAspectRatio="none" so the plot fills whatever
+ * width it is given while keeping the height it was asked for. That is
+ * right for the bars and wrong for the text inside them: the same
+ * transform that widens a bar widens every glyph, so "45%" came out
+ * horizontally smeared while the numbers beside it in HTML did not.
+ *
+ * The vertical scale is always 1 here — height is set as an attribute and
+ * matches the viewBox — so the distortion is a pure horizontal factor, and
+ * the counter-transform is the inverse of it applied about each label's
+ * own anchor. Recomputed on resize, because the factor is the rendered
+ * width and that changes with the window.
+ */
+function unstretchText(svg, viewW) {
+  const fix = () => {
+    const rendered = svg.getBoundingClientRect().width;
+    if (!rendered) return;
+    const k = viewW / rendered;
+    for (const t of svg.querySelectorAll('text')) {
+      const x = parseFloat(t.getAttribute('x')) || 0;
+      t.setAttribute('transform', `translate(${x} 0) scale(${k} 1) translate(${-x} 0)`);
+    }
+  };
+  /* Measured after layout, and again whenever the box changes. */
+  requestAnimationFrame(fix);
+  if (typeof ResizeObserver === 'function') new ResizeObserver(fix).observe(svg);
+  return svg;
+}
+
 /* Recovery's colour IS its meaning — the three bands are the reading. */
 export function recoveryColour(v) {
   if (v == null) return 'var(--muted)';
@@ -393,6 +425,7 @@ export function healthBars(points, {
     };
     put(hiIdx, hi, true);
     if (loIdx >= 0 && lo !== hi) put(loIdx, lo, false);
+    unstretchText(svg, w);
   }
   return svg;
 }
@@ -516,6 +549,7 @@ export function healthLine(points, {
     };
     mark(hiI, vals[hiI], true);
     if (loI !== hiI) mark(loI, vals[loI], false);
+    unstretchText(svg, w);
   }
 
   if (!reduced()) {

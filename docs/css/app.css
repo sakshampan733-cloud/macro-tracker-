@@ -73,16 +73,16 @@
   --h-recovery: #30D158;
 
   --m-kcal:  #FFFFFF;
-  --m-p:     #0A84FF;
-  --m-c:     #FF9F0A;
-  --m-f:     #BF5AF2;
-  --m-fib:   #30D158;
-  --m-water: #5E5CE6;
+  --m-p:     #56C2FF;
+  --m-c:     #FFB84D;
+  --m-f:     #C08CFF;
+  --m-fib:   #8FD97A;
+  --m-water: #7C8CFF;
 
-  --m-p-ink:   #4FA9FF;
-  --m-c-ink:   #FFB340;
-  --m-f-ink:   #D08BFF;
-  --m-fib-ink: #5BDE7F;
+  --m-p-ink:   #56C2FF;
+  --m-c-ink:   #FFB84D;
+  --m-f-ink:   #C08CFF;
+  --m-fib-ink: #8FD97A;
 
   --sans: 'Plex', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --cond: 'PlexCond', 'Plex', -apple-system, system-ui, sans-serif;
@@ -1113,6 +1113,8 @@ body::after {
    * carries the calm readings (breath, oxygen, sleep, water). Nothing is
    * tinted for decoration.
    */
+  --h-caffeine: #C98A4B;
+
   --ring-move:  #FA114F;
   --ring-exer:  #A6F900;
   --ring-stand: #00E5D1;
@@ -1145,15 +1147,15 @@ body::after {
   --h-recovery: var(--ring-exer);
 
   --m-kcal:  #FFFFFF;
-  --m-p:     #0A84FF;
-  --m-c:     #FF9F0A;
-  --m-f:     #BF5AF2;
-  --m-fib:   #30D158;
-  --m-water: #5E5CE6;
-  --m-p-ink:   #4FA9FF;
-  --m-c-ink:   #FFB340;
-  --m-f-ink:   #D08BFF;
-  --m-fib-ink: #5BDE7F;
+  --m-p:     #56C2FF;
+  --m-c:     #FFB84D;
+  --m-f:     #C08CFF;
+  --m-fib:   #8FD97A;
+  --m-water: #7C8CFF;
+  --m-p-ink:   #56C2FF;
+  --m-c-ink:   #FFB84D;
+  --m-f-ink:   #C08CFF;
+  --m-fib-ink: #8FD97A;
 
   --glass:       rgba(20, 20, 24, .44);
   --glass-solid: rgba(10, 10, 12, .82);
@@ -1225,15 +1227,17 @@ body::after {
   --sleep-rem:  #2FA8D8;
 
   --m-kcal:  #000000;
-  --m-p:     #0069D9;
-  --m-c:     #C25E00;
-  --m-f:     #8944D6;
-  --m-fib:   #5FA800;
-  --m-water: #4B32C3;
-  --m-p-ink:   #0069D9;
-  --m-c-ink:   #A85000;
-  --m-f-ink:   #7A35C6;
-  --m-fib-ink: #4E8C00;
+  --m-p:     #1E9BE8;
+  --m-c:     #E09000;
+  --m-f:     #9B62E0;
+  --m-fib:   #56A83E;
+  --m-water: #5B69D6;
+  --m-p-ink:   #0A78BE;
+  --m-c-ink:   #A86A00;
+  --m-f-ink:   #7A45BE;
+  --m-fib-ink: #3F8A2C;
+
+  --h-caffeine: #96622C;
 
   /* Panes are painted here, not translucent: white glass over a white page
      has nothing to show through it. */
@@ -2410,7 +2414,10 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 
 /* Caffeine: one total, fed by food and supplements alike. */
 .caff-bar { height: 6px; border-radius: 999px; background: var(--raised); overflow: hidden; }
-.caff-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width .25s ease; }
+/* Caffeine gets its own colour rather than the accent. It is a reading,
+   not a button, and in the Move ring's red it read as an alarm going off
+   every morning. Coffee brown-amber, which is at least what it is. */
+.caff-fill { height: 100%; border-radius: 999px; background: var(--h-caffeine); transition: width .25s ease; }
 .caff-fill.is-over { background: var(--caution); }
 .caff-row {
   display: flex; align-items: center; gap: 10px;
