@@ -136,7 +136,10 @@ function scheduleTile(sched, targets) {
       el('div', {},
         (sched.knowWake
           ? `Timed from your actual wake at ${hourLabel(sched.wake)}. `
-          : `Timed from a 07:00 wake — import Whoop and these shift to when you really get up. `)
+          /* Named the brand, to people who may own a different one or none.
+             The sleep goal in Settings is the answer for everybody. */
+          : 'Timed from a 07:00 wake — set your sleep goal, or connect your band, '
+            + 'and these shift to when you really get up. ')
         + `Protein is split into four roughly equal doses of about ${Math.round(targets.p / 4)} g. `
         + `Spreading it beats loading one meal, and that gap matters more the deeper the deficit gets.`)),
   );

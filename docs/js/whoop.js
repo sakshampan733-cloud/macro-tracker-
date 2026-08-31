@@ -207,7 +207,7 @@ export function stats(values) {
 }
 
 export function seriesFor(whoop, metric, lastN = null) {
-  let entries = Object.entries(whoop.rows || {}).sort();
+  let entries = Object.entries(whoop?.rows || {}).sort();
   if (lastN) entries = entries.slice(-lastN);
   return entries.map(([date, r]) => ({ date, v: r[metric] })).filter(p => p.v != null);
 }
@@ -243,7 +243,8 @@ export function baseline(whoop, metric, days = 30) {
 }
 
 export function summary(whoop) {
-  const dates = Object.keys(whoop.rows || {}).sort();
+  /* Callers legitimately have nothing yet; that is not an error state. */
+  const dates = Object.keys(whoop?.rows || {}).sort();
   if (!dates.length) return null;
   const out = { from: dates[0], to: dates[dates.length - 1], days: dates.length, metrics: {} };
   for (const m of Object.keys(METRICS)) {

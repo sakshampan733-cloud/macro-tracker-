@@ -37,6 +37,25 @@
   --good:      #5FD08A;
   --caution:   #FFC14D;
 
+
+  /*
+   * Health categories.
+   *
+   * These began as the Apple view's colours and are now the app's, because
+   * they turned out to be the better system: a reading carries the colour
+   * of what it measures rather than one accent shared by everything, so
+   * heart data looks like heart data on any screen it appears on. They are
+   * category identities, not decoration — never reused for anything else.
+   */
+  --h-move:     #FC7A2E;
+  --h-energy:   #FA3E5B;
+  --h-heart:    #FF375F;
+  --h-sleep:    #37B9E8;
+  --h-resp:     #4ED9C6;
+  --h-body:     #A85CFF;
+  --h-strain:   #4F8DF5;
+  --h-recovery: #5FD08A;
+
   --m-kcal:  #E9EEF3;
   --m-p:     #56C2FF;
   --m-c:     #FFB84D;
@@ -1091,6 +1110,19 @@ body::after {
    * Vivid values now, with a separate darker ink for the few places the
    * colour carries text, so nothing loses contrast where it matters.
    */
+
+  /* The same categories, pulled down just enough to hold their own on a
+     light ground. Same hues — a card should be recognisably the same
+     category in either theme. */
+  --h-move:     #D2621B;
+  --h-energy:   #D81E45;
+  --h-heart:    #DA1E4A;
+  --h-sleep:    #0E86BC;
+  --h-resp:     #109384;
+  --h-body:     #7A31D8;
+  --h-strain:   #2C63C9;
+  --h-recovery: #128455;
+
   --m-p:       #1787E0;
   --m-c:       #ED8B08;
   --m-f:       #8654E8;
@@ -2846,30 +2878,47 @@ button.src-tag { cursor: pointer; }
 .inten-bar { height: 8px; border-radius: 99px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
 .inten-bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
 
-.inten-chart {
-  display: flex; align-items: flex-end; gap: 4px;
-  height: 96px; padding: 4px 0;
-}
-.inten-col { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 0; }
-.inten-col i { display: block; width: 100%; border-radius: 3px; background: var(--line-2); }
-.inten-col i.eff-easy  { background: var(--m-water); }
-.inten-col i.eff-solid { background: var(--accent); }
-.inten-col i.eff-hard  { background: var(--m-c); }
-.inten-col i.eff-max   { background: var(--warn); }
-
-.inten-key { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 9px; }
-.inten-key i {
-  display: inline-block; width: 9px; height: 9px; border-radius: 2px;
-  margin-right: 5px; vertical-align: middle; background: var(--line-2);
-}
-.inten-key i.eff-easy  { background: var(--m-water); }
-.inten-key i.eff-solid { background: var(--accent); }
-.inten-key i.eff-hard  { background: var(--m-c); }
-.inten-key i.eff-max   { background: var(--warn); }
-
 /* Three records, and whether each is holding up its end. */
 .sense-rows { display: grid; gap: 8px; margin-bottom: 12px; }
 .sense-row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
 .sense-dot { flex: none; width: 9px; height: 9px; border-radius: 99px; background: var(--caution); }
 .sense-dot.is-ok { background: var(--good); }
 .sense-val { font-family: var(--mono); font-size: 12.5px; color: var(--text-2); }
+
+/* Recent sessions, said in words rather than drawn as an unlabelled score. */
+.sess-list { display: grid; }
+.sess-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+  background: none; border-left: 0; border-right: 0; border-top: 0;
+  width: 100%; text-align: left; color: inherit; cursor: pointer;
+}
+.sess-row:last-of-type { border-bottom: 0; }
+.sess-row:active { opacity: .55; }
+.sess-row .title { font-size: 14.5px; }
+.sess-row .sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.sess-row > svg { flex: none; color: var(--dim); }
+.sess-strain {
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  flex: none; min-width: 34px; text-align: right;
+}
+.sess-strain.is-up { color: var(--m-c); }
+.sess-strain.is-down { color: var(--m-water); }
+.eff-tag {
+  flex: none; font-size: 10.5px; letter-spacing: .03em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 99px; white-space: nowrap;
+  background: var(--surface-2); color: var(--text-2);
+}
+.eff-tag.eff-easy  { background: color-mix(in srgb, var(--m-water) 22%, transparent); color: var(--m-water); }
+.eff-tag.eff-solid { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.eff-tag.eff-hard  { background: color-mix(in srgb, var(--m-c) 22%, transparent); color: var(--m-c); }
+
+/* "Did you train today?" on Home. */
+.ask-card { border-color: var(--accent-2); }
+.ask-card .flex svg { color: var(--accent); }
+
+/* The card language, now the app's rather than one view's. Rounder than
+   the rest of Basal on purpose: these hold a single reading and read as
+   objects, not as rows of a table. */
+.ah-grid > .ah-card { margin: 0; }
+.vital, .vitals, .vitals-head, .vital-note { }

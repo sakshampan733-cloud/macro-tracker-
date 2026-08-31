@@ -13,6 +13,7 @@
 
 import { el, clear, icon, kcal, toast, sheet, confirmSheet, append } from '../ui.js';
 import { flyToTotals, haptic } from '../feedback.js';
+import { EFFORT } from '../data/exercises.js';
 import { openMealLogger } from './meallog.js';
 import { openMealBuilder } from './meal.js';
 import { whoopAdvice } from '../coachwhoop.js';
@@ -20,7 +21,7 @@ import { overdueNote } from '../reminders.js';
 import { caffeineNote } from './supplements.js';
 import { bandName } from '../applehealth.js';
 import {
-  get, totals, dayKey, dayPending, openDay, startNewDay, keepDayOpen, rolloverAsked, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
+  get, totals, dayKey, sessionFor, nextUp, typeById, logSession, trainState, dayPending, openDay, startNewDay, keepDayOpen, rolloverAsked, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
   scannedFoods, builtFoods, addWater, undoWater, peekDay, dismissNote, noteDismissed,
@@ -51,6 +52,7 @@ export function renderHome(root, ctx) {
      had nothing to say. */
   append(root,
     rolloverCard(key, ctx),
+    workoutAsk(key, ctx),
     header(key, ctx),
     readout(t, targets, ctx),
     coachCard(s, targets, key, ctx),
@@ -89,6 +91,88 @@ export function renderHome(root, ctx) {
  * the app after midnight needs to know which day they are adding to
  * before they read a single number.
  */
+/*
+ * "Did you train?", at the hour you usually do.
+ *
+ * Logging a workout meant opening a tab, which is a lot of intent for a
+ * yes. Most days the answer is one word and the app already knows which
+ * session was next, so it can ask on the screen you are already on and be
+ * done in a tap.
+ *
+ * It appears only after the hour you said you train, only on the day you
+ * are actually logging, and never once something is already recorded. An
+ * unanswered question sitting there all day is a nag; this one has a
+ * dismiss that lasts until tomorrow.
+ */
+function workoutAsk(key, ctx) {
+  const s = get();
+  const at = s.settings?.workoutHour;
+  if (at == null) return null;
+  if (key !== dayKey()) return null;
+  if (sessionFor(key)) return null;
+  if (s.settings?.workoutAsked === key) return null;
+
+  const now = new Date().getHours() + new Date().getMinutes() / 60;
+  if (now < at) return null;
+
+  const rot = trainState().rotation || [];
+  const next = rot.length ? nextUp() : null;
+  const t = next ? typeById(next) : null;
+
+  return el('div.tile.ask-card', {},
+    el('div.flex', {}, icon('barbell', 17), el('h3', {}, 'Did you train today?')),
+    t ? el('div.fine', { style: { marginTop: '5px' } }, `${t.name} is next in your rotation.`) : null,
+    el('div.btn-row', { style: { marginTop: '12px' } },
+      t ? el('button.btn.primary.grow', {
+        onclick: () => openEffortAsk(key, next, ctx),
+      }, `Yes — ${t.name}`) : null,
+      el('button.btn.ghost' + (t ? '' : '.grow'), {
+        onclick: () => ctx.go('train', {}),
+      }, t ? 'Something else' : 'Log it'),
+      el('button.btn.ghost', {
+        'aria-label': 'Not today',
+        onclick: () => { commit(st => { st.settings.workoutAsked = key; }, 'settings');
+          haptic('tap'); ctx.refresh(); },
+      }, 'No')));
+}
+
+/*
+ * One more tap, because it is the one thing worth asking for.
+ *
+ * How a session felt is the only part of it no strap and no set count can
+ * supply, and asking here costs a second while the session is still fresh
+ * — far better than the honest alternative, which is never being asked.
+ */
+function openEffortAsk(key, typeId, ctx) {
+  const sh = sheet({
+    title: typeById(typeId)?.name || 'Session',
+    body: el('div', {},
+      el('div.fine', { style: { marginBottom: '12px' } }, 'How did it go?'),
+      el('div', {}, ...EFFORT.map(e => el('button.row', {
+        onclick: () => {
+          logSession(key, { type: typeId, effort: e.id,
+            minutes: typeById(typeId)?.minutes || null,
+            sets: (typeById(typeId)?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null,
+            source: 'manual' });
+          haptic('success'); sh.close(); toast('Logged.'); ctx.refresh();
+        },
+      },
+        el('span.grow', {},
+          el('div.title', {}, e.label),
+          el('div.sub', {}, e.note)),
+        icon('chevron', 14)))),
+      el('button.btn.ghost', { style: { marginTop: '12px', width: '100%' },
+        onclick: () => {
+          logSession(key, { type: typeId, minutes: typeById(typeId)?.minutes || null,
+            sets: (typeById(typeId)?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null,
+            source: 'manual' });
+          haptic('success'); sh.close(); toast('Logged.'); ctx.refresh();
+        },
+      }, 'Skip — just log it')),
+  });
+  return sh;
+}
+
 function rolloverCard(key, ctx) {
   if (!dayPending() || key !== openDay() || rolloverAsked()) return null;
 

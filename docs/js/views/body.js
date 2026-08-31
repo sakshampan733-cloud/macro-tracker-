@@ -15,6 +15,7 @@ import {
   nutritionVsRecovery, stats,
 } from '../whoop.js';
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict, planVsActual } from '../nutrition.js';
+import { trainStats } from '../store.js';
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import {
@@ -53,9 +54,13 @@ export function renderBody(root, ctx) {
      */
     sourceBar(s, ctx) || el('div'),
     vitalsSection(s, ctx),
+    /* The verdict first. Everything below is the evidence for it, and the
+       evidence is only worth reading once you know what it adds up to. */
+    /* Native append stringifies null into the page; senseTile returns
+       null when there is nothing to judge. */
+    senseTile(s, ctx) || el('div'),
     checkInTile(s, ctx),
     weightTile(ctx),
-    planTile(s),
     tdeeTile(s),
     calibrationTile(s) || el('div'),
     bloodTile(s, ctx),
@@ -166,15 +171,27 @@ function weightTile(ctx) {
   const first = withTrend[0];
   const change = latest && first ? latest.trend - first.trend : 0;
 
-  /* Trend, not the raw scale — the daily number swings a kilo on water and
-     the bars would just be noise. */
+  /*
+   * One weight widget, two lines.
+   *
+   * Where your weight is and where your log says it should be were two
+   * separate tiles, one directly under the other, both drawing weight
+   * against time. Splitting them meant the comparison — the only thing
+   * either chart is for — had to be done by eye across a gap. They are one
+   * chart now: the dashed line is the prediction, the solid one is you.
+   */
+  const pv = planVsActual(s);
   const recent = withTrend.slice(-90);
-  const chart = withTrend.length > 2
-    ? healthLine(
-        recent.map(p => ({ v: toDisp(p.trend), label: `${p.date}: ${toDisp(p.kg).toFixed(1)} ${wu}` })),
-        { h: 146, colour: 'var(--accent)', unit: ' ' + wu, dp: 1,
-          raw: recent.map(p => ({ v: toDisp(p.kg) })) })
-    : null;
+  const chart = pv.ready
+    ? dualLine(pv.points.map(p => ({
+        a: toDisp(p.expected), b: p.actual == null ? null : toDisp(p.actual),
+      })), { h: 168, aColour: 'var(--muted)', bColour: 'var(--accent)', unit: ' ' + wu, dp: 1 })
+    : withTrend.length > 2
+      ? healthLine(
+          recent.map(p => ({ v: toDisp(p.trend), label: `${p.date}: ${toDisp(p.kg).toFixed(1)} ${wu}` })),
+          { h: 146, colour: 'var(--accent)', unit: ' ' + wu, dp: 1,
+            raw: recent.map(p => ({ v: toDisp(p.kg) })) })
+      : null;
 
   return el('div.tile', {},
     el('div.tile-head', {},
@@ -206,9 +223,20 @@ function weightTile(ctx) {
           el('div.num', {
             style: { fontSize: '18px', marginTop: '2px', color: change < 0 ? 'var(--good)' : change > 0 ? 'var(--m-c-ink)' : 'var(--text)' },
           }, (change >= 0 ? '+' : '') + toDisp(change).toFixed(1) + ' ' + wu))),
+      pv.ready ? el('div.dl-key', { style: { marginTop: '10px' } },
+        el('span.micro', {}, el('i.dl-dash'), 'What your log predicts'),
+        el('span.micro', {}, el('i.dl-solid'), 'What you weigh')) : null,
       chart,
-      el('div.fine', { style: { marginTop: '6px' } },
-        'Thin line is the scale. Thick line is the ten-day trend — that is the one that means anything.'))
+      pv.ready
+        ? el('div.fine', { style: { marginTop: '6px' } },
+            weightVerdict(pv, wu, toDisp)
+            + ` Maintenance ${kcal(pv.maintenance)} kcal, from the ${pv.maintenanceSource} figure.`
+            + (pv.skipped ? ` ${pv.skipped} unlogged day${pv.skipped === 1 ? '' : 's'} `
+                            + 'contributed nothing rather than being assumed.' : ''))
+        : el('div.fine', { style: { marginTop: '6px' } },
+            'Thin line is the scale. Thick line is the ten-day trend — that is the one that '
+            + 'means anything. Log food for a fortnight and a second line appears: where your '
+            + 'log says this should be.'))
       : el('div.fine', { style: { marginTop: '12px' } },
           'Weigh in most mornings. Four readings and the app can work out your real maintenance calories.'),
   );
@@ -217,79 +245,102 @@ function weightTile(ctx) {
 /* ── Maintenance calories ───────────────────────────────────────────── */
 
 /*
- * Does the log agree with the scale?
+ * What the gap between the two weight lines means.
  *
- * Every food log has the same failure, and it is not lying: it is leaving
- * things out. The oil the vegetables were cooked in, the handful of nuts,
- * the second helping. All eaten, none typed in, and the totals on screen
- * stay reassuring while the scale refuses to move.
- *
- * Nothing else in the app can catch that, because everything else is
- * downstream of the log and inherits whatever the log got wrong. Only the
- * scale is independent evidence. So: the weight the log predicts, against
- * the weight actually measured, on one axis.
- *
- * The direction of the gap says which of two things is happening, and
- * they need opposite responses — so the tile names it rather than leaving
- * the reader to work out which line is which.
+ * The direction is the whole finding, and the two directions need opposite
+ * responses — so it is named rather than left to be inferred from which
+ * line happens to be on top.
  */
-function planTile(s) {
-  const r = planVsActual(s);
-  const wu = weightUnit(s);
-  const toDisp = kg => (wu === 'lb' ? kgToLb(kg) : kg);
+function weightVerdict(pv, wu, toDisp) {
+  const gap = pv.gapKg ?? 0;
+  const drift = Math.abs(gap);
+  /* Half a kilo is inside what a scale and a 7,700-per-kilo approximation
+     can disagree about on their own. */
+  if (drift < 0.5) return 'The two lines agree, so the calories you are logging are broadly the real ones.';
+  const by = `${toDisp(drift).toFixed(1)} ${wu}`;
+  return gap > 0
+    ? `You are ${by} heavier than your log predicts — either food is going unlogged, `
+      + 'or maintenance is set too high.'
+    : `You are ${by} lighter than your log predicts — maintenance is probably set too low, `
+      + 'which makes your target stricter than it needs to be.';
+}
 
-  if (!r.ready) {
-    return el('div.tile', {},
-      el('div.tile-head', {}, el('h3', {}, 'Log against scale')),
-      el('div.fine', {},
-        r.reason === 'no weigh-ins yet'
-          ? 'Weigh in a few times and this compares what your log predicts against what actually happened.'
-          : `Needs ${r.need?.loggedDays ?? 7} logged days and ${r.need?.weighIns ?? 3} weigh-ins. `
-            + `You have ${r.have?.loggedDays ?? 0} and ${r.have?.weighIns ?? 0}.`));
+/*
+ * Does the whole picture hold together?
+ *
+ * Training, food and the scale are three separate records, and each is
+ * only worth something read against the other two. Training hard on an
+ * honest deficit while the scale refuses to move means one of the three is
+ * not what it claims, and knowing which is the entire reason for keeping
+ * all three.
+ *
+ * It lives here rather than on the Train tab because this is a statement
+ * about a body, not about a training week. It refuses to give a verdict
+ * when a record is missing — two out of three is a guess in the clothes of
+ * a finding.
+ */
+function senseTile(s, ctx) {
+  const st = trainStats(28);
+  const pv = planVsActual(s);
+  const hasTraining = st.sessions > 0;
+  if (!hasTraining && !pv.ready) return null;
+
+  const rows = [
+    senseRow('Training', hasTraining ? `${st.perWeek}/week` : 'nothing logged', st.perWeek >= 2.5),
+    senseRow('Food logged', pv.have ? `${pv.have.loggedDays} days` : '0 days',
+             (pv.have?.loggedDays || 0) >= 14),
+    senseRow('Weight vs log', pv.ready ? `${pv.gapKg >= 0 ? '+' : ''}${pv.gapKg.toFixed(1)} kg` : 'not enough yet',
+             pv.ready && Math.abs(pv.gapKg) < 0.5),
+  ];
+
+  let head, body;
+  if (!pv.ready) {
+    head = 'Not enough to judge yet.';
+    body = `You have trained ${st.sessions} time${st.sessions === 1 ? '' : 's'} in four weeks. `
+         + 'Whether that is working needs your food logged and a few weigh-ins too — '
+         + 'training alone cannot say whether you are gaining or losing, only that you turned up.';
+  } else {
+    const gap = pv.gapKg ?? 0;
+    const onPlan = Math.abs(gap) < 0.5;
+    const consistent = st.perWeek >= 2.5;
+    const cutting = (s.profile?.rate ?? 0) < -0.05;
+    if (onPlan && consistent) {
+      head = 'It holds together.';
+      body = `Training ${st.perWeek} times a week, and your weight is doing what your food `
+           + 'log says it should. All three records agreeing is the only state in which any '
+           + 'of them can be trusted.';
+    } else if (onPlan) {
+      head = 'The food side is honest; the training is thin.';
+      body = 'Your weight is tracking your log closely, so the eating is being recorded '
+           + `properly. But ${st.perWeek} sessions a week is not much stimulus — in a `
+           + (cutting ? 'deficit that is how weight comes off muscle as well as fat.'
+                      : 'surplus that is how a gain ends up being mostly fat.');
+    } else if (gap > 0) {
+      head = consistent ? 'You are training. The food is not adding up.' : 'Neither side is holding.';
+      body = `You are ${Math.abs(gap).toFixed(1)} kg heavier than your log predicts. `
+           + (cutting ? 'Food is going unlogged, or maintenance is set too high — the training '
+                        + 'is not the problem here.'
+                      : 'If you are gaining on purpose, that is faster than planned rather than wrong.');
+    } else {
+      head = 'You are losing faster than the plan.';
+      body = `You are ${Math.abs(gap).toFixed(1)} kg lighter than your log predicts. `
+           + (consistent ? 'With this much training that is a real risk to muscle — maintenance '
+                           + 'is probably set too low, and your target stricter than it needs to be.'
+                         : 'Maintenance is probably set too low.');
+    }
   }
 
-  const gap = r.gapKg;
-  const drift = Math.abs(gap);
-  /* Half a kilo is inside what a scale and a 7700-per-kilo approximation
-     can disagree about on their own. Calling that a finding would be
-     manufacturing one. */
-  const close = drift < 0.5;
-  const verdict = close ? 'The log and the scale agree.'
-    : gap > 0 ? 'You are heavier than the log predicts.'
-              : 'You are lighter than the log predicts.';
-  const cause = close
-    ? 'That means the calories you are logging are broadly the real ones, and '
-      + 'everything else the app tells you rests on solid ground.'
-    : gap > 0
-      ? `About ${toDisp(drift).toFixed(1)} ${wu} of it. Either food is going unlogged — `
-        + 'oil, snacks, second helpings are the usual ones — or your maintenance is set '
-        + 'higher than it really is.'
-      : `About ${toDisp(drift).toFixed(1)} ${wu} of it. Your maintenance is probably set `
-        + 'lower than it really is, which means your target is stricter than it needs to be.';
-
   return el('div.tile', {},
-    el('div.tile-head', {},
-      el('h3', {}, 'Log against scale'),
-      el('span.micro', {}, `${r.days} days`)),
-
-    el('div.dl-key', {},
-      el('span.micro', {}, el('i.dl-dash'), 'What the log predicts'),
-      el('span.micro', {}, el('i.dl-solid'), 'What you weigh')),
-
-    dualLine(r.points.map(p => ({
-      a: toDisp(p.expected), b: p.actual == null ? null : toDisp(p.actual),
-    })), { h: 172, aColour: 'var(--muted)', bColour: 'var(--accent)', unit: ' ' + wu, dp: 1 }),
-
-    el('div.note' + (close ? '' : '.info'), {},
-      el('div', {}, el('b', {}, verdict), ' ', cause)),
-
-    el('div.fine', { style: { marginTop: '8px' } },
-      `Maintenance ${kcal(r.maintenance)} kcal, from the ${r.maintenanceSource} figure. `
-      + 'A kilogram of body tissue is taken as 7,700 kcal, which is an approximation — '
-      + 'the gap between the lines is the point, not its last decimal place.'
-      + (r.skipped ? ` ${r.skipped} day${r.skipped === 1 ? '' : 's'} with nothing logged `
-                     + 'contributed nothing to the prediction rather than being assumed.' : '')));
+    el('div.tile-head', {}, el('h3', {}, 'Is it working?')),
+    el('div.sense-rows', {}, ...rows),
+    el('div.note' + (/holds together/.test(head) ? '' : '.info'), {},
+      el('div', {}, el('b', {}, head), ' ', body)));
 }
+
+const senseRow = (name, value, ok) => el('div.sense-row', {},
+  el('span.sense-dot' + (ok ? '.is-ok' : '')),
+  el('span.grow', {}, name),
+  el('span.sense-val', {}, value));
 
 function tdeeTile(s) {
   if (!s.profile) return el('div');
@@ -459,20 +510,77 @@ function srcChip(which, label, current, ctx) {
  * temperature under Body Measurements. Somebody checking this against
  * their own phone should find the same reading in the same place.
  */
-const APPLE_CARDS = [
-  /* metric, Health category, category colour, glyph, chart starts at zero */
-  ['steps',  'Activity',          '#FC7A2E', 'steps',  true],
-  ['kcal',   'Activity',          '#FA3E5B', 'flame',  true],
-  /* Sleep is deliberately not here. It gets its own card lower down with
-     the stage breakdown, and listing it in both places drew the same
-     night twice under two different headings — which reads as the app
-     having two disagreeing numbers for one night. */
-  ['rhr',    'Heart',             '#FF375F', 'heart',  false],
-  ['hrv',    'Heart',             '#FF375F', 'heart',  false],
-  ['spo2',   'Respiratory',       '#4ED9C6', 'lungs',  false],
-  ['resp',   'Respiratory',       '#4ED9C6', 'lungs',  false],
-  ['temp',   'Body Measurements', '#A85CFF', 'thermo', false],
-];
+/*
+ * One card vocabulary for every reading, whichever band produced it.
+ *
+ * The Apple view got this treatment first and it turned out to be the
+ * better screen — a reading filed under a coloured category, named, with
+ * the number large and the unit small, is legible in a way a grey row of
+ * figures never was. There was never a reason for Whoop's numbers to look
+ * worse; the categories are physiology, not branding, and a resting heart
+ * rate belongs under Heart no matter what measured it.
+ *
+ * So this is the whole table now, Whoop's own scores included, and both
+ * views build from it. Sleep is deliberately absent: it keeps its own card
+ * with the stage breakdown, and listing it here as well drew the same
+ * night twice under two headings.
+ */
+const METRIC_CARDS = {
+  /*        category,             colour token,   glyph,   zero-based chart */
+  steps:    ['Activity',          '--h-move',     'steps',  true],
+  kcal:     ['Activity',          '--h-energy',   'flame',  true],
+  strain:   ['Exertion',          '--h-strain',   'bolt',   true],
+  recovery: ['Recovery',          '--h-recovery', 'coach',  true],
+  rhr:      ['Heart',             '--h-heart',    'heart',  false],
+  hrv:      ['Heart',             '--h-heart',    'heart',  false],
+  spo2:     ['Respiratory',       '--h-resp',     'lungs',  false],
+  resp:     ['Respiratory',       '--h-resp',     'lungs',  false],
+  temp:     ['Body Measurements', '--h-body',     'thermo', false],
+};
+
+/* Card order, per band. Apple never lists what it cannot measure. */
+const APPLE_ORDER = ['steps', 'kcal', 'rhr', 'hrv', 'spo2', 'resp', 'temp'];
+const WHOOP_ORDER = ['recovery', 'strain', 'hrv', 'rhr', 'kcal', 'spo2', 'resp', 'temp', 'steps'];
+
+/*
+ * One card. Shared by both views so they cannot drift apart.
+ */
+function metricCard(s, ctx, scoped, sum, key, latestKey) {
+  const spec = METRIC_CARDS[key];
+  const info = sum.metrics[key];
+  if (!spec || !info?.latest) return null;
+  const [category, token, glyph, zero] = spec;
+  const pts = seriesFor(scoped, key, 30);
+  const value = info.latest.v;
+  /* Recovery is the one reading whose colour IS its meaning, so it keeps
+     its own three bands rather than a fixed category hue. */
+  const colour = key === 'recovery' ? recoveryColour(value) : `var(${token})`;
+  const from = sourceForMetric(s, key);
+
+  return el('div.ah-card.tappable', {
+    role: 'button', tabIndex: 0,
+    style: { '--ah': colour },
+    'aria-label': `${info.label}, ${value} ${info.unit}`,
+    onclick: () => openMetric(s, key, ctx),
+    onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, key, ctx); } },
+  },
+    el('div.between', {},
+      el('span.ah-cat', {}, icon(glyph, 15), category),
+      el('span.flex', {},
+        from === 'apple' && healthSource() === 'both'
+          ? el('span.from-tag', {}, 'Apple') : null,
+        el('span.ah-when', {}, info.latest.date === latestKey ? 'Today' : info.latest.date),
+        icon('chevron', 13))),
+    el('div.ah-name', {}, info.label),
+    el('div.ah-value', {},
+      value.toLocaleString(undefined, { minimumFractionDigits: info.dp, maximumFractionDigits: info.dp }),
+      info.unit ? el('span.ah-unit', {}, info.unit) : null),
+    pts.length >= 2
+      ? appleChart(pts.map(p => ({ v: p.v, date: p.date,
+          label: `${p.date}: ${p.v.toFixed(info.dp)} ${info.unit}` })),
+          { colour, h: 96, zero, unit: info.unit, dp: info.dp })
+      : el('div.fine', {}, 'First reading. A trend appears once there are a few days.'));
+}
 
 function appleVitals(s, ctx, scoped, sum) {
   const latestKey = Object.keys(scoped.rows || {}).sort().pop();
@@ -514,38 +622,9 @@ function appleVitals(s, ctx, scoped, sum) {
           'Your Shortcut is not sending the ring data yet. Add Active Energy, '
           + 'Exercise Minutes and Stand Hours to it and the rings fill in.')));
 
-  const cards = [];
-  for (const [key, category, colour, glyph, zero] of APPLE_CARDS) {
-    const info = sum.metrics[key];
-    if (!info?.latest) continue;                 /* never a blank card */
-    const pts = seriesFor(scoped, key, 30);
-    const value = info.latest.v;
-
-    const card = el('div.ah-card.tappable', {
-      role: 'button', tabIndex: 0,
-      style: { '--ah': colour },
-      'aria-label': `${info.label}, ${value} ${info.unit}, from Apple Health`,
-      onclick: () => openMetric(s, key, ctx),
-      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, key, ctx); } },
-    },
-      el('div.between', {},
-        el('span.ah-cat', {}, icon(glyph, 15), category),
-        el('span.flex', {},
-          el('span.ah-when', {}, info.latest.date === latestKey ? 'Today' : info.latest.date),
-          icon('chevron', 13))),
-      el('div.ah-name', {}, info.label),
-      el('div.ah-value', {},
-        /* Health groups its thousands; 8000 steps reads as a serial
-           number without the separator. */
-        value.toLocaleString(undefined, { minimumFractionDigits: info.dp, maximumFractionDigits: info.dp }),
-        info.unit ? el('span.ah-unit', {}, info.unit) : null),
-      pts.length >= 2
-        ? appleChart(pts.map(p => ({ v: p.v, date: p.date,
-              label: `${p.date}: ${p.v.toFixed(info.dp)} ${info.unit}` })),
-            { colour, h: 96, zero, unit: info.unit, dp: info.dp })
-        : el('div.fine', {}, 'First reading. A trend appears once there are a few days.'));
-    cards.push(card);
-  }
+  const cards = APPLE_ORDER
+    .map(k => metricCard(s, ctx, scoped, sum, k, latestKey))
+    .filter(Boolean);
 
   wrap.append(cards.length
     ? el('div.ah-grid', {}, ...cards)
@@ -581,13 +660,26 @@ function appleVitals(s, ctx, scoped, sum) {
 
   /* What an Apple Watch does not measure, said once and plainly, rather
      than left as empty cards for the reader to interpret. */
-  wrap.append(el('div.note.info', {},
-    el('div', {},
-      'Recovery and Strain are Whoop\u2019s own scores rather than measurements, '
-      + 'so there is nothing for an Apple Watch to report and this view leaves '
-      + 'them out. Everything else the app does \u2014 targets, the daily '
-      + 'adjustment, maintenance calories, the report \u2014 runs on the '
-      + 'readings above.')));
+  /*
+   * Explained only to somebody who owns the other band.
+   *
+   * For a person with a Whoop as well, "why is there no Recovery here" is
+   * a real question and this answers it. For an Apple-only user it names a
+   * device they do not own to explain the absence of a number they were
+   * never going to see — which is exactly the brand leak the app is meant
+   * not to have.
+   */
+  wrap.append(healthSource() === 'both'
+    ? el('div.note.info', {},
+        el('div', {},
+          'Recovery and Strain are Whoop\u2019s own scores rather than measurements, '
+          + 'so there is nothing for an Apple Watch to report and this view leaves '
+          + 'them out. Everything else \u2014 targets, the daily adjustment, '
+          + 'maintenance calories, the report \u2014 runs on the readings above.'))
+    : el('div.note.info', {},
+        el('div', {},
+          'Everything the app does \u2014 your targets, the daily adjustment, '
+          + 'maintenance calories, the report \u2014 runs on the readings above.')));
 
   return wrap;
 }
@@ -601,7 +693,12 @@ function vitalsSection(s, ctx) {
      user who had once tried the Apple view stayed stuck in it, with no
      control on screen to get back — the setting outlived the band. */
   const pick = effectivePick(s);
-  const scoped = pick === 'all' ? s.whoop : { rows: rowsFor(s, pick), source: s.whoop?.source };
+  /* A store that has never synced anything has no whoop object at all,
+     and summary() reached straight through for .rows. The Body tab then
+     failed to draw entirely — for a brand-new user, which is the worst
+     possible audience for a blank error screen. */
+  const scoped = pick === 'all' ? (s.whoop || { rows: {} })
+    : { rows: rowsFor(s, pick), source: s.whoop?.source };
   const sum = summary(scoped);
 
   if (!sum) {
@@ -839,139 +936,48 @@ function vitalsSection(s, ctx) {
   };
 
   /*
-   * Vitals, as a panel rather than a wall.
+   * The readings, as Health-style cards.
    *
-   * Seven full charts stacked is not a dashboard, it is a scroll. Each of
-   * these numbers is checked in a second — "is my resting heart rate
-   * where it usually is" — and a 132px chart is the wrong instrument for
-   * a one-second question.
-   *
-   * So: one row each, with the current value, a sparkline small enough to
-   * read as a direction rather than as data, and where that sits against
-   * your own middle band. The full chart is one tap away and unchanged.
-   *
-   * Recovery and sleep keep their own panels below. They carry things a
-   * row cannot hold — a distribution, a stage breakdown — and they are
-   * the two you actually open.
-   */
-  const VITALS = [
-    ['hrv',    'var(--m-p)'],
-    ['rhr',    'var(--accent)'],
-    ['strain', 'var(--m-f)'],
-    ['kcal',   'var(--m-c)'],
-    ['spo2',   'var(--m-fib)'],
-    ['resp',   'var(--m-water)'],
-    ['temp',   'var(--m-c-ink)'],
-    ['steps',  'var(--m-p)'],
-  ];
-
-  /*
-   * Which band's readings to show.
-   *
-   * On two bands the panel is a mix, and "which of these came off which
-   * wrist" is a real question — particularly when the answer decides
-   * whether a number is comparable to yesterday's. Tapping a source tag
-   * narrows the list to it; tapping again clears.
+   * These were a wall of small grey rows: label, number, sparkline,
+   * "usual". It read like a spreadsheet of the one part of the app that
+   * is genuinely alive — measured overnight, arriving on its own. The
+   * Apple view was given card treatment first and was plainly the better
+   * screen, and there was never a reason for Whoop's numbers to look
+   * worse than a watch's. Both build from the same table now, so a
+   * resting heart rate looks like a resting heart rate whichever wrist
+   * it came off.
    */
   const srcFilter = effectivePick(s);
-
   /*
-   * Read from the band you asked for rather than filtering the merge.
+   * Read from the band asked for rather than filtering the merge.
    *
    * Narrowing the merged rows only ever showed what the merge had already
    * decided to keep — which on two bands is Whoop for everything except
-   * steps, so tapping Apple showed one row and looked broken. Reading the
-   * band's own store instead answers the question actually being asked:
-   * what did this watch record.
+   * steps, so choosing Apple showed one card and looked broken.
    */
   const viewRows = { rows: rowsFor(s, srcFilter) };
+  const viewSum = summary(viewRows) || sum;
 
-  const vitalRows = [];
-  const vitalKeys = new Set();
-  const srcSeen = new Set();
-  for (const [key, colour] of VITALS) {
-    /* Do not offer a row the hardware cannot produce. An empty Recovery
-       on an Apple Watch is not missing data, it is a category error. */
-    if (!canMeasure(key, srcFilter === 'all' ? null : srcFilter)) continue;
-    const pts = seriesFor(viewRows, key, 30);
-    /* One reading is enough to show. Requiring four before the row would
-       appear at all meant somebody who had just connected an Apple Watch
-       imported a day, saw nothing, and reasonably concluded it had failed
-       — the number was there the whole time, waiting for a quorum. */
-    if (!pts.length) continue;
-    const info = METRICS[key];
-    const latest = pts[pts.length - 1].v;
-
-    /*
-     * "Above usual" needs a usual to be above. Under four readings there
-     * is no distribution worth comparing against, so it says how many
-     * readings it has instead of inventing a verdict.
-     */
-    let where = 'usual', tone = '';
-    const st30 = pts.length >= 4 ? stats(pts.map(p => p.v)) : null;
-    if (!st30) {
-      where = pts.length === 1 ? 'first reading' : `${pts.length} readings`;
-    } else if (latest > st30.p75) {
-      where = 'above usual'; tone = info.good === 'high' ? 'is-good' : info.good === 'low' ? 'is-warn' : '';
-    } else if (latest < st30.p25) {
-      where = 'below usual'; tone = info.good === 'low' ? 'is-good' : info.good === 'high' ? 'is-warn' : '';
-    }
-
-    vitalKeys.add(key);
-    /* Which band this particular row came off. Judged per metric, because
-       for someone wearing both the answer genuinely differs by row. */
-    const from = srcFilter === 'all' ? sourceForMetric(s, key) : srcFilter;
-    if (srcFilter === 'all' && from) srcSeen.add(from);
-
-    vitalRows.push(el('button.vital' + (from === 'apple' ? '.from-apple' : ''), {
-      onclick: () => openMetric(s, key, ctx),
-      'aria-label': `${info.label}, from ${from === 'apple' ? 'Apple Health' : 'Whoop'}`,
-    },
-      el('span.vital-name', {},
-        info.label,
-        from === 'apple' ? el('span.from-tag', {}, 'Apple') : null),
-      el('span.vital-val', { style: { color: colour } },
-        latest.toFixed(info.dp), el('i', {}, info.unit ? ' ' + info.unit : '')),
-      el('span.vital-spark', { style: { color: colour } },
-        miniSpark(pts.map(p => p.v), { colour })),
-      el('span.vital-where' + (tone ? '.' + tone : ''), {}, where),
-      icon('chevron', 13)));
-  }
+  const order = srcFilter === 'apple' ? APPLE_ORDER : WHOOP_ORDER;
+  const shown = order.filter(k => canMeasure(k, srcFilter === 'all' ? null : srcFilter));
+  const cards = shown
+    .map(k => metricCard(s, ctx, viewRows, viewSum, k, latestKey))
+    .filter(Boolean);
 
   /* "a, b and c" — a list you can read out loud. */
   const listWords = xs => xs.length < 2 ? (xs[0] || '')
     : xs.slice(0, -1).join(', ') + ' or ' + xs[xs.length - 1];
 
-  /* Render the panel when there is something to show OR when a filter is
-     on — otherwise choosing Apple with no Apple data made the whole panel
-     disappear, taking the chips that would let you choose again with it. */
-  if (vitalRows.length || srcFilter !== 'all') {
-    /* Which band these numbers came off. The two sources are never blended
-       — an Apple import is refused outright while Whoop data is present,
-       because Whoop's HRV is RMSSD and Apple's is SDNN and averaging them
-       would produce a number that is not any kind of HRV at all. Saying so
-       on the panel is the difference between segregated and merely
-       separate-by-accident. */
+  if (cards.length || srcFilter !== 'all') {
     const mode = healthSource();
-    const mixed = srcSeen.size > 1;
-    const src = mixed ? 'both' : (srcSeen.values().next().value || existingSource(s) || 'whoop');
-
-    /* Named in words as well as marked in colour: which rows are Apple's
-       is the kind of thing you want stated, not inferred from a tint. */
-    const fromApple = VITALS.map(([k]) => k)
-      .filter(k => vitalKeys.has(k) && sourceForMetric(s, k) === 'apple')
+    const present = new Set(shown.filter(k => viewSum.metrics[k]?.latest));
+    const fromApple = [...present].filter(k => sourceForMetric(s, k) === 'apple')
       .map(k => METRICS[k].label);
-    const missing = (src === 'apple' || mode === 'apple')
-      ? VITALS.map(([k]) => k).filter(k => !vitalKeys.has(k)).map(k => METRICS[k].label)
-      : [];
+    const missing = (mode === 'apple' || srcFilter === 'apple')
+      ? shown.filter(k => !present.has(k)).map(k => METRICS[k].label) : [];
 
     let note = null;
-    /* The two-source note only makes sense when there genuinely are two.
-       On a single band it named hardware the reader does not own. */
-    if (mode === 'both' && mixed && fromApple.length) {
-      /* Everything Apple is allowed to supply alongside Whoop is a count —
-         steps, stand hours, exercise minutes — so the plural verb is
-         always the right one here. */
+    if (mode === 'both' && srcFilter === 'all' && fromApple.length) {
       note = `${listWords(fromApple)} come from Apple Health, marked above. Everything else `
            + 'is measured by your Whoop. The two are never averaged together.';
     } else if (missing.length) {
@@ -979,33 +985,22 @@ function vitalsSection(s, ctx) {
            + 'is collecting them.';
     }
 
-    wrap.append(el('div.tile.flush.vitals', {},
-      el('div.vitals-head', {},
+    /* Native append stringifies null; el() filters it. Building the note
+       as an element keeps a literal "null" off the page. */
+    wrap.append(
+      el('div.between', { style: { margin: '4px 2px 10px' } },
         el('h3', {}, 'Vitals'),
-        /* Both chips appear whenever you have declared both bands, not only
-           once data from both has arrived. They were vanishing at exactly
-           the moment you needed them — when one band had sent nothing and
-           you wanted to look at it to find out why. */
         mode === 'both'
           ? el('div.flex', { style: { gap: '5px' } },
               srcChip('all', 'Both', srcFilter, ctx),
               srcChip('whoop', 'Whoop', srcFilter, ctx),
               srcChip('apple', 'Apple', srcFilter, ctx))
-          /* Someone who says they wear nothing but still has imported data
-             gets a neutral label — naming a band they told us they do not
-             own is the thing this whole pass exists to stop. */
-          : el('span.micro.src-tag' + (src === 'apple' ? '.is-apple' : ''), {},
-              mode === 'none' || !mode ? 'imported'
-                : src === 'apple' ? 'Apple Watch' : bandName())),
-      ...vitalRows,
-      !vitalRows.length && srcFilter !== 'all'
-        ? el('div.vital-note', {},
-            `Nothing from ${srcFilter === 'apple' ? 'your Apple Watch' : 'your Whoop'} yet. `
-            + (srcFilter === 'apple'
-                ? 'Run the Shortcut on your phone, then pull from the relay in Settings.'
-                : 'Connect Whoop or import an export.'))
-        : null,
-      srcFilter === 'all' && note ? el('div.vital-note', {}, note) : null));
+          : null),
+      cards.length
+        ? el('div.ah-grid', {}, ...cards)
+        : el('div.tile', {}, el('div.fine', {},
+            `Nothing from ${srcFilter === 'apple' ? 'your Apple Watch' : 'your Whoop'} yet.`)),
+      el('div', {}, note ? el('div.fine', { style: { margin: '10px 2px 0' } }, note) : null));
   }
 
   /* ── the fortnight, at a glance ── */
@@ -1445,6 +1440,14 @@ export function openWhoopImport(ctx) {
 
 function correlationTile(s) {
   if (!s.whoop || !Object.keys(s.whoop.rows || {}).length) return el('div');
+  /*
+   * This correlates food against recovery, and recovery is a score only
+   * Whoop computes. Shown to an Apple Watch owner it promised an analysis
+   * their hardware can never supply, and named a device they do not own
+   * while doing it. It is not a thin version of the feature for them —
+   * there is no version of it.
+   */
+  if (!canMeasure('recovery')) return el('div');
 
   const res = nutritionVsRecovery(s, 'recovery');
   if (res.paired < 14) {

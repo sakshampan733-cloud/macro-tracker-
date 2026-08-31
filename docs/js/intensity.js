@@ -33,7 +33,7 @@ export function strainBaseline(rows, days = 28) {
   return { mean: +mean.toFixed(1), sd: +sd.toFixed(2), n: vals.length };
 }
 
-const EFFORT_SCORE = { easy: 0.3, solid: 0.6, hard: 0.85, max: 1 };
+const EFFORT_SCORE = { easy: 0.3, solid: 0.62, hard: 0.9 };
 
 /*
  * A session's intensity, 0 to 1, and the reasoning behind it.

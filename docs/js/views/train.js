@@ -28,10 +28,8 @@ import {
   EXERCISES, exerciseById, exercisesFor, setsByGroup, volumeBand, bandVerdict,
   EFFORT, effortById,
 } from '../data/exercises.js';
-import { rowsFor, healthSource, bandName } from '../applehealth.js';
+import { rowsFor, healthSource, bandName, canMeasure } from '../applehealth.js';
 import { strainBaseline, sessionIntensity, disagreement } from '../intensity.js';
-import { planVsActual } from '../nutrition.js';
-import { dualLine } from '../charts.js';
 
 export function renderTrain(root, ctx) {
   const s = get();
@@ -43,11 +41,18 @@ export function renderTrain(root, ctx) {
     el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Train'),
       el('button.btn.sm.ghost', { onclick: () => openRotation(ctx) }, 'My split')),
+    /*
+     * Training only.
+     *
+     * What the training is doing to the body — whether the weight is
+     * responding, whether the whole picture holds together — moved to the
+     * Body tab, where everything else about the body already lives. This
+     * screen logs sessions and reports on the sessions themselves.
+     */
     todayCard(s, key, ctx),
-    intensityTile(s, ctx),
+    recentTile(s, ctx),
     historyTile(ctx),
     coverageTile(ctx),
-    senseTile(s),
   );
 }
 
@@ -88,11 +93,9 @@ function todayCard(s, key, ctx) {
          bar in a chart further down. */
       inten.score != null ? el('div.today-inten', {},
         el('div.between', {},
-          el('span.micro', {}, 'Intensity'),
+          el('span.micro', {}, 'How hard that was'),
           el('span.inten-label', {}, inten.label)),
-        el('div.inten-bar', {},
-          el('i', { style: { width: Math.round(inten.score * 100) + '%' } })),
-        el('div.fine', { style: { marginTop: '6px' } },
+        el('div.fine', { style: { marginTop: '4px' } },
           inten.parts.map(p => p.why).filter(Boolean).join(' · ')
           || `from ${inten.sources} source${inten.sources === 1 ? '' : 's'}`)) : null,
 
@@ -182,156 +185,71 @@ const groupLine = t => !t ? 'Log whatever you did.'
 
 
 /*
- * How hard you have been training, session by session.
+ * The last few sessions, said in words.
  *
- * The pieces existed and were only ever shown one at a time — a strain
- * number here, a set count there, an effort word on the day it happened.
- * None of them answers the question that matters, which is whether the
- * last fortnight was actually harder or easier than the one before.
+ * This was a bar chart of a composite score, and the honest feedback on it
+ * was that nobody could tell what the bars meant. That was fair: the
+ * height was an invented number on no stated scale, so the only way to
+ * read it was to trust it, and an unexplained number is exactly the kind
+ * of thing this app is supposed to avoid.
  *
- * Each bar is one session. Height is the composite; colour is what you
- * said it felt like, where you said. Every part that fed a bar is on the
- * bar's own tooltip, because a single unexplained score is a number to
- * distrust.
+ * The underlying comparison is worth keeping — a session is hard or easy
+ * relative to your own normal, not to a printed scale. So it is stated
+ * instead of drawn: what you trained, how it felt, how much you did, and
+ * where the strap put the day next to your usual. No axis to decode.
  */
-function intensityTile(s, ctx) {
-  const list = sessions(56);
-  if (list.length < 2) return null;
+function recentTile(s, ctx) {
+  const list = sessions(56).slice(-8).reverse();
+  if (!list.length) return null;
 
   const base = strainBaseline(rowsFor(s, 'all'));
-  const scored = list.map(sess => {
-    const t = typeById(sess.type);
-    const planned = (t?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null;
-    const i = sessionIntensity(sess, { baseline: base, plannedSets: planned });
-    return { sess, t, i };
-  }).filter(x => x.i.score != null);
-
-  if (scored.length < 2) {
-    return el('div.tile', {},
-      el('div.tile-head', {}, el('h3', {}, 'Intensity')),
-      el('div.fine', {},
-        'Log sets, or how a session felt, and this fills in. With a strap connected it '
-        + 'also reads your strain against your own average, which is the only way that '
-        + 'number means anything.'));
-  }
-
-  const recent = scored.slice(-16);
-  const mean = recent.reduce((a, x) => a + x.i.score, 0) / recent.length;
-  const half = Math.floor(recent.length / 2);
-  const older = recent.slice(0, half).reduce((a, x) => a + x.i.score, 0) / Math.max(1, half);
-  const newer = recent.slice(half).reduce((a, x) => a + x.i.score, 0) / Math.max(1, recent.length - half);
-  const drift = newer - older;
 
   return el('div.tile', {},
     el('div.tile-head', {},
-      el('h3', {}, 'Intensity'),
-      el('span.micro', {}, `${recent.length} sessions`)),
+      el('h3', {}, 'Recent sessions'),
+      base ? el('span.micro', {}, `your usual strain ${base.mean}`) : null),
 
-    el('div.inten-chart', {}, ...recent.map(({ sess, t, i }) => {
-      const why = [t?.name || 'Session', sess.date,
-        ...i.parts.map(p => p.why).filter(Boolean)].join(' · ');
-      return el('span.inten-col', { title: why },
-        el('i' + (sess.effort ? '.eff-' + sess.effort : ''),
-          { style: { height: Math.max(6, Math.round(i.score * 100)) + '%' } }));
+    el('div.sess-list', {}, ...list.map(sess => {
+      const t = typeById(sess.type);
+      const eff = sess.effort ? effortById(sess.effort) : null;
+      const rel = (sess.strain != null && base)
+        ? sess.strain - base.mean : null;
+      return el('button.sess-row', {
+        onclick: () => openLogger(sess.date, ctx, sess),
+      },
+        el('span.grow', {},
+          el('div.title', {}, t?.name || 'Session'),
+          el('div.sub', {},
+            [dayLabel(sess.date),
+             sess.sets ? `${sess.sets} sets` : null,
+             sess.minutes ? `${sess.minutes} min` : null,
+            ].filter(Boolean).join(' · '))),
+        rel != null ? el('span.sess-strain' + (rel >= 1 ? '.is-up' : rel <= -1 ? '.is-down' : ''), {},
+          `${rel >= 0 ? '+' : ''}${rel.toFixed(1)}`) : null,
+        eff ? el('span.eff-tag.eff-' + eff.id, {}, eff.label) : null,
+        icon('chevron', 13));
     })),
 
-    el('div.inten-key', {},
-      ...['easy', 'solid', 'hard', 'max'].map(k =>
-        el('span.micro', {}, el('i.eff-' + k), EFFORT.find(e => e.id === k).label)),
-      el('span.micro', {}, el('i'), 'not rated')),
-
     el('div.fine', { style: { marginTop: '10px' } },
-      `Average ${labelOf(mean)}. `
-      + (Math.abs(drift) < 0.08
-          ? 'Steady across the window.'
-          : drift > 0
-            ? 'The recent half has been harder than the half before it.'
-            : 'The recent half has been easier than the half before it.')
-      + (base ? ` Strain is read against your own average of ${base.mean}.`
-              : ' Connect a strap and strain joins this too.')));
+      base
+        ? 'The number beside each is how that day\u2019s strain compared with your own '
+          + `average of ${base.mean} — plus means harder than your normal day, minus means easier.`
+        /* Strain is a Whoop score. Offering it to an Apple Watch owner as
+           something they could unlock names a device they do not own and
+           promises a number their hardware will never produce. */
+        : canMeasure('strain')
+          ? 'Rate how a session felt and it shows here. Once your strap has a few weeks '
+            + 'of data, each day is also compared against your own average strain.'
+          : 'Rate how a session felt and it shows here, alongside what you logged.'));
 }
 
-const labelOf = v => v >= 0.82 ? 'very hard' : v >= 0.62 ? 'hard'
-  : v >= 0.4 ? 'moderate' : v >= 0.22 ? 'light' : 'very light';
-
-/*
- * Does the whole picture hold together?
- *
- * Training, food and the scale are three separate records that are only
- * worth anything read against each other. Training hard and eating in a
- * deficit while the scale does not move means one of those three is not
- * what it claims — and knowing which one is the entire point of keeping
- * all three.
- *
- * This says what the three records jointly support, and refuses to say
- * anything when one of them is missing. A verdict from two out of three
- * would be a guess wearing the clothes of a finding.
- */
-function senseTile(s) {
-  const st = trainStats(28);
-  const pv = planVsActual(s);
-  if (!st.sessions) return null;
-
-  if (!pv.ready) {
-    return el('div.tile', {},
-      el('div.tile-head', {}, el('h3', {}, 'Is it working?')),
-      el('div.fine', {},
-        `You have trained ${st.sessions} time${st.sessions === 1 ? '' : 's'} in four weeks. `
-        + 'To say whether it is working, this also needs your food logged and a few '
-        + 'weigh-ins — training on its own cannot tell you whether you are gaining or '
-        + 'losing, only that you turned up.'));
-  }
-
-  const gap = pv.gapKg ?? 0;
-  const cutting = (s.profile?.rate ?? 0) < -0.05;
-  const gaining = (s.profile?.rate ?? 0) > 0.05;
-  const consistent = st.perWeek >= 2.5;
-  const onPlan = Math.abs(gap) < 0.5;
-
-  let head, body;
-  if (onPlan && consistent) {
-    head = 'It holds together.';
-    body = `Training ${st.perWeek} times a week, and your weight is doing what your food `
-         + 'log says it should. All three records agree, which is the only state in which '
-         + 'any of them can be trusted.';
-  } else if (onPlan && !consistent) {
-    head = 'The food side is honest; the training is thin.';
-    body = `Your weight is tracking your log closely, so the eating is being recorded `
-         + `properly. But ${st.perWeek} sessions a week is not much stimulus — in a `
-         + (cutting ? 'deficit that is how weight comes off muscle as well as fat.'
-                    : 'surplus that is how the gain ends up being mostly fat.');
-  } else if (gap > 0) {
-    head = consistent ? 'You are training. The food is not adding up.'
-                      : 'Neither side is quite holding.';
-    body = `You are ${Math.abs(gap).toFixed(1)} kg heavier than your log predicts. `
-         + (cutting
-             ? 'Food is going unlogged, or maintenance is set too high — the training is '
-               + 'not the problem here.'
-             : 'If you are gaining deliberately, this is faster than planned rather than wrong.');
-  } else {
-    head = 'You are losing faster than the plan.';
-    body = `You are ${Math.abs(gap).toFixed(1)} kg lighter than your log predicts. `
-         + (consistent
-             ? 'With this much training that is a real risk to muscle — maintenance is '
-               + 'probably set too low, which makes your target stricter than it needs to be.'
-             : 'Maintenance is probably set too low.');
-  }
-
-  return el('div.tile', {},
-    el('div.tile-head', {}, el('h3', {}, 'Is it working?')),
-    el('div.sense-rows', {},
-      senseRow('Training', `${st.perWeek}/week`, consistent),
-      senseRow('Food logged', `${pv.have.loggedDays} days`, pv.have.loggedDays >= 14),
-      senseRow('Weight vs log', `${gap >= 0 ? '+' : ''}${gap.toFixed(1)} kg`, onPlan)),
-    el('div.note' + (onPlan && consistent ? '' : '.info'), {},
-      el('div', {}, el('b', {}, head), ' ', body)));
+function dayLabel(key) {
+  const today = dayKey();
+  if (key === today) return 'Today';
+  if (key === shiftDay(today, -1)) return 'Yesterday';
+  return new Date(key + 'T12:00:00')
+    .toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 }
-
-const senseRow = (name, value, ok) => el('div.sense-row', {},
-  el('span.sense-dot' + (ok ? '.is-ok' : '')),
-  el('span.grow', {}, name),
-  el('span.sense-val', {}, value));
-
 
 /* ── Four weeks, and a year behind it ───────────────────────────────── */
 
@@ -569,6 +487,9 @@ function openTypeEditor(existing, after) {
   };
 
   const nameIn = el('input', { type: 'text', placeholder: 'Chest & Triceps', value: state.name });
+  /* How long this one usually takes, so logging it does not ask again. */
+  const minsIn = el('input.num-in', { type: 'number', inputmode: 'numeric', min: '0', max: '400',
+    placeholder: 'minutes', value: existing?.minutes ?? '' });
   const chips = el('div.chip-wrap');
   const planWrap = el('div.plan-list');
   const meter = el('div');
@@ -699,6 +620,10 @@ function openTypeEditor(existing, after) {
         el('span.micro', {}, 'What it trains')),
       chips,
       el('div.fine', {}, 'Cardio is tracked but does not count towards muscle coverage.'),
+      el('div.section-label', { style: { marginTop: '14px' } },
+        el('span.micro', {}, 'How long it usually takes')),
+      minsIn,
+      el('div.fine', {}, 'Optional. Fills itself in when you log this workout.'),
       el('div.section-label', { style: { marginTop: '16px' } },
         el('span.micro', {}, 'Exercises — optional')),
       el('div.fine', { style: { marginBottom: '8px' } },
@@ -721,7 +646,8 @@ function openTypeEditor(existing, after) {
           if (!name) { toast('Give it a name.', 'err'); return; }
           if (!state.cardio && !state.groups.size) { toast('Pick at least one group.', 'err'); return; }
           saveType({ id: existing?.id, name, groups: [...state.groups],
-                     cardio: state.cardio, plan: state.plan });
+                     cardio: state.cardio, plan: state.plan,
+                     minutes: minsIn.value ? +minsIn.value : null });
           haptic('success'); sh.close(); after();
         },
       }, 'Save')),
@@ -808,8 +734,10 @@ function openLogger(key, ctx, prefill = {}) {
   const setsIn = el('input.num-in', { type: 'number', inputmode: 'numeric', min: '0', max: '100',
     placeholder: plannedSets ? `${plannedSets} planned` : 'hard sets',
     value: existing?.sets ?? '' });
+  const typicalMins = typeById(state.type)?.minutes || null;
   const minsIn = el('input.num-in', { type: 'number', inputmode: 'numeric', min: '0', max: '600',
-    placeholder: 'minutes', value: prefill.minutes ?? existing?.minutes ?? '' });
+    placeholder: typicalMins ? `${typicalMins} usual` : 'minutes',
+    value: prefill.minutes ?? existing?.minutes ?? '' });
   const noteIn = el('input', { type: 'text', placeholder: 'Note (optional)', value: existing?.note || '' });
 
   /*
@@ -912,7 +840,7 @@ function openLogger(key, ctx, prefill = {}) {
             type: state.type,
             sets: setsIn.value ? +setsIn.value : (setsFromEx || plannedSets || null),
             effort: state.effort,
-            minutes: minsIn.value ? +minsIn.value : null,
+            minutes: minsIn.value ? +minsIn.value : (prefill.minutes ?? typicalMins ?? null),
             strain: prefill.strain ?? existing?.strain ?? null,
             note: noteIn.value.trim(),
             exercises: kept,

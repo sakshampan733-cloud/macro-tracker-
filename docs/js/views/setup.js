@@ -461,6 +461,38 @@ export function renderSettings(root, ctx) {
             sleepSchedule() ? 'Change' : 'Set it')))),
 
     /*
+     * When you train, which is the only thing the app needs in order to
+     * ask about it at a useful moment. Logging a session otherwise means
+     * opening a tab, and most days the answer is one word.
+     */
+    group(ctx, 'training', 'Training',
+      'When you usually train, so the app can ask on the day.',
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', { style: { flex: '1', paddingRight: '12px' } },
+            el('div', { style: { fontWeight: '500' } }, 'Ask me at'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              get().settings?.workoutHour != null
+                ? `After ${clockText(get().settings.workoutHour)}, Home asks whether you trained. `
+                  + 'One tap logs it with the next session in your rotation.'
+                : 'Not set. Set the hour you usually finish training and Home will ask, '
+                  + 'rather than you having to remember to open the Train tab.')),
+          el('select.sel', {
+            onchange: e => {
+              const v = e.target.value;
+              commit(st => {
+                if (v === '') delete st.settings.workoutHour;
+                else st.settings.workoutHour = +v;
+              }, 'settings');
+              ctx.refresh();
+            },
+          },
+            el('option', { value: '', selected: get().settings?.workoutHour == null }, 'Off'),
+            ...Array.from({ length: 18 }, (_, i) => i + 5).map(h =>
+              el('option', { value: String(h), selected: get().settings?.workoutHour === h },
+                clockText(h))))))),
+
+    /*
      * Named for what it is rather than for one brand. Somebody with an
      * Apple Watch should not have to open a section called "Whoop" to set
      * their watch up, and the choice of band belongs at the top of it
@@ -501,7 +533,10 @@ export function renderSettings(root, ctx) {
               el('div', {},
                 el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Whoop data'),
                 el('div.micro', { style: { marginTop: '3px' } },
-                  Object.keys(s.whoop.rows || {}).length
+                  /* Someone who has never synced has no whoop object at
+                     all, and this reached straight through to .rows —
+                     taking the whole Settings screen down with it. */
+                  Object.keys(s.whoop?.rows || {}).length
                     ? `${Object.keys(s.whoop.rows).length} days imported`
                     : 'Not imported')),
               el('button.btn.sm', { onclick: () => openWhoopConnect(ctx) }, 'Set up')))

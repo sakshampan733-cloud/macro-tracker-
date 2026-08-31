@@ -192,10 +192,17 @@ export function bandVerdict(weeklySets, band) {
  * picture that has to come from the person, so it is one tap and never
  * required.
  */
+/*
+ * Three, not four.
+ *
+ * "Everything" and "Pushed" were asking the same question twice — the gap
+ * between close to failure and at failure is real in a programme and
+ * invisible in a one-tap rating, and a scale with a rung nobody can
+ * reliably pick is a scale that returns noise.
+ */
 export const EFFORT = [
-  { id: 'easy',   label: 'Held back',  note: 'Left several reps in reserve throughout.' },
-  { id: 'solid',  label: 'Solid',      note: 'Worked properly, stopped short of failure.' },
-  { id: 'hard',   label: 'Pushed',     note: 'Close to failure on the working sets.' },
-  { id: 'max',    label: 'Everything', note: 'Took sets to failure. Not a weekly thing.' },
+  { id: 'easy',  label: 'Held back', note: 'Left several reps in reserve throughout.' },
+  { id: 'solid', label: 'Solid',     note: 'Worked properly, stopped short of failure.' },
+  { id: 'hard',  label: 'Pushed',    note: 'Close to failure on the working sets.' },
 ];
 export const effortById = id => EFFORT.find(e => e.id === id) || null;
