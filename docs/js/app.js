@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.08.31-ring';
+export const VERSION = '2026.08.31-rings-light';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, openDay, pushBackup, setDishDensities, flush } from './store.js';
@@ -120,22 +120,36 @@ function drawHeader() {
 /*
  * Theme.
  *
- * There is one. The light theme was a second palette maintained alongside
- * the real one and it never looked like the app — the tokens inverted but
- * the thirty-odd corrections that made dark work did not, so it read as
- * dark-mode-with-the-lights-on. Rather than maintain two, this commits to
- * the one that works: a true black ground with the Health palette on top,
- * which on an OLED screen is genuinely unlit pixels and lets the cards
- * read as objects floating in nothing.
+ * Light is back, and it is a different thing from the one that was removed:
+ * that was a cream paper metaphor which made every colour on top of it look
+ * muddy. This is Health's own light — a cool near-white page with white
+ * cards on it — and the ring palette holds up on both grounds.
+ *
+ * 'auto' resolves to a real attribute rather than leaving it unset. The
+ * stylesheet has rules scoped to the light theme, and none of them can
+ * match while the attribute is absent; the result was light tokens wearing
+ * dark corrections.
  */
-function applyTheme() {
+function applyTheme(pref) {
   const root = document.documentElement;
-  root.setAttribute('data-theme', 'dark');
-  root.style.colorScheme = 'dark';
+  const resolved = (!pref || pref === 'auto')
+    ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches === false ? 'light' : 'dark')
+    : pref;
+
+  root.setAttribute('data-theme', resolved);
+  root.style.colorScheme = (!pref || pref === 'auto') ? 'light dark' : resolved;
+
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', '#000000');
-  applyOrb(get().settings?.orb || 'none', 'dark');
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#000000' : '#F2F2F7');
+
+  applyOrb(get().settings?.orb || 'none', resolved);
 }
+
+/* The system flipping while the app is open, on 'auto'. */
+window.matchMedia?.('(prefers-color-scheme: dark)')
+  .addEventListener?.('change', () => {
+    if ((get().settings?.theme || 'dark') === 'auto') applyTheme('auto');
+  });
 
 /*
  * Re-solve the home-dish densities before drawing.
@@ -161,7 +175,7 @@ function refreshDensities() {
 
 function draw() {
   const s = get();
-  applyTheme();
+  applyTheme(s.settings?.theme || 'dark');
   setExplanations(s.settings?.explain !== false);
   refreshDensities();
   clear(main);

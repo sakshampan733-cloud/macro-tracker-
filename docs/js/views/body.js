@@ -35,131 +35,24 @@ import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
 } from '../whooprelay.js';
 
-/*
- * The order of this screen belongs to whoever is reading it.
- *
- * Every arrangement here was an argument — vitals first because they
- * changed overnight, the verdict above its own evidence — and every one of
- * those arguments is about a typical person rather than the one holding
- * the phone. Somebody cutting checks their weight first; somebody deep in
- * a training block checks recovery. Both are right, and neither needs to
- * ask.
- *
- * So the sections are addressable and their order is stored. The defaults
- * are still the arguments above; they are now a starting point rather than
- * a ruling.
- */
-const BODY_SECTIONS = [
-  ['vitals',  s => null],          /* placeholders: built in renderBody */
-  ['sense',   s => null],
-  ['checkin', s => null],
-  ['weight',  s => null],
-  ['tdee',    s => null],
-  ['dishes',  s => null],
-  ['blood',   s => null],
-  ['food-recovery', s => null],
-];
-const DEFAULT_BODY_ORDER = BODY_SECTIONS.map(([id]) => id);
-
-function bodyOrder(s) {
-  const saved = s.settings?.bodyOrder;
-  if (!Array.isArray(saved) || !saved.length) return DEFAULT_BODY_ORDER;
-  /* Anything new the app has grown since the order was saved goes to the
-     bottom rather than vanishing — a stored layout must never be able to
-     hide a feature that did not exist when it was written. */
-  const known = saved.filter(id => DEFAULT_BODY_ORDER.includes(id));
-  return [...known, ...DEFAULT_BODY_ORDER.filter(id => !known.includes(id))];
-}
-
 export function renderBody(root, ctx) {
   const s = get();
   clear(root);
 
-  const built = {
-    vitals: vitalsSection(s, ctx),
-    sense: senseTile(s, ctx),
-    checkin: checkInTile(s, ctx),
-    weight: weightTile(ctx),
-    tdee: tdeeTile(s),
-    dishes: calibrationTile(s),
-    blood: bloodTile(s, ctx),
-    'food-recovery': correlationTile(s),
-  };
-
-  const list = el('div.dash');
-  for (const id of bodyOrder(s)) {
-    const node = built[id];
-    if (!node) continue;
-    list.append(el('div.dash-item', { dataset: { id } }, node));
-  }
-
   root.append(
     (root.classList.add('stagger'), el('div.between', { style: { marginBottom: '14px' } },
       el('h1', {}, 'Body'),
-      el('div.flex', { style: { gap: '8px' } },
-        el('button.btn.sm.ghost', { onclick: () => openArrange(ctx) }, 'Arrange'),
-        el('button.btn.sm.primary', { onclick: () => openReport(ctx, 7) }, 'Report')))),
+      el('button.btn.sm.ghost', { onclick: () => openReport(ctx, 7) }, 'Report'))),
     sourceBar(s, ctx) || el('div'),
-    list,
+    vitalsSection(s, ctx),
+    senseTile(s, ctx) || el('div'),
+    checkInTile(s, ctx),
+    weightTile(ctx),
+    tdeeTile(s),
+    calibrationTile(s) || el('div'),
+    bloodTile(s, ctx),
+    correlationTile(s),
   );
-}
-
-const SECTION_NAMES = {
-  vitals: 'Vitals', sense: 'Is it working?', checkin: 'Check-in',
-  weight: 'Weight', tdee: 'Maintenance calories', dishes: 'Home dishes',
-  blood: 'Blood panel', 'food-recovery': 'Food against recovery',
-};
-
-/*
- * Arranging, in a panel rather than by dragging the page.
- *
- * Dragging a full-width card around a scrolling page is a phone gesture
- * that a laptop does not have and a trackpad does badly — you lose the
- * card under the pointer the moment the page scrolls to follow you. A
- * short list with move buttons works with a finger, a mouse, a trackpad
- * and a keyboard, and you can see the whole order at once, which is the
- * thing you were actually trying to change.
- */
-function openArrange(ctx) {
-  const body = el('div');
-  const draw = () => {
-    clear(body);
-    const order = bodyOrder(get());
-    order.forEach((id, i) => {
-      body.append(el('div.row.arrange-row', {},
-        el('span.arr-n', {}, String(i + 1)),
-        el('span.grow', {}, el('div.title', {}, SECTION_NAMES[id] || id)),
-        el('button.btn.sm.ghost', {
-          disabled: i === 0, 'aria-label': `Move ${SECTION_NAMES[id]} up`,
-          onclick: () => {
-            const n = order.slice(); [n[i - 1], n[i]] = [n[i], n[i - 1]];
-            commit(st => { st.settings.bodyOrder = n; }, 'settings');
-            haptic('tap'); draw(); ctx.refresh();
-          },
-        }, '↑'),
-        el('button.btn.sm.ghost', {
-          disabled: i === order.length - 1, 'aria-label': `Move ${SECTION_NAMES[id]} down`,
-          onclick: () => {
-            const n = order.slice(); [n[i + 1], n[i]] = [n[i], n[i + 1]];
-            commit(st => { st.settings.bodyOrder = n; }, 'settings');
-            haptic('tap'); draw(); ctx.refresh();
-          },
-        }, '↓')));
-    });
-  };
-  draw();
-  return sheet({
-    title: 'Arrange',
-    body: el('div', {},
-      el('div.fine', { style: { marginBottom: '12px' } },
-        'The order of your Body tab. It is remembered, and anything the app grows '
-        + 'later joins the bottom rather than hiding.'),
-      body),
-    foot: el('button.btn.ghost', { style: { width: '100%' },
-      onclick: () => { commit(st => { delete st.settings.bodyOrder; }, 'settings');
-        toast('Back to the default order.'); draw(); ctx.refresh(); },
-    }, 'Reset to default'),
-  });
 }
 
 /* ── Check-in ───────────────────────────────────────────────────────── */
@@ -830,9 +723,9 @@ function appleVitals(s, ctx, scoped, sum) {
   if (today.sleepH) {
     const core = Math.max(0, today.sleepH - (today.remH || 0) - (today.swsH || 0));
     const stages = [
-      { label: 'Deep', value: today.swsH || 0, colour: '#2B4EC4' },
-      { label: 'REM',  value: today.remH || 0, colour: '#38C0E8' },
-      { label: 'Core', value: core,            colour: '#7FD8F0' },
+      { label: 'Deep', value: today.swsH || 0, colour: 'var(--sleep-deep)' },
+      { label: 'Core', value: core,            colour: 'var(--sleep-core)' },
+      { label: 'REM',  value: today.remH || 0, colour: 'var(--sleep-rem)' },
     ];
     wrap.append(el('div.ah-card', { style: { '--ah': '#37B9E8' } },
       el('div.between', {},
@@ -1050,9 +943,12 @@ function vitalsSection(s, ctx) {
   if (today.sleepH) {
     const light = Math.max(0, (today.sleepH || 0) - (today.remH || 0) - (today.swsH || 0));
     const stages = [
-      { label: 'Deep', value: today.swsH || 0, colour: 'var(--m-p)' },
-      { label: 'REM',  value: today.remH || 0, colour: 'var(--m-f)' },
-      { label: 'Light', value: light, colour: 'var(--line-2)' },
+      /* Deep, core, REM — Health's blue family rather than the app's
+         hairline grey, which made the biggest part of the night look like
+         missing data. */
+      { label: 'Deep', value: today.swsH || 0, colour: 'var(--sleep-deep)' },
+      { label: 'Light', value: light, colour: 'var(--sleep-core)' },
+      { label: 'REM',  value: today.remH || 0, colour: 'var(--sleep-rem)' },
     ];
     wrap.append(el('div.tile.tappable', {
       role: 'button', tabIndex: 0,
@@ -1323,9 +1219,9 @@ function openSleepDetail(s, ctx) {
     ? recent.reduce((a, d) => a + (k === 'light' ? light(d) : (d[k] || 0)), 0) / recent.length : 0;
 
   const stages = [
-    { label: 'Deep', key: 'swsH',  value: last.swsH || 0, mean: avg('swsH'),  colour: 'var(--m-p)' },
-    { label: 'REM',  key: 'remH',  value: last.remH || 0, mean: avg('remH'),  colour: 'var(--m-f)' },
-    { label: 'Light', key: 'light', value: light(last),   mean: avg('light'), colour: 'var(--line-2)' },
+    { label: 'Deep', key: 'swsH',  value: last.swsH || 0, mean: avg('swsH'),  colour: 'var(--sleep-deep)' },
+    { label: 'REM',  key: 'remH',  value: last.remH || 0, mean: avg('remH'),  colour: 'var(--sleep-rem)' },
+    { label: 'Light', key: 'light', value: light(last),   mean: avg('light'), colour: 'var(--sleep-core)' },
   ];
 
   const durSeries = days.slice(-60).map(d => ({ v: d.sleepH, label: `${d.date}: ${d.sleepH.toFixed(1)} h` }));

@@ -139,7 +139,10 @@ function todayCard(s, key, ctx) {
     band ? el('div.note.info', { style: { marginTop: '10px' } },
       el('div', {}, band.line)) : null,
     el('div.btn-row', { style: { marginTop: '13px' } },
-      el('button.btn.primary.grow', {
+      /* A confirmation, not a call to action. Solid accent on "yes, I did
+         the thing I already did" made the loudest element on the screen
+         the least consequential one. */
+      el('button.btn.confirm.grow', {
         onclick: () => openLogger(key, ctx, { type: suggestion, ...(band?.data || {}) }),
       }, band ? `Yes — ${t?.name || 'log it'}` : `Log ${t?.name || 'session'}`),
       el('button.btn.ghost', {

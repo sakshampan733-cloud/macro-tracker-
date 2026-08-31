@@ -64,12 +64,12 @@
    * what it measures — so they are never borrowed for decoration.
    */
   --h-move:     #FF9F0A;
-  --h-energy:   #FA114F;
+  --h-energy:   var(--ring-move);
   --h-heart:    #FF375F;
   --h-sleep:    #7A5CFF;
-  --h-resp:     #00E5D1;
+  --h-resp:     var(--ring-stand);
   --h-body:     #BF5AF2;
-  --h-strain:   #A6F900;
+  --h-strain:   var(--ring-exer);
   --h-recovery: #30D158;
 
   --m-kcal:  #FFFFFF;
@@ -385,8 +385,19 @@ h3 { font-size: 15px; }
 .row:last-child { border-bottom: 0; }
 .row:active { background: var(--surface-2); }
 .row .grow { flex: 1; min-width: 0; }
+/*
+ * A row's title wraps rather than truncating.
+ *
+ * Every exercise name in the picker was cut at the same width, so a list
+ * of presses and pulldowns read as a column of "Dumbbell shoulder pr…" —
+ * the part that distinguishes them is the end, and the end was what got
+ * removed. Two lines is fine; an unreadable name is not.
+ */
 .row .title {
   font-size: 14.5px; font-weight: 500;
+  overflow-wrap: anywhere; line-height: 1.3;
+}
+.row .title.is-clipped {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .row .sub {
@@ -1090,12 +1101,28 @@ body::after {
    * means is still the category palette's job, and green stays reserved
    * for "this is going well" rather than for "you can press this".
    */
+  /*
+   * Three colours, three jobs.
+   *
+   * The Activity rings are a red, an acid green and a cyan, and the reason
+   * they work together is that each one means something distinct. Using
+   * one of them for everything — which is what happened when the accent
+   * became red — throws that away and leaves a monochrome screen.
+   *
+   * So: red marks what you press, green means it is going well, cyan
+   * carries the calm readings (breath, oxygen, sleep, water). Nothing is
+   * tinted for decoration.
+   */
+  --ring-move:  #FA114F;
+  --ring-exer:  #A6F900;
+  --ring-stand: #00E5D1;
+
   --accent:    #FA114F;
   --accent-2:  #B80B39;
   --accent-ink:#FFFFFF;
 
   --warn:      #FF453A;
-  --good:      #32D74B;
+  --good:      #A6F900;
   --caution:   #FF9F0A;
 
   /*
@@ -1109,13 +1136,13 @@ body::after {
   --ring-stand:#00E5D1;
 
   --h-move:     #FF9F0A;
-  --h-energy:   #FA114F;
+  --h-energy:   var(--ring-move);
   --h-heart:    #FF375F;
   --h-sleep:    #7A5CFF;
-  --h-resp:     #00E5D1;
+  --h-resp:     var(--ring-stand);
   --h-body:     #BF5AF2;
-  --h-strain:   #A6F900;
-  --h-recovery: #32D74B;
+  --h-strain:   var(--ring-exer);
+  --h-recovery: var(--ring-exer);
 
   --m-kcal:  #FFFFFF;
   --m-p:     #0A84FF;
@@ -1145,6 +1172,89 @@ body::after {
 
 /* Following the system, when no explicit choice has been made. */
 
+
+/*
+ * Light.
+ *
+ * Not the cream it used to be — that was a paper metaphor and it made
+ * every colour on top of it look muddy. This is Health's own light: a cool
+ * near-white page with genuinely white cards on it, so a card reads as
+ * raised rather than as a slightly different shade of the same paper.
+ *
+ * The ring colours keep their hue and lose only as much brightness as
+ * legibility on white demands. The acid green is the one that has to move
+ * furthest — at full strength it disappears into the page.
+ */
+:root[data-theme="light"] {
+  --bg:        #F2F2F7;
+  --bg-2:      #FFFFFF;
+  --surface:   #FFFFFF;
+  --surface-2: #F7F7FA;
+  --raised:    #FFFFFF;
+  --line:      rgba(60, 60, 67, .13);
+  --line-2:    rgba(60, 60, 67, .26);
+
+  --text:      #000000;
+  --text-2:    #3C3C43;
+  --muted:     #6E6E73;
+  --dim:       #AEAEB2;
+
+  --ring-move:  #E00043;
+  --ring-exer:  #5FA800;
+  --ring-stand: #00A294;
+
+  --accent:    #E00043;
+  --accent-2:  #A80033;
+  --accent-ink:#FFFFFF;
+
+  --warn:      #D70015;
+  --good:      #5FA800;
+  --caution:   #B25000;
+
+  --h-move:     #C25E00;
+  --h-energy:   var(--ring-move);
+  --h-heart:    #E0004B;
+  --h-sleep:    #4B32C3;
+  --h-resp:     var(--ring-stand);
+  --h-body:     #8944D6;
+  --h-strain:   var(--ring-exer);
+  --h-recovery: var(--ring-exer);
+
+  --sleep-deep: #2A288A;
+  --sleep-core: #3560E0;
+  --sleep-rem:  #2FA8D8;
+
+  --m-kcal:  #000000;
+  --m-p:     #0069D9;
+  --m-c:     #C25E00;
+  --m-f:     #8944D6;
+  --m-fib:   #5FA800;
+  --m-water: #4B32C3;
+  --m-p-ink:   #0069D9;
+  --m-c-ink:   #A85000;
+  --m-f-ink:   #7A35C6;
+  --m-fib-ink: #4E8C00;
+
+  /* Panes are painted here, not translucent: white glass over a white page
+     has nothing to show through it. */
+  --glass:       rgba(255, 255, 255, .82);
+  --glass-solid: rgba(255, 255, 255, .96);
+  --glass-line:  rgba(60, 60, 67, .14);
+  --glass-hi:    rgba(255, 255, 255, .9);
+  --glass-active:rgba(60, 60, 67, .08);
+  --glass-bg:    rgba(255, 255, 255, .88);
+  --glass-brd:   rgba(60, 60, 67, .16);
+
+  --sheen:      linear-gradient(150deg, rgba(255,255,255,.7), rgba(255,255,255,0) 42%);
+  --edge-light: inset 0 1px 0 rgba(255,255,255,.9);
+  --lift:       0 1px 2px rgba(60,60,67,.10), 0 8px 22px -12px rgba(60,60,67,.22);
+  --lift-lg:    0 2px 6px rgba(60,60,67,.10), 0 22px 50px -20px rgba(60,60,67,.30);
+  /* Grain only reads as texture against black. */
+  --grain:      0;
+}
+
+/* On white the tab bar needs no extra edge — the shadow does that work. */
+:root[data-theme="light"] .tabs { border: 1px solid var(--line); }
 
 body::after { opacity: var(--grain); }
 
@@ -2835,31 +2945,6 @@ button.src-tag { cursor: pointer; }
 .ah-grid > .ah-card { margin: 0; }
 .vital, .vitals, .vitals-head, .vital-note { }
 
-/* Drag to rearrange, the way icons move on a home screen. */
-.dash-edit .dash-item { touch-action: none; cursor: grab; }
-.dash-edit .dash-item > * { pointer-events: none; }
-.dash-item.is-lifted {
-  position: relative; z-index: 40; cursor: grabbing;
-  transform: scale(1.03); opacity: .95;
-  box-shadow: 0 18px 44px -18px rgba(0,0,0,.9);
-  border-radius: 18px;
-}
-.dash-item.is-shifting { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
-@media (prefers-reduced-motion: no-preference) {
-  .dash-edit .dash-item:not(.is-lifted) { animation: jiggle 2.4s ease-in-out infinite; }
-  @keyframes jiggle {
-    0%,100% { transform: rotate(-.22deg); }
-    50%     { transform: rotate(.22deg); }
-  }
-}
-.dash-edit .dash-item { position: relative; }
-.dash-edit .dash-item::after {
-  content: ''; position: absolute; inset: -3px;
-  border: 1.5px dashed var(--line-2); border-radius: 18px; pointer-events: none;
-}
-.dash { display: grid; gap: 0; }
-.dash-item { min-width: 0; }
-
 /* One screen, not a column you climb. */
 .metric-detail { display: grid; gap: 16px; }
 .metric-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
@@ -2886,6 +2971,21 @@ button.src-tag { cursor: pointer; }
  * Highlighting a number turned it Chrome's default blue, which after the
  * palette work was the only blue left in the app and looked like a bug.
  */
+/*
+ * Sleep stages, in Health's own blues.
+ *
+ * Light sleep was drawn in the app's hairline grey, which made the largest
+ * part of every night look like the absence of a reading rather than a
+ * stage of sleep. Health uses one blue family across the three — deep
+ * nearly indigo, core mid, REM pale — so depth reads as depth.
+ */
+:root {
+  --sleep-deep: #3634A3;
+  --sleep-core: #4471F5;
+  --sleep-rem:  #6FD3F7;
+  --sleep-awake:#FF9F0A;
+}
+
 ::selection { background: color-mix(in srgb, var(--accent) 34%, transparent); color: var(--text); }
 ::-moz-selection { background: color-mix(in srgb, var(--accent) 34%, transparent); color: var(--text); }
 :root { accent-color: var(--accent); caret-color: var(--accent); }
@@ -2937,9 +3037,34 @@ button.src-tag { cursor: pointer; }
 .sess-row:active, .cal-day:active { transform: scale(.975); }
 .btn { transition: transform .12s cubic-bezier(.2,.8,.2,1), filter .12s ease; }
 .btn:active { transform: scale(.96); }
-.arrange-row .arr-n {
-  flex: none; width: 22px; height: 22px; border-radius: 6px; margin-right: 4px;
-  background: var(--surface-2); color: var(--muted);
-  display: grid; place-items: center;
-  font-family: var(--cond), var(--sans); font-size: 12px; font-variant-numeric: tabular-nums;
+
+/*
+ * A confirming button.
+ *
+ * "Yes — Chest & Triceps" is agreement with something the app already
+ * worked out, not a call to action, and a solid block of accent made the
+ * loudest thing on the screen the least consequential one. Tinted, with
+ * the accent kept as an outline and the label.
+ */
+.btn.confirm {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  color: var(--text);
 }
+.btn.confirm:active { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+
+/* Theme picker. */
+.theme-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.theme-opt {
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  padding: 10px 8px 8px; background: var(--surface-2);
+  display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: pointer;
+}
+.theme-opt[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.theme-swatch {
+  width: 100%; height: 30px; border-radius: 7px;
+  border: 1px solid var(--line); background-clip: padding-box;
+}
+.theme-swatch.dark  { background: linear-gradient(140deg, #000, #1C1C1E); }
+.theme-swatch.light { background: linear-gradient(140deg, #fff, #E9E9EE); }
+.theme-swatch.auto  { background: linear-gradient(100deg, #000 0 50%, #fff 50% 100%); }

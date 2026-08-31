@@ -547,11 +547,24 @@ export function renderSettings(root, ctx) {
       field('Background', orbPicker(ctx),
         'The glow behind the glass. It tints both themes.'),
       el('div.tile', {},
-        el('div.fine', {},
-          'Basal is dark only. The light theme was a second palette kept alongside the '
-          + 'real one and it never looked like the app — the colours inverted but the '
-          + 'corrections that make dark work did not. True black rather than dark grey: '
-          + 'on an OLED screen those pixels are genuinely off.'))),
+        el('div.theme-row', {},
+          ...[
+            ['dark',  'Dark'],
+            ['light', 'Light'],
+            ['auto',  'System'],
+          ].map(([value, label]) => el('button.theme-opt', {
+            type: 'button',
+            'aria-pressed': String((s.settings.theme || 'dark') === value),
+            onclick: () => {
+              commit(st => { st.settings.theme = value; }, 'settings');
+              ctx.refresh();
+            },
+          },
+            el('div', { class: 'theme-swatch ' + value }),
+            el('span.micro', {}, label)))),
+        el('div.fine', { style: { marginTop: '10px' } },
+          'Dark is true black — on an OLED screen those pixels are genuinely off. '
+          + 'Light is a cool near-white with white cards, not the cream it used to be.'))),
 
     group(ctx, 'read', 'Reading',
       'How much the app explains, and how much to trust it.',

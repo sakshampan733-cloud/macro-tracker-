@@ -123,7 +123,7 @@ function workoutAsk(key, ctx) {
     el('div.flex', {}, icon('barbell', 17), el('h3', {}, 'Did you train today?')),
     t ? el('div.fine', { style: { marginTop: '5px' } }, `${t.name} is next in your rotation.`) : null,
     el('div.btn-row', { style: { marginTop: '12px' } },
-      t ? el('button.btn.primary.grow', {
+      t ? el('button.btn.confirm.grow', {
         onclick: () => openEffortAsk(key, next, ctx),
       }, `Yes — ${t.name}`) : null,
       el('button.btn.ghost' + (t ? '' : '.grow'), {
