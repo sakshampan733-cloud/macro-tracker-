@@ -175,7 +175,7 @@ export function openCaffeine(key, now = new Date()) {
             el('span', { style: { fontSize: '15px' } }, ' mg'))),
         atBed != null ? el('div.readout-side', {},
           el('div.micro', {}, 'Still in you at bedtime'),
-          el('div.v', { style: { color: atBed >= 50 ? 'var(--caution)' : 'var(--good)' } },
+          el('div.v', { style: { color: atBed >= 50 ? 'var(--caution)' : 'var(--good-ink)' } },
             `${Math.round(atBed)} mg`)) : null)),
 
     el('div.section-label', {}, el('span.micro', {}, 'Where it came from')),
@@ -268,7 +268,7 @@ function buildSupplements(s, key, ctx, repaint) {
         el('h3', {}, 'Supplements'),
         el('span.micro', { style: { marginLeft: '8px' } }, open ? '▾' : '▸')),
       el('span.num', {
-        style: { fontSize: '13px', color: all ? 'var(--good)' : 'var(--muted)' },
+        style: { fontSize: '13px', color: all ? 'var(--good-ink)' : 'var(--muted)' },
       }, all ? `all ${chosen.length} taken` : `${done}/${chosen.length}`)));
 
   if (!open) return el('div.tile', {}, header);

@@ -87,7 +87,7 @@ function buildMedication(s, key, ctx, repaint) {
     el('div.between', { style: { marginBottom: '10px' } },
       el('div.flex', { style: { gap: '7px' } }, icon('pill', 15), el('h3', {}, 'Medication')),
       el('span.num', {
-        style: { fontSize: '13px', color: done === log.length ? 'var(--good)' : 'var(--muted)' },
+        style: { fontSize: '13px', color: done === log.length ? 'var(--good-ink)' : 'var(--muted)' },
       }, log.length ? `${done}/${log.length}` : 'none due')),
     ...rows,
     el('button.btn.sm.ghost.block', { style: { marginTop: '10px' },

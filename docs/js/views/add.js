@@ -64,7 +64,7 @@ function consumedHeader(s, ctx) {
         el('span.num', { style: { fontSize: '21px', fontWeight: '500' } }, kcal(t.kcal)),
         el('span.micro', { style: { marginLeft: '6px' } }, `of ${kcal(targets.kcal)}`)),
       el('span.num', {
-        style: { fontSize: '13px', color: left < 0 ? 'var(--warn)' : 'var(--good)' },
+        style: { fontSize: '13px', color: left < 0 ? 'var(--warn)' : 'var(--good-ink)' },
       }, left < 0 ? `${Math.abs(left)} over` : `${left} left`)),
     el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' } },
       bar('Protein', t.p, targets.p, 'var(--m-p)'),

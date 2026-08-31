@@ -45,7 +45,7 @@ export function goalTile(s, ctx) {
     : st.onPace == null ? 'info'
     : st.onPace >= 0.85 ? 'good'
     : st.onPace >= 0.4 ? 'info' : 'warn';
-  const colour = { good: 'var(--good)', warn: 'var(--warn)', info: 'var(--m-p)' }[tone];
+  const colour = { good: 'var(--good-ink)', warn: 'var(--warn)', info: 'var(--m-p)' }[tone];
 
   return el('div', {},
     el('div.section-label', {}, el('span.micro', {}, 'Goal')),

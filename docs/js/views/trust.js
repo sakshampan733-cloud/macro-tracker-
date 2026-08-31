@@ -61,7 +61,7 @@ export function openTrust() {
       el('p', { style: { color: 'var(--text-2)', lineHeight: '1.55', marginTop: 0 } },
         'This app tells you how sure it is about your food. It should do the same about itself.'),
 
-      el('div.section-label', {}, el('span.micro', { style: { color: 'var(--good)' } }, 'Trust this')),
+      el('div.section-label', {}, el('span.micro', { style: { color: 'var(--good-ink)' } }, 'Trust this')),
       ...SOLID.map(row),
 
       el('div.section-label', {}, el('span.micro', { style: { color: 'var(--caution)' } }, 'Take with salt')),

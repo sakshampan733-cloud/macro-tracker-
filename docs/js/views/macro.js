@@ -72,7 +72,7 @@ function proteinBody(q, mealLeu, targets) {
         el('span.grow', {},
           el('div.title', {}, MEAL_LABELS[meal] || meal),
           el('div.sub', {}, `${Math.round(v.protein)} g protein`)),
-        el('span.kcal', { style: { color: v.hit ? 'var(--good)' : 'var(--caution)' } },
+        el('span.kcal', { style: { color: v.hit ? 'var(--good-ink)' : 'var(--caution)' } },
           g(v.leucine, 1) + ' g',
           el('div.micro', { style: { marginTop: '2px' } }, v.hit ? 'over' : 'under'))))),
 
@@ -89,7 +89,7 @@ function proteinBody(q, mealLeu, targets) {
       sourceRows(p.sources, s => el('div.row', {},
         el('span.grow', {},
           el('div.title', {}, s.name),
-          el('div.sub', { style: { color: s.complete ? 'var(--good)' : 'var(--caution)' } },
+          el('div.sub', { style: { color: s.complete ? 'var(--good-ink)' : 'var(--caution)' } },
             s.complete
               ? `has all nine building blocks (complete protein) · quality ${s.diaas}`
               : `short on ${s.limiting} (its limiting amino acid) · quality ${s.diaas}`),
@@ -110,7 +110,7 @@ function proteinBody(q, mealLeu, targets) {
 
 /* ── Carbohydrate ───────────────────────────────────────────────────── */
 
-const TIER_COLOUR = { good: 'var(--good)', ok: 'var(--m-c)', limit: 'var(--warn)' };
+const TIER_COLOUR = { good: 'var(--good-ink)', ok: 'var(--m-c)', limit: 'var(--warn)' };
 const TIER_LABEL  = { good: 'Whole', ok: 'Starchy staples', limit: 'Refined or sugar' };
 
 function carbBody(q, targets) {
@@ -183,7 +183,7 @@ function fatBody(q, targets) {
         el('div', {},
           el('div.micro', {}, 'Omega-3'),
           el('div.num', { style: { fontSize: '22px', marginTop: '2px',
-            color: f.omega3 >= 1.5 ? 'var(--good)' : 'var(--caution)' } }, g(f.omega3, 2) + ' g')),
+            color: f.omega3 >= 1.5 ? 'var(--good-ink)' : 'var(--caution)' } }, g(f.omega3, 2) + ' g')),
         el('div', { style: { textAlign: 'right' } },
           el('div.micro', {}, 'Trans fat'),
           el('div.num', { style: { fontSize: '22px', marginTop: '2px',

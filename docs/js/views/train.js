@@ -30,6 +30,7 @@ import {
 } from '../data/exercises.js';
 import { rowsFor, healthSource, bandName, canMeasure } from '../applehealth.js';
 import { strainBaseline, sessionIntensity, disagreement } from '../intensity.js';
+import { appleChart } from '../charts.js';
 
 export function renderTrain(root, ctx) {
   const s = get();
@@ -91,10 +92,13 @@ function todayCard(s, key, ctx) {
 
       /* Today's reading, in the card for today, rather than only as one
          bar in a chart further down. */
-      inten.score != null ? el('div.today-inten', {},
+      inten.score != null ? el('button.today-inten', {
+        onclick: () => openSession(key, ctx),
+      },
         el('div.between', {},
-          el('span.micro', {}, 'How hard that was'),
-          el('span.inten-label', {}, inten.label)),
+          el('span.micro', {}, 'How hard that was', icon('chevron', 11)),
+          el('span.inten-label' + (inten.score >= 0.62 ? '.is-hard'
+            : inten.score >= 0.4 ? '.is-mid' : '.is-easy'), {}, inten.label)),
         el('div.fine', { style: { marginTop: '4px' } },
           inten.parts.map(p => p.why).filter(Boolean).join(' · ')
           || `from ${inten.sources} source${inten.sources === 1 ? '' : 's'}`)) : null,
@@ -218,7 +222,7 @@ function recentTile(s, ctx) {
       const rel = (sess.strain != null && base)
         ? sess.strain - base.mean : null;
       return el('button.sess-row', {
-        onclick: () => openLogger(sess.date, ctx, sess),
+        onclick: () => openSession(sess.date, ctx),
       },
         el('span.grow', {},
           el('div.title', {}, t?.name || 'Session'),
@@ -253,6 +257,115 @@ function dayLabel(key) {
   return new Date(key + 'T12:00:00')
     .toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 }
+
+
+/*
+ * One session, opened.
+ *
+ * The composite intensity existed and was never shown as anything but a
+ * word. That is the wrong way round: a single adjective is exactly the
+ * part you cannot argue with, and the two things it was computed from —
+ * what you said, and what the strap recorded against your own average —
+ * are the interesting half. Both are drawn here, side by side, and the
+ * curve underneath is every session before it on the same scale.
+ *
+ * The strap is the harder witness to fool, which is the point: you can
+ * tell the app you pushed, and if the day never moved off your baseline
+ * it will show you both readings and let you decide which you believe.
+ */
+function openSession(key, ctx) {
+  const s = get();
+  const sess = sessionFor(key);
+  if (!sess) return openLogger(key, ctx);
+
+  const t = typeById(sess.type);
+  const base = strainBaseline(rowsFor(s, 'all'));
+  const planned = (t?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null;
+  const inten = sessionIntensity(sess, { baseline: base, plannedSets: planned });
+  const dis = disagreement(inten);
+
+  /* `said` is the caption for a witness that exists but has nothing to
+     explain — your own rating is a word, not a derivation. */
+  const witness = (label, part, missing, said) => {
+    if (!part) {
+      return el('div.wit', {},
+        el('div.micro', {}, label),
+        el('div.wit-v.is-none', {}, '—'),
+        el('div.fine', {}, missing));
+    }
+    return el('div.wit', {},
+      el('div.micro', {}, label),
+      el('div.wit-v', {}, Math.round(part.v * 100) + '%'),
+      el('div.wit-bar', {}, el('i', { style: { width: Math.round(part.v * 100) + '%' } })),
+      el('div.fine', {}, part.why || said || ''));
+  };
+
+  const you = inten.parts.find(p => p.from === 'you');
+  const strap = inten.parts.find(p => p.from === 'strap');
+  const sets = inten.parts.find(p => p.from === 'sets');
+
+  /* Every scored session, so today has something to sit against. */
+  const history = sessions(180)
+    .map(x => {
+      const ty = typeById(x.type);
+      const pl = (ty?.plan || []).reduce((a, y) => a + (y.sets || 0), 0) || null;
+      return { date: x.date, i: sessionIntensity(x, { baseline: base, plannedSets: pl }) };
+    })
+    .filter(x => x.i.score != null)
+    .slice(-40);
+
+  sheet({
+    title: t?.name || 'Session',
+    body: el('div.sess-detail', {},
+      el('div.metric-hero', {},
+        el('div', {},
+          el('div.micro', {}, dayLabel(key)),
+          el('div.metric-big', {}, Math.round((inten.score || 0) * 100),
+            el('span.metric-unit', {}, 'intensity'))),
+        el('div.metric-place', {},
+          el('div.metric-pct' + (inten.score >= 0.62 ? '.is-hard'
+            : inten.score >= 0.4 ? '.is-mid' : '.is-easy'), {}, inten.label),
+          el('div.micro', {}, `from ${inten.sources} source${inten.sources === 1 ? '' : 's'}`))),
+
+      el('div.wit-grid', {},
+        witness('What you said', you, 'Not rated. Tap edit to add it.',
+          effortById(sess.effort)?.label),
+        witness('What your strap saw', strap,
+          base ? 'No strain recorded for this day.'
+               : 'Needs a few weeks of strap data to compare against.'),
+        witness('What you logged', sets, 'No set count on this session.')),
+
+      dis ? el('div.note.info', {}, el('div', {},
+        dis.high === 'you' && dis.low === 'strap'
+          ? 'You rated this harder than the day reads on your strap. A short, brutal '
+            + 'session does exactly that — the strap measures the whole day, not the hour.'
+        : dis.high === 'strap' && dis.low === 'you'
+          ? 'Your strap saw a much bigger day than you rated it. Worth knowing which one '
+            + 'you trust before you plan tomorrow.'
+        : dis.high === 'sets' && dis.low === 'strap'
+          ? 'A lot of sets, and the day barely moved against your usual. Either they were '
+            + 'lighter than they felt, or the session was too short to register.'
+        : 'The two readings do not agree. Neither is wrong — they measure different things.'))
+        : null,
+
+      history.length >= 2
+        ? el('div', {},
+            el('div.section-label', {}, el('span.micro', {}, `Last ${history.length} sessions`)),
+            appleChart(history.map(h => ({ v: Math.round(h.i.score * 100), date: h.date,
+              label: `${h.date}: ${h.i.label}` })),
+              { colour: 'var(--ring-move)', h: 130, zero: true, unit: '', dp: 0 }))
+        : el('div.fine', {}, 'Log a few more and a curve appears here.'),
+
+      el('div.fine', {},
+        base
+          ? `Strain is read against your own average of ${base.mean} rather than a printed `
+            + 'scale — a ten is a hard day for one person and a walk for another.'
+          : 'Connect a strap and its reading joins this.')),
+    foot: el('div.btn-row', {},
+      el('button.btn.ghost.grow', { onclick: () => openLogger(key, ctx, sess) }, 'Edit session')),
+  });
+}
+
 
 /* ── Four weeks, and a year behind it ───────────────────────────────── */
 

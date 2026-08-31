@@ -81,7 +81,7 @@ export function bloodTile(s, ctx) {
       el('div.between', { style: { marginBottom: '10px' } },
         el('span.fine', {}, `${vals.length} markers recorded`),
         el('span.num', {
-          style: { fontSize: '13px', color: outOf.length ? 'var(--caution)' : 'var(--good)' },
+          style: { fontSize: '13px', color: outOf.length ? 'var(--caution)' : 'var(--good-ink)' },
         }, outOf.length ? `${outOf.length} outside range` : 'all in range')),
 
       el('div.tile.flush', { style: { margin: 0, border: '1px solid var(--line)' } },

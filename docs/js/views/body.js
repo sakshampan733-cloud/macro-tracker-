@@ -75,7 +75,7 @@ function checkInTile(s, ctx) {
   const rate = profile.rate ?? 0;
   const verdict = checkInVerdict(ci, profile, rate);
 
-  const toneColour = { good: 'var(--good)', warn: 'var(--warn)', info: 'var(--m-p)' };
+  const toneColour = { good: 'var(--good-ink)', warn: 'var(--warn)', info: 'var(--m-p)' };
 
   return el('div.tile', {},
     el('div.tile-head', {},
@@ -233,7 +233,7 @@ function weightTile(ctx) {
         el('div', { style: { textAlign: 'right' } },
           el('div.micro', {}, spanDays >= 7 ? `Trend, ${spanDays} days` : 'Trend change'),
           el('div.num', {
-            style: { fontSize: '18px', marginTop: '2px', color: change < 0 ? 'var(--good)' : change > 0 ? 'var(--m-c-ink)' : 'var(--text)' },
+            style: { fontSize: '18px', marginTop: '2px', color: change < 0 ? 'var(--good-ink)' : change > 0 ? 'var(--m-c-ink)' : 'var(--text)' },
           }, (change >= 0 ? '+' : '') + toDisp(change).toFixed(1) + ' ' + wu))),
       Math.abs(scale - latest.trend) > 0.35
         ? el('div.fine', { style: { marginTop: '6px' } },
@@ -1253,7 +1253,7 @@ function openSleepDetail(s, ctx) {
             el('i.dot', { style: { background: st.colour } }), st.label),
           el('span.num', { style: { fontSize: '13.5px' } },
             `${st.value.toFixed(1)} h · ${Math.round(pct)}% · `,
-            el('span', { style: { color: Math.abs(diff) < 0.25 ? 'var(--muted)' : (diff > 0 ? 'var(--good)' : 'var(--caution)') } },
+            el('span', { style: { color: Math.abs(diff) < 0.25 ? 'var(--muted)' : (diff > 0 ? 'var(--good-ink)' : 'var(--caution)') } },
               `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}`)));
       })),
 
@@ -1566,7 +1566,7 @@ function correlationTile(s) {
             el('div.title', {}, f.label),
             el('div.sub', {}, `${f.n} paired days${f.strong ? '' : ' · weak, treat as noise'}`)),
           el('span.kcal', {
-            style: { color: f.strong ? (f.r > 0 ? 'var(--good)' : 'var(--warn)') : 'var(--muted)' },
+            style: { color: f.strong ? (f.r > 0 ? 'var(--good-ink)' : 'var(--warn)') : 'var(--muted)' },
           }, (f.r > 0 ? '+' : '') + f.r.toFixed(2))))),
     el('div.note', {}, el('div', {},
       'These are correlations across your own days, not causes. '

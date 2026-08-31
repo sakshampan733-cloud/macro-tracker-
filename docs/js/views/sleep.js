@@ -424,7 +424,7 @@ export function sleepTile(s, key, ctx) {
           el('div.readout-main', { style: { fontSize: '30px' } }, durText(sleptH))),
         el('div.readout-side', {},
           el('div.micro', {}, 'Against goal'),
-          el('div.v', { style: { color: close ? 'var(--good)' : 'var(--muted)' } },
+          el('div.v', { style: { color: close ? 'var(--good-ink)' : 'var(--muted)' } },
             `${diff >= 0 ? '+' : '\u2212'}${durText(Math.abs(diff))}`))),
       el('div.micro', { style: { marginTop: '6px' } },
         banded

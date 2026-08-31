@@ -693,7 +693,7 @@ input.num-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 }
 .metric .v .u { font-size: 12px; color: var(--muted); margin-left: 2px; letter-spacing: 0; }
 .metric .verdict { font-size: 11.5px; color: var(--muted); }
-.metric.good .v { color: var(--good); }
+.metric.good .v { color: var(--good-ink, var(--good)); }
 .metric.warn .v { color: var(--warn); }
 
 /* ── Water ──────────────────────────────────────────────────────────── */
@@ -1113,7 +1113,7 @@ body::after {
    * carries the calm readings (breath, oxygen, sleep, water). Nothing is
    * tinted for decoration.
    */
-  --h-caffeine: #C98A4B;
+  --h-caffeine: #3DDBC4;
 
   --ring-move:  #FA114F;
   --ring-exer:  #A6F900;
@@ -1125,6 +1125,9 @@ body::after {
 
   --warn:      #FF453A;
   --good:      #A6F900;
+  /* The ring green is a fill colour. At sentence size it glares, so text
+     that means "this is fine" uses a calmer one. */
+  --good-ink:  #8FD97A;
   --caution:   #FF9F0A;
 
   /*
@@ -1211,6 +1214,7 @@ body::after {
 
   --warn:      #D70015;
   --good:      #5FA800;
+  --good-ink:  #3F8A2C;
   --caution:   #B25000;
 
   --h-move:     #C25E00;
@@ -1237,7 +1241,7 @@ body::after {
   --m-f-ink:   #7A45BE;
   --m-fib-ink: #3F8A2C;
 
-  --h-caffeine: #96622C;
+  --h-caffeine: #0E9C8E;
 
   /* Panes are painted here, not translucent: white glass over a white page
      has nothing to show through it. */
@@ -2266,7 +2270,7 @@ ol.steps li b { color: var(--text); font-weight: 600; }
   font-size: 10.5px; letter-spacing: .04em; color: var(--dim);
   white-space: nowrap; min-width: 62px; text-align: right;
 }
-.vital-where.is-good { color: var(--good); }
+.vital-where.is-good { color: var(--good-ink, var(--good)); }
 .vital-where.is-warn { color: var(--caution); }
 .vital .ic { color: var(--dim); }
 
@@ -2414,9 +2418,10 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 
 /* Caffeine: one total, fed by food and supplements alike. */
 .caff-bar { height: 6px; border-radius: 999px; background: var(--raised); overflow: hidden; }
-/* Caffeine gets its own colour rather than the accent. It is a reading,
-   not a button, and in the Move ring's red it read as an alarm going off
-   every morning. Coffee brown-amber, which is at least what it is. */
+/* The teal it always was. Coffee brown was the literal answer and it
+   looked like mud; this is a reading, not a button, and it needs to be
+   nothing else on the screen — which the teal, now retired as the accent,
+   is free to be. */
 .caff-fill { height: 100%; border-radius: 999px; background: var(--h-caffeine); transition: width .25s ease; }
 .caff-fill.is-over { background: var(--caution); }
 .caff-row {
@@ -2551,14 +2556,14 @@ ol.steps li b { color: var(--text); font-weight: 600; }
   margin-top: 8px; font-variant-numeric: tabular-nums;
 }
 .sched-verdict { text-align: center; font-size: 12.5px; color: var(--dim); margin-top: 4px; line-height: 1.45; }
-.sched-verdict.is-good { color: var(--good); }
+.sched-verdict.is-good { color: var(--good-ink, var(--good)); }
 
 
 
 
 .caff-card { cursor: pointer; }
 .caff-card .caff-row:last-child { border-bottom: 0; }
-.fine.is-good { color: var(--good); }
+.fine.is-good { color: var(--good-ink, var(--good)); }
 .fine.is-plain { color: var(--muted); }
 .caff-row .micro { margin-top: 2px; }
 
@@ -2799,7 +2804,7 @@ button.src-tag { cursor: pointer; }
    label, so a glance answers "did I go" without reading. */
 .train-today { border-color: var(--accent-2); }
 .train-done { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
-.train-done .flex svg { color: var(--good); }
+.train-done .flex svg { color: var(--good-ink, var(--good)); }
 .train-detect { border-color: color-mix(in srgb, var(--caution) 40%, var(--line)); }
 .train-detect .flex svg { color: var(--caution); }
 .train-today h2 { font-size: 27px; letter-spacing: -.02em; }
@@ -2903,7 +2908,8 @@ button.src-tag { cursor: pointer; }
 
 /* Intensity: one bar per session, coloured by what you said it felt like. */
 .today-inten { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
-.inten-label { font-size: 13px; color: var(--accent); text-transform: lowercase; }
+/* The word follows the reading, not the accent. */
+.inten-label { font-size: 13px; color: var(--text-2); text-transform: lowercase; }
 .inten-bar { height: 8px; border-radius: 99px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
 .inten-bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
 
@@ -2938,9 +2944,17 @@ button.src-tag { cursor: pointer; }
   padding: 3px 8px; border-radius: 99px; white-space: nowrap;
   background: var(--surface-2); color: var(--text-2);
 }
-.eff-tag.eff-easy  { background: color-mix(in srgb, var(--m-water) 22%, transparent); color: var(--m-water); }
-.eff-tag.eff-solid { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
-.eff-tag.eff-hard  { background: color-mix(in srgb, var(--m-c) 22%, transparent); color: var(--m-c); }
+/*
+ * Effort runs across the three rings, in order.
+ *
+ * Held back is the calm cyan, solid the exercise green, pushed the move
+ * red — so the tags read as a scale at a glance rather than as three
+ * unrelated labels. They were all wearing the accent, which made "solid"
+ * and "pushed" the same colour as every button on the screen.
+ */
+.eff-tag.eff-easy  { background: color-mix(in srgb, var(--ring-stand) 18%, transparent); color: var(--ring-stand); }
+.eff-tag.eff-solid { background: color-mix(in srgb, var(--ring-exer) 18%, transparent); color: var(--good-ink); }
+.eff-tag.eff-hard  { background: color-mix(in srgb, var(--ring-move) 20%, transparent); color: var(--ring-move); }
 
 /* "Did you train today?" on Home. */
 .ask-card { border-color: var(--accent-2); }
@@ -3075,3 +3089,30 @@ button.src-tag { cursor: pointer; }
 .theme-swatch.dark  { background: linear-gradient(140deg, #000, #1C1C1E); }
 .theme-swatch.light { background: linear-gradient(140deg, #fff, #E9E9EE); }
 .theme-swatch.auto  { background: linear-gradient(100deg, #000 0 50%, #fff 50% 100%); }
+.inten-label.is-easy { color: var(--ring-stand); }
+.inten-label.is-mid  { color: var(--good-ink); }
+.inten-label.is-hard { color: var(--ring-move); }
+
+/* One session, opened: the composite, then the witnesses it came from. */
+.sess-detail { display: grid; gap: 16px; }
+/* Three witnesses side by side rather than stacked — they exist to be
+   compared, and a column makes you scroll to do it. */
+.wit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.wit {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 9px 10px; display: grid; gap: 3px; align-content: start;
+}
+.wit .micro { font-size: 9.5px; line-height: 1.25; }
+.wit .fine { font-size: 10.5px; line-height: 1.3; }
+.wit-v { font-family: var(--cond), var(--sans); font-size: 21px; color: var(--text); line-height: 1; }
+.wit-v.is-none { color: var(--dim); }
+.wit-bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.wit-bar i { display: block; height: 100%; border-radius: 99px; background: var(--ring-move); }
+.metric-pct.is-easy { color: var(--ring-stand); }
+.metric-pct.is-mid  { color: var(--good-ink); }
+.metric-pct.is-hard { color: var(--ring-move); }
+.today-inten {
+  width: 100%; text-align: left; background: none; border: 0; padding: 0;
+  color: inherit; cursor: pointer;
+}
+.today-inten .micro svg { vertical-align: -1px; color: var(--dim); }

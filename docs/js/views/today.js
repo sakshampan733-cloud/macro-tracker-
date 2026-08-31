@@ -398,7 +398,7 @@ function buildCeilings(t, targets, key, ctx, repaint) {
   },
     el('div.between', {},
       el('span.micro', {}, 'Keep under ', open ? '▾' : '▸'),
-      el('span.micro', { style: { color: over.length ? 'var(--warn)' : near.length ? 'var(--caution)' : 'var(--good)' } },
+      el('span.micro', { style: { color: over.length ? 'var(--warn)' : near.length ? 'var(--caution)' : 'var(--good-ink)' } },
         summary)));
 
   if (!open) return header;

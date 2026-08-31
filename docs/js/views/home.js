@@ -270,13 +270,13 @@ const STRAP_METRICS = {
     colour: (v, r) => {
       const p = r.sleepPerf;
       if (p == null) return 'var(--text-2)';
-      return p >= 85 ? 'var(--good)' : p >= 70 ? 'var(--caution)' : 'var(--warn)';
+      return p >= 85 ? 'var(--good-ink)' : p >= 70 ? 'var(--caution)' : 'var(--warn)';
     },
   },
   recovery: {
     read: r => (r.recovery != null && Number.isFinite(r.recovery)) ? r.recovery : null,
     text: v => `recovery ${Math.round(v)}%`,
-    colour: v => v >= 67 ? 'var(--good)' : v >= 34 ? 'var(--caution)' : 'var(--warn)',
+    colour: v => v >= 67 ? 'var(--good-ink)' : v >= 34 ? 'var(--caution)' : 'var(--warn)',
   },
   strain: {
     read: r => (r.strain != null && Number.isFinite(r.strain)) ? r.strain : null,
