@@ -22,13 +22,16 @@ import {
   sessions, nextUp, trainStats, trainGrid,
 } from '../store.js';
 import {
-  GROUPS, GROUP_LABEL, coverage, sessionLoad, loadMismatch,
+  GROUPS, GROUP_LABEL, coverage,
 } from '../data/workouts.js';
 import {
   EXERCISES, exerciseById, exercisesFor, setsByGroup, volumeBand, bandVerdict,
   EFFORT, effortById,
 } from '../data/exercises.js';
 import { rowsFor, healthSource, bandName } from '../applehealth.js';
+import { strainBaseline, sessionIntensity, disagreement } from '../intensity.js';
+import { planVsActual } from '../nutrition.js';
+import { dualLine } from '../charts.js';
 
 export function renderTrain(root, ctx) {
   const s = get();
@@ -41,8 +44,10 @@ export function renderTrain(root, ctx) {
       el('h1', {}, 'Train'),
       el('button.btn.sm.ghost', { onclick: () => openRotation(ctx) }, 'My split')),
     todayCard(s, key, ctx),
+    intensityTile(s, ctx),
     historyTile(ctx),
     coverageTile(ctx),
+    senseTile(s),
   );
 }
 
@@ -62,8 +67,10 @@ function todayCard(s, key, ctx) {
 
   if (done) {
     const t = typeById(done.type);
-    const load = sessionLoad(done);
-    const mism = loadMismatch(load);
+    const base = strainBaseline(rowsFor(s, 'all'));
+    const planned = (t?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null;
+    const inten = sessionIntensity(done, { baseline: base, plannedSets: planned });
+    const dis = disagreement(inten);
     return el('div.tile.train-done', {},
       el('div.between', {},
         el('div.flex', {}, icon('check', 18), el('h3', {}, t?.name || 'Session')),
@@ -76,13 +83,35 @@ function todayCard(s, key, ctx) {
          done.source === 'manual' ? null : `confirmed from ${done.source === 'apple' ? 'Apple Health' : 'Whoop'}`,
         ].filter(Boolean).join(' · ')),
       done.note ? el('div.fine', { style: { marginTop: '3px' } }, done.note) : null,
-      mism ? el('div.note.info', { style: { marginTop: '10px' } }, el('div', {},
-        mism === 'sets-high'
-          ? 'You logged a lot of work, but your day was an easy one by the strap. '
-            + 'Either the sets were lighter than they felt, or the session was short '
-            + 'enough not to move the day.'
-          : 'Your strap saw a hard day and the log has very little in it. Worth adding '
-            + 'the rest before you forget it — this is the number the coverage below reads.'))
+
+      /* Today's reading, in the card for today, rather than only as one
+         bar in a chart further down. */
+      inten.score != null ? el('div.today-inten', {},
+        el('div.between', {},
+          el('span.micro', {}, 'Intensity'),
+          el('span.inten-label', {}, inten.label)),
+        el('div.inten-bar', {},
+          el('i', { style: { width: Math.round(inten.score * 100) + '%' } })),
+        el('div.fine', { style: { marginTop: '6px' } },
+          inten.parts.map(p => p.why).filter(Boolean).join(' · ')
+          || `from ${inten.sources} source${inten.sources === 1 ? '' : 's'}`)) : null,
+
+      dis ? el('div.note.info', { style: { marginTop: '10px' } }, el('div', {},
+        dis.high === 'sets' && dis.low === 'strap'
+          ? 'A lot of sets, but the day barely moved your strap compared with your usual. '
+            + 'Either they were lighter than they felt, or the session was short enough '
+            + 'not to register across the whole day.'
+        : dis.high === 'strap' && dis.low === 'sets'
+          ? 'Your strap saw a much bigger day than the log accounts for. Either there is '
+            + 'work missing from it, or something outside the gym was hard today.'
+        : dis.high === 'you' && dis.low === 'strap'
+          ? 'It felt hard, and the day did not read as hard on your strap. A short, brutal '
+            + 'session does that — the strap measures the whole day, not the hour.'
+        : dis.high === 'strap' && dis.low === 'you'
+          ? 'Your strap saw a heavy day and you rated it easy. Worth knowing which one you '
+            + 'trust before you plan tomorrow.'
+        : 'The sets and how it felt do not quite agree. Neither is wrong — they measure '
+          + 'different things.'))
         : null);
   }
 
@@ -150,6 +179,159 @@ function planLine(t) {
 const groupLine = t => !t ? 'Log whatever you did.'
   : t.cardio || !t.groups?.length ? 'Cardio — tracked, but it does not count towards muscle coverage.'
   : t.groups.map(g => GROUP_LABEL[g] || g).join(' · ');
+
+
+/*
+ * How hard you have been training, session by session.
+ *
+ * The pieces existed and were only ever shown one at a time — a strain
+ * number here, a set count there, an effort word on the day it happened.
+ * None of them answers the question that matters, which is whether the
+ * last fortnight was actually harder or easier than the one before.
+ *
+ * Each bar is one session. Height is the composite; colour is what you
+ * said it felt like, where you said. Every part that fed a bar is on the
+ * bar's own tooltip, because a single unexplained score is a number to
+ * distrust.
+ */
+function intensityTile(s, ctx) {
+  const list = sessions(56);
+  if (list.length < 2) return null;
+
+  const base = strainBaseline(rowsFor(s, 'all'));
+  const scored = list.map(sess => {
+    const t = typeById(sess.type);
+    const planned = (t?.plan || []).reduce((a, x) => a + (x.sets || 0), 0) || null;
+    const i = sessionIntensity(sess, { baseline: base, plannedSets: planned });
+    return { sess, t, i };
+  }).filter(x => x.i.score != null);
+
+  if (scored.length < 2) {
+    return el('div.tile', {},
+      el('div.tile-head', {}, el('h3', {}, 'Intensity')),
+      el('div.fine', {},
+        'Log sets, or how a session felt, and this fills in. With a strap connected it '
+        + 'also reads your strain against your own average, which is the only way that '
+        + 'number means anything.'));
+  }
+
+  const recent = scored.slice(-16);
+  const mean = recent.reduce((a, x) => a + x.i.score, 0) / recent.length;
+  const half = Math.floor(recent.length / 2);
+  const older = recent.slice(0, half).reduce((a, x) => a + x.i.score, 0) / Math.max(1, half);
+  const newer = recent.slice(half).reduce((a, x) => a + x.i.score, 0) / Math.max(1, recent.length - half);
+  const drift = newer - older;
+
+  return el('div.tile', {},
+    el('div.tile-head', {},
+      el('h3', {}, 'Intensity'),
+      el('span.micro', {}, `${recent.length} sessions`)),
+
+    el('div.inten-chart', {}, ...recent.map(({ sess, t, i }) => {
+      const why = [t?.name || 'Session', sess.date,
+        ...i.parts.map(p => p.why).filter(Boolean)].join(' · ');
+      return el('span.inten-col', { title: why },
+        el('i' + (sess.effort ? '.eff-' + sess.effort : ''),
+          { style: { height: Math.max(6, Math.round(i.score * 100)) + '%' } }));
+    })),
+
+    el('div.inten-key', {},
+      ...['easy', 'solid', 'hard', 'max'].map(k =>
+        el('span.micro', {}, el('i.eff-' + k), EFFORT.find(e => e.id === k).label)),
+      el('span.micro', {}, el('i'), 'not rated')),
+
+    el('div.fine', { style: { marginTop: '10px' } },
+      `Average ${labelOf(mean)}. `
+      + (Math.abs(drift) < 0.08
+          ? 'Steady across the window.'
+          : drift > 0
+            ? 'The recent half has been harder than the half before it.'
+            : 'The recent half has been easier than the half before it.')
+      + (base ? ` Strain is read against your own average of ${base.mean}.`
+              : ' Connect a strap and strain joins this too.')));
+}
+
+const labelOf = v => v >= 0.82 ? 'very hard' : v >= 0.62 ? 'hard'
+  : v >= 0.4 ? 'moderate' : v >= 0.22 ? 'light' : 'very light';
+
+/*
+ * Does the whole picture hold together?
+ *
+ * Training, food and the scale are three separate records that are only
+ * worth anything read against each other. Training hard and eating in a
+ * deficit while the scale does not move means one of those three is not
+ * what it claims — and knowing which one is the entire point of keeping
+ * all three.
+ *
+ * This says what the three records jointly support, and refuses to say
+ * anything when one of them is missing. A verdict from two out of three
+ * would be a guess wearing the clothes of a finding.
+ */
+function senseTile(s) {
+  const st = trainStats(28);
+  const pv = planVsActual(s);
+  if (!st.sessions) return null;
+
+  if (!pv.ready) {
+    return el('div.tile', {},
+      el('div.tile-head', {}, el('h3', {}, 'Is it working?')),
+      el('div.fine', {},
+        `You have trained ${st.sessions} time${st.sessions === 1 ? '' : 's'} in four weeks. `
+        + 'To say whether it is working, this also needs your food logged and a few '
+        + 'weigh-ins — training on its own cannot tell you whether you are gaining or '
+        + 'losing, only that you turned up.'));
+  }
+
+  const gap = pv.gapKg ?? 0;
+  const cutting = (s.profile?.rate ?? 0) < -0.05;
+  const gaining = (s.profile?.rate ?? 0) > 0.05;
+  const consistent = st.perWeek >= 2.5;
+  const onPlan = Math.abs(gap) < 0.5;
+
+  let head, body;
+  if (onPlan && consistent) {
+    head = 'It holds together.';
+    body = `Training ${st.perWeek} times a week, and your weight is doing what your food `
+         + 'log says it should. All three records agree, which is the only state in which '
+         + 'any of them can be trusted.';
+  } else if (onPlan && !consistent) {
+    head = 'The food side is honest; the training is thin.';
+    body = `Your weight is tracking your log closely, so the eating is being recorded `
+         + `properly. But ${st.perWeek} sessions a week is not much stimulus — in a `
+         + (cutting ? 'deficit that is how weight comes off muscle as well as fat.'
+                    : 'surplus that is how the gain ends up being mostly fat.');
+  } else if (gap > 0) {
+    head = consistent ? 'You are training. The food is not adding up.'
+                      : 'Neither side is quite holding.';
+    body = `You are ${Math.abs(gap).toFixed(1)} kg heavier than your log predicts. `
+         + (cutting
+             ? 'Food is going unlogged, or maintenance is set too high — the training is '
+               + 'not the problem here.'
+             : 'If you are gaining deliberately, this is faster than planned rather than wrong.');
+  } else {
+    head = 'You are losing faster than the plan.';
+    body = `You are ${Math.abs(gap).toFixed(1)} kg lighter than your log predicts. `
+         + (consistent
+             ? 'With this much training that is a real risk to muscle — maintenance is '
+               + 'probably set too low, which makes your target stricter than it needs to be.'
+             : 'Maintenance is probably set too low.');
+  }
+
+  return el('div.tile', {},
+    el('div.tile-head', {}, el('h3', {}, 'Is it working?')),
+    el('div.sense-rows', {},
+      senseRow('Training', `${st.perWeek}/week`, consistent),
+      senseRow('Food logged', `${pv.have.loggedDays} days`, pv.have.loggedDays >= 14),
+      senseRow('Weight vs log', `${gap >= 0 ? '+' : ''}${gap.toFixed(1)} kg`, onPlan)),
+    el('div.note' + (onPlan && consistent ? '' : '.info'), {},
+      el('div', {}, el('b', {}, head), ' ', body)));
+}
+
+const senseRow = (name, value, ok) => el('div.sense-row', {},
+  el('span.sense-dot' + (ok ? '.is-ok' : '')),
+  el('span.grow', {}, name),
+  el('span.sense-val', {}, value));
+
 
 /* ── Four weeks, and a year behind it ───────────────────────────────── */
 
@@ -298,11 +480,19 @@ function openRotation(ctx) {
          of it to the rotation, which is not a place anyone would look. */
       body.append(el('div.row', {},
         el('span.rot-n', {}, String(i + 1)),
+        /* The chevron used to sit inside .title, which is clipped with an
+           ellipsis — so the one thing signalling "this opens" was the
+           first thing cut off, and the tap target was the text alone
+           rather than the row. Both fixed: the button fills the row's
+           height and carries its own chevron outside the clipping. */
         el('button.row-main.grow', {
+          'aria-label': `Edit ${t?.name || 'workout'}`,
           onclick: () => t && openTypeEditor(t, () => { draw(); ctx.refresh(); }),
         },
-          el('div.title', {}, t?.name || 'Deleted workout', icon('chevron', 12)),
-          el('div.sub', {}, planLine(t))),
+          el('span.rm-text', {},
+            el('div.title', {}, t?.name || 'Deleted workout'),
+            el('div.sub', {}, planLine(t))),
+          icon('chevron', 14)),
         el('button.btn.sm.ghost', {
           disabled: i === 0, 'aria-label': 'Move up',
           onclick: () => { const n = rot.slice(); [n[i - 1], n[i]] = [n[i], n[i - 1]];

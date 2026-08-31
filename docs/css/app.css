@@ -2794,7 +2794,17 @@ button.src-tag { cursor: pointer; }
   display: grid; place-items: center;
   font-family: var(--cond), var(--sans); font-size: 12px; font-variant-numeric: tabular-nums;
 }
-.row-main { text-align: left; background: none; border: 0; color: inherit; cursor: pointer; padding: 0; }
+/* A button that fills its row rather than hugging its text — the whole
+   row is the target, which is what a chevron on the right promises. */
+.row-main {
+  display: flex; align-items: center; gap: 10px;
+  text-align: left; background: none; border: 0; color: inherit;
+  cursor: pointer; min-width: 0;
+  padding: 11px 0; margin: -11px 0;
+}
+.row-main .rm-text { flex: 1; min-width: 0; }
+.row-main > svg { flex: none; color: var(--dim); }
+.row-main:active { opacity: .55; }
 
 .ex-list { display: grid; gap: 6px; }
 .ex-row { display: grid; grid-template-columns: 1fr 62px 92px auto; gap: 6px; align-items: center; }
@@ -2829,3 +2839,37 @@ button.src-tag { cursor: pointer; }
 .vol-fill.is-in { background: var(--good); }
 .vol-fill.is-over { background: var(--caution); }
 .vol-fill.is-high { background: var(--warn); }
+
+/* Intensity: one bar per session, coloured by what you said it felt like. */
+.today-inten { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
+.inten-label { font-size: 13px; color: var(--accent); text-transform: lowercase; }
+.inten-bar { height: 8px; border-radius: 99px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
+.inten-bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
+
+.inten-chart {
+  display: flex; align-items: flex-end; gap: 4px;
+  height: 96px; padding: 4px 0;
+}
+.inten-col { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 0; }
+.inten-col i { display: block; width: 100%; border-radius: 3px; background: var(--line-2); }
+.inten-col i.eff-easy  { background: var(--m-water); }
+.inten-col i.eff-solid { background: var(--accent); }
+.inten-col i.eff-hard  { background: var(--m-c); }
+.inten-col i.eff-max   { background: var(--warn); }
+
+.inten-key { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 9px; }
+.inten-key i {
+  display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+  margin-right: 5px; vertical-align: middle; background: var(--line-2);
+}
+.inten-key i.eff-easy  { background: var(--m-water); }
+.inten-key i.eff-solid { background: var(--accent); }
+.inten-key i.eff-hard  { background: var(--m-c); }
+.inten-key i.eff-max   { background: var(--warn); }
+
+/* Three records, and whether each is holding up its end. */
+.sense-rows { display: grid; gap: 8px; margin-bottom: 12px; }
+.sense-row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.sense-dot { flex: none; width: 9px; height: 9px; border-radius: 99px; background: var(--caution); }
+.sense-dot.is-ok { background: var(--good); }
+.sense-val { font-family: var(--mono); font-size: 12.5px; color: var(--text-2); }
