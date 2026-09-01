@@ -1313,7 +1313,20 @@ body::before {
   position: fixed; inset: 0; z-index: -1;
   background: var(--ambient, none), var(--bg);
 }
-body { background: var(--bg); }
+/*
+ * Transparent, so the layer above can be seen.
+ *
+ * When the ambient wash was removed I gave body a solid background as the
+ * new flat ground — which paints over the fixed ::before sitting at
+ * z-index -1. The ground looked right, because ::before paints the same
+ * colour, and it stayed looking right when an orb was chosen: the
+ * gradient was there in the computed style and buried under a sheet of
+ * opaque black. That is why picking a colour appeared to do nothing.
+ *
+ * html carries the ground colour for overscroll; the wash goes on the
+ * layer, and body gets out of its way.
+ */
+body { background: transparent; }
 
 /*
  * The optional wash. Off by default — `--orb` is only ever set when
