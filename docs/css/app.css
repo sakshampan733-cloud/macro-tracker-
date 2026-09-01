@@ -3091,13 +3091,30 @@ button.src-tag { cursor: pointer; }
   display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: pointer;
 }
 .theme-opt[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/*
+ * The swatch keeps the implementation further up this file.
+ *
+ * When the theme picker came back I wrote a second, cruder set of swatch
+ * rules down here without noticing the considered ones already above —
+ * and the System swatch is not a gradient there, it is two elements inside
+ * a clipped box, precisely because a hard stop on a diagonal rasterises
+ * badly. My duplicate overrode the background but left those pseudo halves
+ * in place, and left them without the `position: relative` that contains
+ * them. An absolutely-positioned `::before` with `left: 50%` and no
+ * positioned ancestor resolves against the viewport: a white band down the
+ * right half of the screen, over whatever happened to be there.
+ *
+ * That is the "distortion" — not a card, not a blur, a pseudo-element that
+ * had lost its containing block.
+ */
 .theme-swatch {
   width: 100%; height: 30px; border-radius: 7px;
   border: 1px solid var(--line); background-clip: padding-box;
+  /* Belt and braces: nothing inside a swatch may ever escape it again. */
+  position: relative; overflow: hidden;
 }
 .theme-swatch.dark  { background: linear-gradient(140deg, #000, #1C1C1E); }
 .theme-swatch.light { background: linear-gradient(140deg, #fff, #E9E9EE); }
-.theme-swatch.auto  { background: linear-gradient(100deg, #000 0 50%, #fff 50% 100%); }
 .inten-label.is-easy { color: var(--ring-stand); }
 .inten-label.is-mid  { color: var(--good-ink); }
 .inten-label.is-hard { color: var(--ring-move); }
@@ -3125,3 +3142,59 @@ button.src-tag { cursor: pointer; }
   color: inherit; cursor: pointer;
 }
 .today-inten .micro svg { vertical-align: -1px; color: var(--dim); }
+
+/*
+ * Blur, only where there is something behind to blur.
+ *
+ * A white rectangle kept appearing over part of a card — not an element,
+ * nothing in the DOM at those coordinates, computed styles all normal.
+ * That is a compositing fault, not a layout one, and the cause was volume:
+ * every .tile and every .set-group carried
+ * `backdrop-filter: saturate(185%) blur(30px)`, so the Settings screen
+ * alone stacked nine large blurred layers. Past some count WebKit stops
+ * producing a blurred tile and hands back a blank one, which paints as
+ * that white block — on a phone and in a desktop renderer alike.
+ *
+ * It also buys nothing now. The blur existed so glass had something to
+ * refract, and the ground has been flat black since the ambient wash was
+ * removed; blurring one flat colour returns that colour. So with no orb —
+ * the default — the surfaces are painted instead of blurred. Identical to
+ * look at, and the whole class of fault is gone. Switch an orb on and the
+ * glass comes back, because then there is genuinely something behind it.
+ */
+:root[data-orb="none"] .tile,
+:root[data-orb="none"] .tile-hero,
+:root[data-orb="none"] .tile-field,
+:root[data-orb="none"] .set-group,
+:root[data-orb="none"] .ah-card,
+:root[data-orb="none"] .wit,
+:root[data-orb="none"] .tabs,
+:root[data-orb="none"] .sheet,
+:root[data-orb="none"] .topbar,
+:root[data-orb="none"] .sticky-glass,
+:root[data-orb="none"] .scrim,
+:root[data-orb="none"] .food-cell,
+:root[data-orb="none"] .chip,
+:root[data-orb="none"] .row {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root[data-orb="none"] .tabs,
+:root[data-orb="none"] .topbar,
+:root[data-orb="none"] .sticky-glass { background: var(--glass-solid); }
+:root[data-orb="none"] .sheet { background: var(--surface); }
+:root[data-orb="none"] .scrim { background: rgba(0, 0, 0, .62); }
+
+/*
+ * And a ceiling for when an orb IS on: one blur budget for the whole app
+ * rather than each surface inventing its own, so the layer count stays
+ * somewhere a compositor can actually service.
+ */
+.tile, .tile-hero, .tile-field, .set-group, .ah-card {
+  backdrop-filter: saturate(140%) blur(16px);
+  -webkit-backdrop-filter: saturate(140%) blur(16px);
+}
+.tabs, .sheet, .topbar, .sticky-glass {
+  backdrop-filter: saturate(150%) blur(20px);
+  -webkit-backdrop-filter: saturate(150%) blur(20px);
+}
