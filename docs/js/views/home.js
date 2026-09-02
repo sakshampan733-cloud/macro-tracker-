@@ -107,22 +107,20 @@ export function renderHome(root, ctx) {
  * dismiss that lasts until tomorrow.
  */
 /*
- * "Weigh in" — once, in the morning.
+ * "Worth weighing in" — when it would actually change something.
  *
- * Logging a weight is four taps from here otherwise, and the one morning
- * you forget is the one that leaves a hole in the trend. It asks on the
- * screen you are already on and takes the number inline, because sending
- * someone to another tab to type one figure is how a daily habit stops
- * being daily.
+ * Not a daily prompt. It appears when the app can point at something it
+ * cannot compute, or is computing worse, for want of a weight — and it
+ * says which, because "weigh yourself" is an instruction and "your
+ * maintenance figure needs four readings and has two" is a reason.
  *
- * It never appears in the afternoon. A weight taken then is not a late
- * version of the morning one — it is a different measurement, and asking
- * for it would put exactly the noise into the trend that weighing at a
- * fixed time exists to keep out.
+ * Somebody weighing most mornings never sees it. That is the whole design:
+ * a reminder that fires when nothing is wrong teaches you to ignore it.
  */
 function weighAsk(key, ctx) {
   if (key !== dayKey()) return null;
-  if (!weighInDue()) return null;
+  const due = weighInDue();
+  if (!due) return null;
 
   const s = get();
   const wu = weightUnit(s);
@@ -144,19 +142,27 @@ function weighAsk(key, ctx) {
     ctx.refresh();
   };
 
+  /* Comparability still matters, so it is said — but as a note on how to
+     take the reading, not as a reason to wait for tomorrow. */
+  const hour = new Date().getHours();
+  const note = hour >= 4 && hour < 11
+    ? 'Now is a good time — before eating or drinking is the reading that compares.'
+    : 'Take it first thing tomorrow if you can. Morning readings are the comparable ones; '
+      + 'evening runs a kilo or two higher and by a different amount each day.';
+
   return el('div.tile.ask-card', {},
-    el('div.flex', {}, icon('body', 17), el('h3', {}, 'Weigh in')),
-    el('div.fine', { style: { marginTop: '5px' } },
-      'First thing, after the toilet, before drinking. That is the one that is comparable '
-      + 'to the others.'),
+    el('div.flex', {}, icon('body', 17), el('h3', {}, 'Worth weighing in')),
+    el('div.fine', { style: { marginTop: '5px' } }, due.line),
+    el('div.fine', { style: { marginTop: '5px' } }, note),
     el('div.flex', { style: { marginTop: '12px', gap: '8px' } },
       input,
       el('button.btn.confirm', { style: { flex: 'none' }, onclick: save }, 'Log'),
       el('button.btn.ghost', { style: { flex: 'none' },
         onclick: () => { commit(st => { st.settings.weighAsked = key; }, 'settings');
           haptic('tap'); ctx.refresh(); },
-      }, 'Not today')));
+      }, 'Later')));
 }
+
 
 function workoutAsk(key, ctx) {
   const s = get();

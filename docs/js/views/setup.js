@@ -440,40 +440,31 @@ export function renderSettings(root, ctx) {
       el('div.tile', {},
         el('div.between', {},
           el('div', { style: { flex: '1', paddingRight: '12px' } },
-            el('div', { style: { fontWeight: '500' } }, 'Morning reminder'),
+            el('div', { style: { fontWeight: '500' } }, 'Ask when it matters'),
             el('div.fine', { style: { marginTop: '3px' } },
               s.settings?.weighReminder === false
-                ? 'Off. Nothing will ask, and the trend gets whatever you happen to log.'
-                : 'On. Asks once each morning, half an hour after you usually wake, and only '
-                  + 'on a day with nothing logged.')),
+                ? 'Off. Nothing will ask, and the trend and your maintenance figure get '
+                  + 'whatever you happen to log.'
+                : 'On. Nothing daily — it speaks up only when a missing weight is actually '
+                  + 'costing something, and says which thing.')),
           el('button.btn.sm', {
             onclick: () => {
               commit(st => { st.settings.weighReminder = st.settings.weighReminder === false; }, 'settings');
               ctx.refresh();
             },
           }, s.settings?.weighReminder === false ? 'Turn on' : 'Turn off')),
-        /*
-         * The cadence question, answered once, here.
-         *
-         * People ask whether to weigh weekly or monthly to avoid noise.
-         * It is the wrong lever: a single reading is noisy whenever you
-         * take it, and taking fewer of them does not make any one of them
-         * cleaner — it just leaves the noise in, with nothing to average
-         * it against.
-         */
+
         el('div.fine', { style: { marginTop: '14px' } },
-          'Daily is best, and it is not close. One weight is a noisy number whatever day '
-          + 'you take it — food, water and salt move it a kilo either way. The ten-day '
-          + 'trend is what removes that, and a trend needs points: weighing weekly leaves '
-          + 'you comparing single noisy readings, while weighing most mornings lets the '
-          + 'average do the work. It is also what tightens the ± on your maintenance '
-          + 'figure, which is calculated from exactly these readings.'),
+          'It asks when your maintenance figure has fewer than the four weigh-ins a month '
+          + 'it needs, when a week has passed and the ten-day trend has gone stale, or when '
+          + 'a thin month is leaving the ± wider than it has to be. Weigh most mornings and '
+          + 'you will never see it, which is the point — a reminder that fires when nothing '
+          + 'is wrong is one you learn to ignore.'),
         el('div.fine', { style: { marginTop: '8px' } },
-          'Morning only. Evening weight runs a kilo or two higher — gut contents, glycogen '
-          + 'and the water bound to it, salt — and by a different amount each day, so it is '
-          + 'not a fixed offset that could be corrected for. Mixing the two measures your '
-          + 'dinner. Anything logged outside the morning is marked rather than quietly '
-          + 'averaged in.'))),
+          'Morning readings are the comparable ones. Evening weight runs a kilo or two '
+          + 'higher — gut contents, glycogen and the water bound to it, salt — and by a '
+          + 'different amount each day, so it is not an offset that could be corrected for. '
+          + 'Anything logged outside the morning is marked rather than quietly averaged in.'))),
 
     /*
      * When you train, which is the only thing the app needs in order to

@@ -19,7 +19,7 @@
  * marked. Never an instruction to take it.
  */
 
-import { get, dayKey, doseLog, sessionFor, wasNotified, markNotified, peekDay } from './store.js';
+import { get, dayKey, shiftDay, doseLog, sessionFor, wasNotified, markNotified, peekDay } from './store.js';
 import { rowsFor, healthSource, bandName } from './applehealth.js';
 
 /*
@@ -58,41 +58,98 @@ async function show(title, body, tag) {
 
 
 /*
- * Time to weigh in.
+ * When a weigh-in would actually change something.
  *
- * A weight is only worth anything next to weights taken the same way, and
- * the way that removes the most noise is first thing: after the toilet,
- * before drinking, before eating. Everything else — gut contents,
- * glycogen and its water, sodium — moves a kilo or two and moves by a
- * different amount every day, which is why an evening weight is not a
- * second reading of the same quantity and cannot be averaged with a
- * morning one to get something better than either.
+ * The first attempt at this asked every morning, which is a nag rather
+ * than a feature: somebody weighing daily does not need telling, and
+ * somebody who is not gets the same message every day until they start
+ * ignoring the app entirely.
  *
- * So there is one reminder, in the morning, and it only appears on a day
- * with nothing logged. It uses the wake time the app already knows —
- * measured by a band, or the sleep schedule for anyone without one — and
- * falls back to seven o'clock rather than inventing a number.
+ * The useful question is not "has it been a day" but "is the absence of a
+ * weight now costing something", and the app can answer that precisely,
+ * because it knows what it is unable to compute without one. Maintenance
+ * is back-calculated from weigh-ins and needs four in the window before it
+ * will say anything at all; past that, each one narrows the ± it reports.
+ * And the trend is a ten-day average, so a week's gap leaves it describing
+ * a body from last week.
+ *
+ * So this fires on those thresholds and says which one was crossed. If you
+ * weigh most days it never fires, which is correct — there is nothing to
+ * tell you.
  */
 export function weighInDue(now = new Date()) {
   const s = get();
   if (!s.profile) return null;
+  if (s.settings?.weighReminder === false) return null;
   const key = dayKey();
   if (peekDay(key).weight) return null;
   if (s.settings?.weighAsked === key) return null;
-  if (s.settings?.weighReminder === false) return null;
 
-  /* Their own waking hour, from whichever source knows it. */
-  const rows = Object.entries(s.whoop?.rows || {}).sort().slice(-14);
-  const wakes = rows.map(([, r]) => r.wakeHour).filter(h => h != null);
-  const fromBand = wakes.length
-    ? wakes.reduce((a, b) => a + b, 0) / wakes.length : null;
-  const wake = fromBand ?? s.settings?.sleepGoal?.wake ?? 7;
+  const days = Object.entries(s.days || {})
+    .filter(([, d]) => d.weight > 0)
+    .map(([date]) => date)
+    .sort();
+  const last = days[days.length - 1] || null;
+  const since = last
+    ? Math.round((new Date(key + 'T12:00:00') - new Date(last + 'T12:00:00')) / 86400000)
+    : null;
 
-  const hour = now.getHours() + now.getMinutes() / 60;
-  /* Half an hour after waking, and never past the morning window — a
-     prompt at four in the afternoon is asking for the wrong measurement. */
-  if (hour < wake + 0.5 || hour >= 11) return null;
-  return { wake: +wake.toFixed(2) };
+  /* Weigh-ins inside the window maintenance is calculated over. */
+  const from = shiftDay(key, -27);
+  const inWindow = days.filter(d => d >= from).length;
+
+  /* Never weighed. Nothing else in the app can start without this one. */
+  if (!last) {
+    return { reason: 'first', since: null, inWindow: 0,
+      line: 'Your first weigh-in is what starts the trend and lets the app work out your '
+          + 'real maintenance calories. Nothing else can be calculated without it.' };
+  }
+
+  /*
+   * Days you logged food and the app could do nothing with them.
+   *
+   * This is the real cost, and it is the one worth naming. Intake on its
+   * own says what you ate; it takes a weight to turn that into whether it
+   * is working. Every logged day since the last weigh-in is a day of good
+   * data the app is holding and cannot answer the question with — so the
+   * count of those, not the calendar, is what should trigger asking.
+   */
+  const loggedSince = Object.entries(s.days || {})
+    .filter(([d, day]) => d > last && d <= key && (day.entries || []).length >= 2)
+    .length;
+
+  if (loggedSince >= 5) {
+    return { reason: 'unmatched', since, inWindow, loggedSince,
+      line: `You have logged ${loggedSince} days of food since your last weigh-in. The app `
+          + 'can say what you ate, but it takes a weight to say whether it is working — '
+          + 'that is the whole comparison.' };
+  }
+
+  /* Not enough for a maintenance figure at all. */
+  if (inWindow < 4 && since >= 2) {
+    return { reason: 'short', since, inWindow,
+      line: `Your maintenance figure needs four weigh-ins in a month and has ${inWindow}. `
+          + `Last one was ${since} days ago — one more moves this along.` };
+  }
+
+  /* The trend is a ten-day average; a week without a reading makes it a
+     description of last week. */
+  if (since >= 7) {
+    return { reason: 'stale', since, inWindow,
+      line: `It has been ${since} days. Your trend weight is a ten-day average, so right `
+          + 'now it is describing where you were rather than where you are.' };
+  }
+
+  /* Enough to compute, thin enough that the error bar is wider than it
+     needs to be. Asked once at five days rather than every morning. */
+  if (inWindow < 10 && since >= 5) {
+    return { reason: 'thin', since, inWindow,
+      line: `${inWindow} weigh-ins this month, and ${since} days since the last. Each one `
+          + 'narrows the ± on your maintenance calories — this is the cheapest accuracy '
+          + 'in the app.' };
+  }
+
+  return null;
 }
 
 /*
@@ -203,13 +260,19 @@ export function startReminders() {
       }
     }
 
-    /* The morning weigh-in, on the same terms as everything else here. */
+    /*
+     * A weigh-in, when one would change something.
+     *
+     * No notification for the "thin" case — a wider error bar is worth a
+     * card on screen and not worth an alert. The two that genuinely stop
+     * the app working get one.
+     */
+    const due = weighInDue(now);
     const stampWeigh = `weigh@${key}`;
-    if (document.visibilityState !== 'visible' && !wasNotified(stampWeigh) && weighInDue(now)) {
+    if (due && due.reason !== 'thin'
+        && document.visibilityState !== 'visible' && !wasNotified(stampWeigh)) {
       markNotified(stampWeigh);
-      await show('Time to weigh in',
-        'First thing, after the toilet, before drinking — that is the one that is comparable.',
-        stampWeigh);
+      await show('Worth weighing in', due.line, stampWeigh);
     }
 
     if (!get().medications?.length) return;
