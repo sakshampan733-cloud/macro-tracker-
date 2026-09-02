@@ -16,6 +16,7 @@ import {
 } from '../whoop.js';
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict, planVsActual } from '../nutrition.js';
 import { trainStats } from '../store.js';
+import { stepReport, stepTarget, stepsWorth, suggestedTarget } from '../steps.js';
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import {
@@ -46,6 +47,7 @@ export function renderBody(root, ctx) {
     sourceBar(s, ctx) || el('div'),
     vitalsSection(s, ctx) || el('div'),
     senseTile(s, ctx) || el('div'),
+    stepsTile(s, ctx) || el('div'),
     checkInTile(s, ctx),
     weightTile(ctx),
     tdeeTile(s),
@@ -54,6 +56,115 @@ export function renderBody(root, ctx) {
     correlationTile(s),
   );
 }
+
+
+/*
+ * Steps, treated as a lever rather than a statistic.
+ *
+ * The number was already on this screen in a card the size of a stamp,
+ * alongside blood oxygen — which files it as something that happens to
+ * you. It is the opposite: it is the one part of the burn that answers to
+ * a decision. Metabolism does not, and training is a few hours a week
+ * against sixteen waking hours a day.
+ *
+ * Days hit rather than an average, because the average hides the shape.
+ * Twelve thousand on Saturday does not undo four days of two thousand, and
+ * it was the four days the deficit noticed.
+ */
+function stepsTile(s, ctx) {
+  const r = stepReport(14);
+  if (!r.target && !r.series.length) return null;
+
+  if (!r.ready) {
+    return el('div.tile', {},
+      el('div.tile-head', {}, el('h3', {}, 'Steps')),
+      el('div.fine', {},
+        'A few more days of step counts and this can show you where the week is '
+        + 'actually being won or lost.'));
+  }
+
+  const worth = stepsWorth(r.mean, s.profile?.weightKg);
+  const pct = r.target ? Math.min(100, Math.round((r.median / r.target) * 100)) : null;
+
+  return el('div.tile', {},
+    el('div.tile-head', {},
+      el('h3', {}, 'Steps'),
+      el('button.btn.sm.ghost', { onclick: () => openStepTarget(ctx) },
+        r.target ? `target ${r.target.toLocaleString()}` : 'set a target')),
+
+    el('div.between', { style: { marginBottom: '10px' } },
+      el('div', {},
+        el('div.micro', {}, r.today != null ? 'Today' : 'Typical day'),
+        el('div.num', { style: { fontSize: '26px', marginTop: '2px' } },
+          (r.today != null ? r.today : r.median).toLocaleString())),
+      el('div', { style: { textAlign: 'right' } },
+        el('div.micro', {}, `Hit the target`),
+        el('div.num', { style: { fontSize: '18px', marginTop: '2px',
+          color: r.hit >= r.days * 0.6 ? 'var(--good-ink)' : 'var(--caution)' } },
+          `${r.hit} of ${r.days} days`))),
+
+    /* One bar a day, against the target line, so a bad run is visible as a
+       run rather than as a lower average. */
+    el('div.step-bars', {},
+      ...r.series.map(d => {
+        const h = r.target ? Math.min(100, (d.steps / r.target) * 100) : 50;
+        return el('span.step-col', { title: `${d.date}: ${d.steps.toLocaleString()}` },
+          el('i' + (r.target && d.steps >= r.target ? '.is-hit' : ''),
+            { style: { height: Math.max(4, h) + '%' } }));
+      })),
+    r.target ? el('div.step-line', {}, el('span.micro', {}, `target ${r.target.toLocaleString()}`)) : null,
+
+    el('div.fine', { style: { marginTop: '10px' } },
+      `Typical day ${r.median.toLocaleString()} steps.`
+      + (worth ? ` Roughly ${worth.lo}–${worth.hi} kcal of walking — which is already inside `
+                 + 'the burn your band reports, not on top of it.' : '')),
+
+    r.worst.length && r.target ? el('div.fine', { style: { marginTop: '6px' } },
+      `Lowest days: ${r.worst.map(d => d.steps.toLocaleString()).join(', ')}. `
+      + 'The week is usually lost on those rather than won on the big ones.') : null);
+}
+
+function openStepTarget(ctx) {
+  const cur = stepTarget();
+  const sugg = suggestedTarget();
+  const input = el('input.num-in', {
+    type: 'number', inputmode: 'numeric', step: '500', min: '1000', max: '40000',
+    value: cur || '',
+    placeholder: sugg ? String(sugg) : '8000',
+  });
+  const sh = sheet({
+    title: 'Step target',
+    body: el('div', {},
+      el('div.fine', { style: { marginBottom: '12px' } },
+        sugg
+          ? `Suggested: ${sugg.toLocaleString()} — the middle of your own last four weeks, `
+            + 'nudged up. A target set above anything you have ever done is one you learn '
+            + 'to ignore.'
+          : 'Ten thousand is a figure from a 1960s pedometer advert, not a finding. Pick '
+            + 'something a little above your own normal day.'),
+      el('div.field', {}, input),
+      el('div.fine', { style: { marginTop: '10px' } },
+        'Walking is the only part of your daily burn that answers to a decision, which is '
+        + 'why it is worth a target at all. It is already counted in what your band '
+        + 'reports — this is about noticing the quiet days, not about adding calories.')),
+    foot: el('div.btn-row', {},
+      cur != null ? el('button.btn.ghost', {
+        onclick: () => { commit(st => { delete st.settings.stepTarget; }, 'settings');
+          toast('Back to the suggested target.'); sh.close(); ctx.refresh(); },
+      }, 'Use the suggestion') : null,
+      el('button.btn.primary.grow', {
+        onclick: () => {
+          const v = Math.round(+input.value);
+          if (!(v >= 1000 && v <= 40000)) { toast('Pick something between 1,000 and 40,000.', 'err'); return; }
+          commit(st => { st.settings.stepTarget = v; }, 'settings');
+          haptic('success'); toast(`Target set to ${v.toLocaleString()}.`);
+          sh.close(); ctx.refresh();
+        },
+      }, 'Save')),
+  });
+  return sh;
+}
+
 
 /* ── Check-in ───────────────────────────────────────────────────────── */
 

@@ -1288,6 +1288,55 @@ export const FOODS = [
   F('momo-chutney','Momo chutney (schezwan)','Eating out','veg','as-served','D',
     118,1.6,12,7.2,1.4,6.2,1.1,760,[['1 tbsp',18],['1 bowl',45]]),
 
+  /* The rest of the counter.
+   *
+   * A momo stall sells one dumpling a dozen ways and the difference
+   * between them is almost entirely what happens after it is filled —
+   * steamed is the dumpling, fried adds oil, kurkure adds batter and oil,
+   * tandoori adds a marinade and char, and a gravy momo arrives sitting in
+   * a sauce that weighs more than the momos do. Those are not variations
+   * on a theme; the fried one is half again the calories of the steamed.
+   */
+  F('momo-tandoori-chicken','Tandoori momos, chicken','Eating out','meat','as-served','D',
+    262,13.2,25,12.4,1.4,3.0,4.6,490,[['1 piece (~42 g)',42],['1 plate (6 pc)',252]]),
+  F('momo-tandoori-paneer','Tandoori momos, paneer','Eating out','veg','as-served','D',
+    278,10.4,26,14.6,1.6,3.2,6.6,480,[['1 piece (~42 g)',42],['1 plate (6 pc)',252]]),
+  F('momo-kurkure-chicken','Kurkure momos, chicken','Eating out','meat','as-served','D',
+    334,11.6,31,18.2,1.6,2.0,7.4,440,[['1 piece (~44 g)',44],['1 plate (6 pc)',264]]),
+  F('momo-fried-chicken','Momos, fried chicken','Eating out','meat','as-served','D',
+    298,12.4,27,16.0,1.3,1.6,6.2,410,[['1 piece (~40 g)',40],['1 plate (8 pc)',320]]),
+  F('momo-fried-paneer','Momos, fried paneer','Eating out','veg','as-served','D',
+    312,9.2,28,18.0,1.5,1.8,8.0,400,[['1 piece (~40 g)',40],['1 plate (8 pc)',320]]),
+  F('momo-chilli-veg','Chilli momos, veg','Eating out','veg','as-served','D',
+    268,6.0,32,12.8,2.0,5.4,5.2,880,
+    [['1 plate (6 pc with sauce, ~260 g)',260]],'chilly momo dry'),
+  F('momo-chilli-chicken','Chilli momos, chicken','Eating out','meat','as-served','D',
+    284,11.4,29,13.6,1.8,5.0,5.0,910,[['1 plate (6 pc with sauce, ~260 g)',260]]),
+  F('momo-gravy-veg','Gravy momos, veg','Eating out','veg','as-served','D',
+    196,5.2,22,9.6,1.9,3.8,4.0,760,
+    [['1 bowl (6 pc in gravy, ~330 g)',330]],'jhol momo soupy'),
+  F('momo-gravy-chicken','Gravy momos, chicken','Eating out','meat','as-served','D',
+    212,9.4,20,10.4,1.6,3.4,3.8,790,[['1 bowl (6 pc in gravy, ~330 g)',330]]),
+  F('momo-afghani','Afghani momos','Eating out','veg','as-served','D',
+    322,9.0,26,20.4,1.6,3.6,9.8,520,
+    [['1 piece (~44 g)',44],['1 plate (6 pc)',264]],'malai creamy momo'),
+  F('momo-cheese-corn','Cheese and corn momos','Eating out','veg','as-served','D',
+    244,8.8,30,10.2,2.2,3.0,5.4,420,[['1 piece (~38 g)',38],['1 plate (8 pc)',304]]),
+  F('momo-mushroom','Mushroom momos','Eating out','veg','as-served','D',
+    178,5.8,28,4.8,2.0,1.6,1.5,330,[['1 piece (~36 g)',36],['1 plate (8 pc)',288]]),
+  F('momo-buff','Buff momos','Eating out','meat','as-served','D',
+    214,12.0,24,7.4,1.2,1.4,3.0,400,
+    [['1 piece (~38 g)',38],['1 plate (8 pc)',304]],'buffalo nepali momo'),
+  F('momo-pork','Pork momos','Eating out','meat','as-served','D',
+    246,11.4,23,11.8,1.2,1.4,4.4,390,[['1 piece (~38 g)',38],['1 plate (8 pc)',304]]),
+  F('momo-schezwan-steam','Schezwan momos, steamed','Eating out','veg','as-served','D',
+    204,5.6,30,6.6,1.9,3.4,2.2,720,[['1 piece (~36 g)',36],['1 plate (8 pc)',288]]),
+  F('momo-soup','Momo soup','Eating out','veg','as-served','D',
+    62,2.4,8.4,2.0,0.8,1.6,0.6,540,[['1 bowl (~250 g)',250]],'thukpa broth'),
+  F('momo-mayo','Momo mayo dip','Eating out','veg','as-served','D',
+    486,1.2,6.0,50.0,0,4.4,7.6,520,[['1 tbsp',15],['1 cup dip',40]]),
+
+
   F('chilli-paneer-dry','Chilli paneer, dry','Eating out','veg','as-served','D',
     248,12.4,13,16.4,1.4,5.2,7.2,690,[['1 plate (~200 g)',200],['half plate',100]]),
   F('chilli-paneer-gravy','Chilli paneer, gravy','Eating out','veg','as-served','D',

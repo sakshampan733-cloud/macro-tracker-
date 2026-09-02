@@ -3278,3 +3278,10 @@ button.src-tag { cursor: pointer; }
 @media (max-width: 420px) {
   .readout-main { font-size: 26px !important; }
 }
+
+/* Steps: one bar a day against the target, so a bad run reads as a run. */
+.step-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; }
+.step-col { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 0; }
+.step-col i { display: block; width: 100%; border-radius: 3px; background: var(--line-2); }
+.step-col i.is-hit { background: var(--h-move); }
+.step-line { margin-top: 5px; text-align: right; }
