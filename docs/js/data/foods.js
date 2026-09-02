@@ -28,6 +28,218 @@ const F = (id, n, grp, diet, basis, grade, kcal, p, c, f, fib, sug, sat, na, ser
 
 export const FOODS = [
 
+  /* ── Chains, filled out ────────────────────────────────────────────
+   *
+   * Several brands were carrying one or two items, which is worse than
+   * carrying none: the menu opens, shows a single row, and reads as
+   * broken. These are the items people actually order, with the portion
+   * sizes the chains actually serve.
+   *
+   * Grade D throughout. Restaurant food is cooked by a person to a target
+   * rather than to a gram, and oil is the variable — the app carries that
+   * uncertainty rather than pretending a served dish is a lab sample.
+   */
+
+  /* Chaayos */
+  F('chaayos-kulhad-chai','Chaayos Kulhad Chai','Eating out','veg','as-served','D',
+    88,2.6,11.4,3.6,0,10.8,2.2,42,[['1 kulhad (150 ml)',150]],'masala tea'),
+  F('chaayos-desi-chai','Chaayos Desi Chai','Eating out','veg','as-served','D',
+    96,2.8,12.6,3.9,0,12.0,2.4,45,[['1 cup (180 ml)',180]]),
+  F('chaayos-aam-papad-chai','Chaayos Aam Papad Chai','Eating out','veg','as-served','D',
+    104,2.6,15.8,3.6,0.2,15.0,2.2,48,[['1 cup (180 ml)',180]]),
+  F('chaayos-green-tea','Chaayos Green Tea','Eating out','veg','as-served','D',
+    4,0,0.9,0,0,0,0,3,[['1 cup (200 ml)',200]]),
+  F('chaayos-maggi','Chaayos Cheese Maggi','Eating out','veg','as-served','D',
+    418,10.2,52.0,18.6,2.4,3.0,8.4,1180,[['1 bowl (~180 g)',180]]),
+  F('chaayos-veg-sandwich','Chaayos Grilled Veg Sandwich','Eating out','veg','as-served','D',
+    342,10.4,42.0,14.6,3.6,5.2,6.2,690,[['1 sandwich (~160 g)',160]]),
+  F('chaayos-samosa','Chaayos Samosa','Eating out','veg','as-served','D',
+    262,4.6,30.0,13.6,2.2,1.8,6.0,420,[['1 samosa (~85 g)',85]]),
+  F('chaayos-bun-maska','Chaayos Bun Maska','Eating out','veg','as-served','D',
+    336,6.4,42.0,15.4,1.6,6.0,9.0,420,[['1 plate (~110 g)',110]]),
+
+  /* Keventers */
+  F('keventers-classic-choc','Keventers Classic Chocolate Shake','Eating out','veg','as-served','D',
+    198,4.6,26.4,8.2,0.8,24.0,5.0,96,[['regular (300 ml)',300],['large (450 ml)',450]]),
+  F('keventers-vanilla','Keventers Vanilla Shake','Eating out','veg','as-served','D',
+    184,4.4,25.0,7.4,0,23.0,4.6,92,[['regular (300 ml)',300]]),
+  F('keventers-butterscotch','Keventers Butterscotch Shake','Eating out','veg','as-served','D',
+    206,4.4,28.6,8.4,0,26.4,5.2,104,[['regular (300 ml)',300]]),
+  F('keventers-oreo','Keventers Cookies & Cream Shake','Eating out','veg','as-served','D',
+    224,4.8,30.2,9.6,0.9,26.0,5.6,152,[['regular (300 ml)',300]]),
+  F('keventers-mango','Keventers Mango Shake','Eating out','veg','as-served','D',
+    172,3.8,27.0,5.6,0.5,25.0,3.4,72,[['regular (300 ml)',300]]),
+  F('keventers-cold-coffee','Keventers Cold Coffee','Eating out','veg','as-served','D',
+    166,4.2,22.4,6.6,0,21.0,4.0,88,[['regular (300 ml)',300]]),
+
+  /* Cafe Coffee Day */
+  F('ccd-cafe-latte','CCD Cafe Latte','Eating out','veg','as-served','D',
+    134,6.6,13.4,6.2,0,12.6,3.9,102,[['regular (300 ml)',300]]),
+  F('ccd-devils-own','CCD Devil\'s Own','Eating out','veg','as-served','D',
+    336,6.2,44.0,15.0,0.8,40.0,9.2,142,[['regular (350 ml)',350]]),
+  F('ccd-tropical-iceberg','CCD Tropical Iceberg','Eating out','veg','as-served','D',
+    228,3.0,44.0,4.6,0.4,41.0,2.8,64,[['regular (350 ml)',350]]),
+  F('ccd-choco-frappe','CCD Chocolate Frappe','Eating out','veg','as-served','D',
+    310,6.0,44.0,12.4,1.0,40.0,7.6,148,[['regular (350 ml)',350]]),
+  F('ccd-veg-sandwich','CCD Grilled Veg Sandwich','Eating out','veg','as-served','D',
+    318,9.6,40.0,13.2,3.4,4.4,5.6,640,[['1 sandwich (~150 g)',150]]),
+  F('ccd-choco-fantasy','CCD Choco Fantasy','Eating out','veg','as-served','D',
+    404,5.2,48.0,21.0,2.0,36.0,11.0,210,[['1 slice (~110 g)',110]]),
+
+  /* Burger Singh */
+  F('burger-singh-uttar','Burger Singh Uttar Pradesh Ke Chaap','Eating out','veg','as-served','D',
+    468,16.0,52.0,21.0,4.2,7.0,7.4,980,[['1 burger (~230 g)',230]]),
+  F('burger-singh-punjabi','Burger Singh Punjabi Tandoori Chicken','Eating out','meat','as-served','D',
+    512,24.0,50.0,24.0,3.0,6.4,8.6,1120,[['1 burger (~240 g)',240]]),
+  F('burger-singh-amritsari','Burger Singh Amritsari Aloo Tikki','Eating out','veg','as-served','D',
+    424,9.6,56.0,18.0,4.0,7.6,6.0,860,[['1 burger (~215 g)',215]]),
+  F('burger-singh-crispy-veg','Burger Singh Crispy Veg','Eating out','veg','as-served','D',
+    366,8.4,46.0,16.0,3.2,6.0,5.4,720,[['1 burger (~190 g)',190]]),
+  F('burger-singh-fries','Burger Singh Masala Fries','Eating out','veg','as-served','D',
+    318,3.8,40.0,16.0,3.6,0.6,7.0,540,[['regular (~110 g)',110]]),
+  F('burger-singh-loaded-fries','Burger Singh Loaded Fries','Eating out','veg','as-served','D',
+    412,8.6,44.0,22.0,3.8,2.6,9.4,780,[['1 portion (~180 g)',180]]),
+
+  /* Bikanervala */
+  F('bikanervala-raj-kachori','Bikanervala Raj Kachori','Eating out','veg','as-served','D',
+    436,10.0,50.0,21.0,5.6,9.0,8.2,880,[['1 piece (~200 g)',200]]),
+  F('bikanervala-dahi-bhalla','Bikanervala Dahi Bhalla','Eating out','veg','as-served','D',
+    286,9.0,34.0,12.4,3.0,12.0,5.4,620,[['1 plate (~200 g)',200]]),
+  F('bikanervala-paneer-tikka','Bikanervala Paneer Tikka','Eating out','veg','as-served','D',
+    348,19.0,12.0,26.0,2.2,5.0,13.0,720,[['1 plate (~180 g)',180]]),
+  F('bikanervala-kaju-katli','Bikanervala Kaju Katli','Eating out','veg','as-served','D',
+    546,10.0,56.0,31.0,1.8,48.0,7.0,26,[['1 piece (~20 g)',20]]),
+  F('bikanervala-rasmalai','Bikanervala Rasmalai','Eating out','veg','as-served','D',
+    268,8.0,32.0,12.0,0,30.0,7.0,92,[['1 piece (~90 g)',90]]),
+  F('bikanervala-thali','Bikanervala Special Thali','Eating out','veg','as-served','D',
+    1080,32.0,142.0,42.0,18.0,22.0,16.0,2600,[['1 thali',1]]),
+
+  /* Wow! Momo */
+  F('wow-steam-veg','Wow! Momo Steamed Veg Momo','Eating out','veg','as-served','D',
+    204,6.4,34.0,4.6,2.6,2.2,1.4,520,[['6 pieces (~180 g)',180]]),
+  F('wow-steam-chicken','Wow! Momo Steamed Chicken Momo','Eating out','meat','as-served','D',
+    228,13.0,30.0,6.0,2.0,2.0,1.8,560,[['6 pieces (~180 g)',180]]),
+  F('wow-pan-fried-veg','Wow! Momo Pan-Fried Veg Momo','Eating out','veg','as-served','D',
+    286,6.6,36.0,12.4,2.8,2.4,3.0,600,[['6 pieces (~190 g)',190]]),
+  F('wow-tandoori-momo','Wow! Momo Tandoori Momo','Eating out','veg','as-served','D',
+    312,9.0,34.0,15.0,2.6,4.0,5.0,760,[['6 pieces (~200 g)',200]]),
+  F('wow-schezwan-chicken','Wow! Momo Schezwan Chicken Momo','Eating out','meat','as-served','D',
+    268,13.4,32.0,9.4,2.4,3.4,2.6,880,[['6 pieces (~185 g)',185]]),
+  F('wow-momo-roll','Wow! Momo Momo Roll','Eating out','veg','as-served','D',
+    356,9.4,44.0,16.0,3.0,4.0,5.6,720,[['1 roll (~180 g)',180]]),
+
+  /* ── Vegetables, the everyday ones ─────────────────────────────────
+   *
+   * The library was 505 foods with fourteen vegetables in it — heavy on
+   * eating out and thin on exactly what somebody eating carefully reaches
+   * for. Searching "lettuce" returned nothing at all.
+   *
+   * Values are IFCT/USDA per 100 g raw unless the name says otherwise.
+   * Leaf vegetables are given with the sodium they actually carry rather
+   * than zero, because a salad is not a sodium-free meal once it is
+   * dressed and the app tracks that.
+   */
+  F('lettuce','Lettuce, iceberg','Vegetables','veg','raw','A',
+    14,0.9,3.0,0.1,1.2,2.0,0,10,[['1 cup shredded (72 g)',72],['1 leaf (10 g)',10]],'salad greens'),
+  F('lettuce-romaine','Lettuce, romaine','Vegetables','veg','raw','A',
+    17,1.2,3.3,0.3,2.1,1.2,0,8,[['1 cup shredded (47 g)',47]],'cos salad'),
+  F('kale','Kale','Vegetables','veg','raw','A',
+    35,2.9,4.4,1.5,4.1,0.8,0.2,53,[['1 cup chopped (67 g)',67]]),
+  F('cabbage-green','Cabbage, green','Vegetables','veg','raw','A',
+    25,1.3,5.8,0.1,2.5,3.2,0,18,[['1 cup shredded (89 g)',89]],'patta gobi'),
+  F('cabbage-red','Cabbage, red','Vegetables','veg','raw','A',
+    31,1.4,7.4,0.2,2.1,3.8,0,27,[['1 cup shredded (89 g)',89]]),
+  F('carrot','Carrot','Vegetables','veg','raw','A',
+    41,0.9,9.6,0.2,2.8,4.7,0,69,[['1 medium (61 g)',61],['1 cup chopped (128 g)',128]],'gajar'),
+  F('beetroot','Beetroot','Vegetables','veg','raw','A',
+    43,1.6,9.6,0.2,2.8,6.8,0,78,[['1 medium (82 g)',82]],'chukandar'),
+  F('radish','Radish, white','Vegetables','veg','raw','A',
+    16,0.7,3.4,0.1,1.6,1.9,0,39,[['1 medium (45 g)',45]],'mooli daikon'),
+  F('celery','Celery','Vegetables','veg','raw','A',
+    16,0.7,3.0,0.2,1.6,1.3,0,80,[['1 stalk (40 g)',40]]),
+  F('asparagus','Asparagus','Vegetables','veg','raw','A',
+    20,2.2,3.9,0.1,2.1,1.9,0,2,[['5 spears (80 g)',80]]),
+  F('green-beans','Green beans','Vegetables','veg','raw','A',
+    31,1.8,7.0,0.1,3.4,3.3,0,6,[['1 cup (100 g)',100]],'french beans'),
+  F('pumpkin','Pumpkin','Vegetables','veg','raw','A',
+    26,1.0,6.5,0.1,0.5,2.8,0,1,[['1 cup cubed (116 g)',116]],'kaddu'),
+  F('bottle-gourd','Bottle gourd','Vegetables','veg','raw','A',
+    14,0.6,3.4,0.0,0.5,1.6,0,2,[['1 cup cubed (116 g)',116]],'lauki ghiya'),
+  F('ridge-gourd','Ridge gourd','Vegetables','veg','raw','A',
+    20,1.2,4.4,0.2,1.6,2.0,0,3,[['1 cup (100 g)',100]],'turai'),
+  F('bitter-gourd','Bitter gourd','Vegetables','veg','raw','A',
+    17,1.0,3.7,0.2,2.8,1.9,0,5,[['1 medium (100 g)',100]],'karela'),
+  F('zucchini','Zucchini','Vegetables','veg','raw','A',
+    17,1.2,3.1,0.3,1.0,2.5,0.1,8,[['1 medium (196 g)',196]],'courgette'),
+  F('brinjal','Brinjal, aubergine','Vegetables','veg','raw','A',
+    25,1.0,5.9,0.2,3.0,3.5,0,2,[['1 medium (250 g)',250]],'baingan eggplant'),
+  F('okra','Okra','Vegetables','veg','raw','A',
+    33,1.9,7.5,0.2,3.2,1.5,0,7,[['1 cup (100 g)',100]],'bhindi ladies finger'),
+  F('capsicum-green','Capsicum, green','Vegetables','veg','raw','A',
+    20,0.9,4.6,0.2,1.7,2.4,0,3,[['1 medium (119 g)',119]],'shimla mirch bell pepper'),
+  F('capsicum-red','Capsicum, red','Vegetables','veg','raw','A',
+    31,1.0,6.0,0.3,2.1,4.2,0,4,[['1 medium (119 g)',119]],'red bell pepper'),
+  F('broccoli','Broccoli','Vegetables','veg','raw','A',
+    34,2.8,6.6,0.4,2.6,1.7,0,33,[['1 cup chopped (91 g)',91]]),
+  F('cauliflower','Cauliflower','Vegetables','veg','raw','A',
+    25,1.9,5.0,0.3,2.0,1.9,0,30,[['1 cup florets (107 g)',107]],'gobi'),
+  F('mushroom','Mushroom, button','Vegetables','veg','raw','A',
+    22,3.1,3.3,0.3,1.0,2.0,0,5,[['1 cup sliced (70 g)',70]],'khumb'),
+  F('fenugreek-leaves','Fenugreek leaves','Vegetables','veg','raw','A',
+    49,4.4,6.0,0.9,1.1,0,0.2,76,[['1 cup (~40 g)',40]],'methi'),
+  F('coriander-leaves','Coriander leaves','Vegetables','veg','raw','A',
+    23,2.1,3.7,0.5,2.8,0.9,0,46,[['1 tbsp (4 g)',4]],'dhania cilantro'),
+  F('spring-onion','Spring onion','Vegetables','veg','raw','A',
+    32,1.8,7.3,0.2,2.6,2.3,0,16,[['1 stalk (15 g)',15]],'scallion hara pyaz'),
+  F('sweetcorn-boiled','Sweetcorn, boiled','Vegetables','veg','cooked','A',
+    96,3.4,21.0,1.5,2.4,4.5,0.2,1,[['1 cob (~90 g)',90],['1 cup (164 g)',164]],'bhutta corn'),
+
+  /* ── Fruit ─────────────────────────────────────────────────────────── */
+  /* ── Fruit ─────────────────────────────────────────────────────────── */
+  F('strawberry','Strawberries','Fruit','veg','raw','A',
+    32,0.7,7.7,0.3,2.0,4.9,0,1,[['1 cup halves (152 g)',152]]),
+  F('blueberry','Blueberries','Fruit','veg','raw','A',
+    57,0.7,14.5,0.3,2.4,10.0,0,1,[['1 cup (148 g)',148]]),
+  F('pineapple','Pineapple','Fruit','veg','raw','A',
+    50,0.5,13.1,0.1,1.4,9.9,0,1,[['1 cup chunks (165 g)',165]],'ananas'),
+  F('kiwi','Kiwi','Fruit','veg','raw','A',
+    61,1.1,14.7,0.5,3.0,9.0,0,3,[['1 medium (69 g)',69]]),
+  /* ── Legumes and pulses ────────────────────────────────────────────── */
+  F('lentil-boiled','Lentils, boiled','Legumes','veg','cooked','A',
+    116,9.0,20.1,0.4,7.9,1.8,0.1,2,[['1 cup (198 g)',198]],'masoor dal cooked'),
+  F('chickpea-boiled','Chickpeas, boiled','Legumes','veg','cooked','A',
+    164,8.9,27.4,2.6,7.6,4.8,0.3,7,[['1 cup (164 g)',164]],'chana kabuli'),
+  F('kidney-bean-boiled','Kidney beans, boiled','Legumes','veg','cooked','A',
+    127,8.7,22.8,0.5,6.4,0.3,0.1,1,[['1 cup (177 g)',177]],'rajma cooked'),
+  F('black-bean-boiled','Black beans, boiled','Legumes','veg','cooked','A',
+    132,8.9,23.7,0.5,8.7,0.3,0.1,1,[['1 cup (172 g)',172]]),
+  F('moong-sprouts','Moong sprouts','Legumes','veg','raw','A',
+    30,3.0,5.9,0.2,1.8,4.1,0,6,[['1 cup (104 g)',104]],'sprouted green gram'),
+  F('chana-sprouts','Sprouted black chana','Legumes','veg','raw','A',
+    120,8.9,20.0,1.4,7.0,3.0,0.2,10,[['1 cup (150 g)',150]]),
+  F('tempeh','Tempeh','Legumes','veg','as-served','A',
+    192,20.3,7.6,10.8,0,0,2.2,9,[['100 g',100]]),
+
+  /* ── Dairy and protein staples ─────────────────────────────────────── */
+  /* ── Dairy and protein staples ─────────────────────────────────────── */
+  F('cottage-cheese','Cottage cheese, low fat','Dairy & Egg','veg','as-served','B',
+    72,12.4,4.3,1.0,0,4.1,0.6,330,[['1 cup (226 g)',226],['100 g',100]]),
+  F('greek-yogurt-plain','Greek yoghurt, plain 0%','Dairy & Egg','veg','as-served','B',
+    59,10.2,3.6,0.4,0,3.2,0.1,36,[['1 cup (170 g)',170],['100 g',100]]),
+  F('soy-milk','Soy milk, unsweetened','Drinks','veg','as-served','B',
+    33,3.3,1.8,1.6,0.6,0.5,0.2,51,[['1 glass (240 ml)',240]]),
+  F('almond-milk','Almond milk, unsweetened','Drinks','veg','as-served','B',
+    15,0.6,0.6,1.2,0.3,0.2,0.1,72,[['1 glass (240 ml)',240]]),
+
+  /* ── Nuts, seeds and fats ──────────────────────────────────────────── */
+  /* ── Nuts, seeds and fats ──────────────────────────────────────────── */
+  F('pumpkin-seeds','Pumpkin seeds','Fats & Nuts','veg','raw','A',
+    559,30.2,10.7,49.1,6.0,1.4,8.7,7,[['1 tbsp (10 g)',10]]),
+  F('sunflower-seeds','Sunflower seeds','Fats & Nuts','veg','raw','A',
+    584,20.8,20.0,51.5,8.6,2.6,4.5,9,[['1 tbsp (9 g)',9]]),
+  F('makhana','Makhana, plain','Snacks & Sweets','veg','as-served','A',
+    347,9.7,76.9,0.1,14.5,0,0,1,[['1 cup (~25 g)',25]],'fox nuts lotus seeds'),
+
   /* ── Protein: meat, fish, eggs ─────────────────────────────────────── */
   F('chicken-breast-raw','Chicken breast, skinless','Protein','meat','raw','A',
     120,22.5,0,3.1,0,0,0.9,63,[['100 g raw',100],['1 breast (~150 g)',150]]),
@@ -634,7 +846,7 @@ export const FOODS = [
     430,8.5,61.0,16.5,2.2,3.5,7.8,1200,[['1 cake (60 g)',60]]),
   F('knorr-soup','Knorr soup, prepared','Prepared','veg','as-served','B',
     35,1.0,6.5,0.6,0.5,1.5,0.3,380,[['1 bowl (200 ml)',200]]),
-  F('poha-ready','Poha, cooked','Prepared','veg','as-served','C',
+  F('poha-ready','Poha, ready-mix packet','Prepared','veg','as-served','C',
     180,3.5,32.0,4.5,1.5,1.0,1.8,320,[['1 plate (200 g)',200]]),
   F('amul-butter','Amul Butter','Fats & Nuts','veg','as-served','B',
     720,0.5,0.5,80.0,0.0,0.5,50.0,700,[['1 tsp (5 g)',5],['1 tbsp (14 g)',14]]),
@@ -666,7 +878,7 @@ export const FOODS = [
     68,1.1,15.5,0.1,0.0,14.5,0.05,25,[['1 bottle (65 ml)',65]]),
   F('kissan-jam','Kissan Mixed Fruit Jam','Snacks & Sweets','veg','as-served','B',
     278,0.3,68.0,0.1,0.5,62.0,0.0,30,[['1 tbsp (20 g)',20]]),
-  F('pintola-peanut-butter','Peanut butter, natural','Fats & Nuts','veg','as-served','B',
+  F('pintola-peanut-butter','Pintola peanut butter, natural','Fats & Nuts','veg','as-served','B',
     588,25.0,22.0,45.0,6.0,5.0,8.0,10,[['1 tbsp (16 g)',16],['2 tbsp (32 g)',32]]),
   F('nutella','Nutella','Snacks & Sweets','veg','as-served','B',
     539,6.3,57.5,30.9,0.0,56.3,10.6,41,[['1 tbsp (15 g)',15]]),
