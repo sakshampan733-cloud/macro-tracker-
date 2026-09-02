@@ -9,7 +9,7 @@
 import {
   el, clear, icon, kcal, g, distribution, toast, sheet, field,
   segmented, empty, dateLabel, confirmSheet, explain, replaceKids } from '../ui.js';
-import { get, commit, dayKey, shiftDay, setWeight, clearWeight, peekDay, weightSeries, totals } from '../store.js';
+import { get, commit, dayKey, shiftDay, setWeight, clearWeight, peekDay, weightSeries, totals, isMorningWeigh } from '../store.js';
 import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
   nutritionVsRecovery, stats,
@@ -25,7 +25,7 @@ import {
 import { haptic } from '../feedback.js';
 import { openReport } from './report.js';
 import { openAppleHealth } from './apple.js';
-import { sleepTile, sleepSchedule, sleepHours } from './sleep.js';
+import { sleepTile, sleepSchedule, sleepHours, clockText } from './sleep.js';
 import { weightUnit, kgToLb, lbToKg, showWeight } from '../units.js';
 import {
   existingSource, sourceForMetric, healthSource, setHealthSource, canMeasure, bandName,
@@ -387,10 +387,18 @@ function openWeightHistory(ctx) {
         type: 'number', inputmode: 'decimal', step: '0.1',
         value: toDisp(r.kg).toFixed(1),
       });
+      /* A weight taken in the evening is not a late morning weight — it
+         carries a kilo or two of food and water that a morning one does
+         not, and the amount changes daily. Marked, so a reading that does
+         not belong beside the others can be seen rather than quietly
+         moving the trend. */
+      const late = r.hour != null && !isMorningWeigh(r.hour);
       list.append(el('div.row', {},
         el('span.grow', {},
-          el('div.title', {}, dateLabel(r.date)),
-          el('div.sub', {}, `trend ${toDisp(trend.get(r.date) ?? r.kg).toFixed(1)} ${wu}`)),
+          el('div.title', {}, dateLabel(r.date),
+            late ? el('span.late-tag', {}, clockText(r.hour)) : null),
+          el('div.sub', {}, `trend ${toDisp(trend.get(r.date) ?? r.kg).toFixed(1)} ${wu}`
+            + (late ? ' · not a morning reading' : ''))),
         input,
         el('button.btn.sm.ghost', {
           onclick: () => {

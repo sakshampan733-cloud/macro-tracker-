@@ -19,7 +19,7 @@
  * marked. Never an instruction to take it.
  */
 
-import { get, dayKey, doseLog, sessionFor, wasNotified, markNotified } from './store.js';
+import { get, dayKey, doseLog, sessionFor, wasNotified, markNotified, peekDay } from './store.js';
 import { rowsFor, healthSource, bandName } from './applehealth.js';
 
 /*
@@ -55,6 +55,45 @@ async function show(title, body, tag) {
   } catch { return false; }
 }
 
+
+
+/*
+ * Time to weigh in.
+ *
+ * A weight is only worth anything next to weights taken the same way, and
+ * the way that removes the most noise is first thing: after the toilet,
+ * before drinking, before eating. Everything else — gut contents,
+ * glycogen and its water, sodium — moves a kilo or two and moves by a
+ * different amount every day, which is why an evening weight is not a
+ * second reading of the same quantity and cannot be averaged with a
+ * morning one to get something better than either.
+ *
+ * So there is one reminder, in the morning, and it only appears on a day
+ * with nothing logged. It uses the wake time the app already knows —
+ * measured by a band, or the sleep schedule for anyone without one — and
+ * falls back to seven o'clock rather than inventing a number.
+ */
+export function weighInDue(now = new Date()) {
+  const s = get();
+  if (!s.profile) return null;
+  const key = dayKey();
+  if (peekDay(key).weight) return null;
+  if (s.settings?.weighAsked === key) return null;
+  if (s.settings?.weighReminder === false) return null;
+
+  /* Their own waking hour, from whichever source knows it. */
+  const rows = Object.entries(s.whoop?.rows || {}).sort().slice(-14);
+  const wakes = rows.map(([, r]) => r.wakeHour).filter(h => h != null);
+  const fromBand = wakes.length
+    ? wakes.reduce((a, b) => a + b, 0) / wakes.length : null;
+  const wake = fromBand ?? s.settings?.sleepGoal?.wake ?? 7;
+
+  const hour = now.getHours() + now.getMinutes() / 60;
+  /* Half an hour after waking, and never past the morning window — a
+     prompt at four in the afternoon is asking for the wrong measurement. */
+  if (hour < wake + 0.5 || hour >= 11) return null;
+  return { wake: +wake.toFixed(2) };
+}
 
 /*
  * A workout the band noticed, on a day with nothing logged.
@@ -162,6 +201,15 @@ export function startReminders() {
                : 'Tap to log your session.',
           stampW);
       }
+    }
+
+    /* The morning weigh-in, on the same terms as everything else here. */
+    const stampWeigh = `weigh@${key}`;
+    if (document.visibilityState !== 'visible' && !wasNotified(stampWeigh) && weighInDue(now)) {
+      markNotified(stampWeigh);
+      await show('Time to weigh in',
+        'First thing, after the toilet, before drinking — that is the one that is comparable.',
+        stampWeigh);
     }
 
     if (!get().medications?.length) return;

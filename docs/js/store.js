@@ -537,20 +537,46 @@ export function eatPlanned(key, id) {
 
 /* ── Weight ─────────────────────────────────────────────────────────── */
 
-export function setWeight(key, kg) {
-  commit(s => { day(key).weight = kg; }, 'weight');
+/*
+ * A weigh-in, and the hour it was taken.
+ *
+ * The hour matters because a weight is only comparable to weights taken
+ * the same way. Evening weight runs a kilo or two above morning weight —
+ * gut contents, glycogen and the water bound to it, sodium — and the
+ * amount varies with what you ate, so it is not a fixed offset that could
+ * be subtracted. A trend built from a mix of the two measures mostly
+ * dinner.
+ *
+ * So the hour is recorded, and anything logged outside the morning is
+ * marked rather than silently averaged in with the rest.
+ */
+export function setWeight(key, kg, at = new Date()) {
+  const hour = at.getHours() + at.getMinutes() / 60;
+  commit(s => {
+    const d = day(key);
+    d.weight = kg;
+    d.weighHour = hour;
+  }, 'weight');
 }
+
+/* First thing, after the toilet, before drinking. */
+export const MORNING = { from: 4, to: 11 };
+export const isMorningWeigh = h => h == null || (h >= MORNING.from && h < MORNING.to);
 
 /* A weigh-in typed by mistake had no way back — the only entry in the app
    that could be written and never unwritten. */
 export function clearWeight(key) {
-  commit(s => { if (s.days?.[key]) delete s.days[key].weight; }, 'weight');
+  commit(s => {
+    if (!s.days?.[key]) return;
+    delete s.days[key].weight;
+    delete s.days[key].weighHour;
+  }, 'weight');
 }
 
 export function weightSeries() {
   return Object.entries(state.days)
     .filter(([, d]) => d.weight)
-    .map(([k, d]) => ({ date: k, kg: d.weight }))
+    .map(([k, d]) => ({ date: k, kg: d.weight, hour: d.weighHour ?? null }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 

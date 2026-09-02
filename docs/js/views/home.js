@@ -13,15 +13,16 @@
 
 import { el, clear, icon, kcal, toast, sheet, confirmSheet, append } from '../ui.js';
 import { flyToTotals, haptic } from '../feedback.js';
+import { weightUnit, kgToLb, lbToKg } from '../units.js';
 import { EFFORT } from '../data/exercises.js';
 import { openMealLogger } from './meallog.js';
 import { openMealBuilder } from './meal.js';
 import { whoopAdvice } from '../coachwhoop.js';
-import { overdueNote, detectedWorkout, workoutHourDue } from '../reminders.js';
+import { overdueNote, detectedWorkout, workoutHourDue, weighInDue } from '../reminders.js';
 import { caffeineNote } from './supplements.js';
 import { bandName } from '../applehealth.js';
 import {
-  get, totals, dayKey, sessionFor, nextUp, typeById, logSession, trainState, dayPending, openDay, startNewDay, keepDayOpen, rolloverAsked, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
+  get, weightSeries, setWeight, totals, dayKey, sessionFor, nextUp, typeById, logSession, trainState, dayPending, openDay, startNewDay, keepDayOpen, rolloverAsked, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
   scannedFoods, builtFoods, addWater, undoWater, peekDay, dismissNote, noteDismissed,
@@ -52,6 +53,7 @@ export function renderHome(root, ctx) {
      had nothing to say. */
   append(root,
     rolloverCard(key, ctx),
+    weighAsk(key, ctx),
     workoutAsk(key, ctx),
     header(key, ctx),
     readout(t, targets, ctx),
@@ -104,6 +106,58 @@ export function renderHome(root, ctx) {
  * unanswered question sitting there all day is a nag; this one has a
  * dismiss that lasts until tomorrow.
  */
+/*
+ * "Weigh in" — once, in the morning.
+ *
+ * Logging a weight is four taps from here otherwise, and the one morning
+ * you forget is the one that leaves a hole in the trend. It asks on the
+ * screen you are already on and takes the number inline, because sending
+ * someone to another tab to type one figure is how a daily habit stops
+ * being daily.
+ *
+ * It never appears in the afternoon. A weight taken then is not a late
+ * version of the morning one — it is a different measurement, and asking
+ * for it would put exactly the noise into the trend that weighing at a
+ * fixed time exists to keep out.
+ */
+function weighAsk(key, ctx) {
+  if (key !== dayKey()) return null;
+  if (!weighInDue()) return null;
+
+  const s = get();
+  const wu = weightUnit(s);
+  const toDisp = kg => (wu === 'lb' ? kgToLb(kg) : kg);
+  const fromDisp = v => (wu === 'lb' ? lbToKg(v) : v);
+  const last = weightSeries().slice(-1)[0];
+
+  const input = el('input.num-in', {
+    type: 'number', inputmode: 'decimal', step: '0.1', min: '20',
+    placeholder: last ? toDisp(last.kg).toFixed(1) : wu,
+  });
+
+  const save = () => {
+    const kg = fromDisp(+input.value);
+    if (!(kg > 20 && kg < 400)) { toast(`That does not look like a weight in ${wu}.`, 'err'); return; }
+    setWeight(key, kg);
+    haptic('success');
+    toast('Logged.');
+    ctx.refresh();
+  };
+
+  return el('div.tile.ask-card', {},
+    el('div.flex', {}, icon('body', 17), el('h3', {}, 'Weigh in')),
+    el('div.fine', { style: { marginTop: '5px' } },
+      'First thing, after the toilet, before drinking. That is the one that is comparable '
+      + 'to the others.'),
+    el('div.flex', { style: { marginTop: '12px', gap: '8px' } },
+      input,
+      el('button.btn.confirm', { style: { flex: 'none' }, onclick: save }, 'Log'),
+      el('button.btn.ghost', { style: { flex: 'none' },
+        onclick: () => { commit(st => { st.settings.weighAsked = key; }, 'settings');
+          haptic('tap'); ctx.refresh(); },
+      }, 'Not today')));
+}
+
 function workoutAsk(key, ctx) {
   const s = get();
   if (key !== dayKey()) return null;

@@ -3241,3 +3241,9 @@ button.src-tag { cursor: pointer; }
   backdrop-filter: saturate(150%) blur(20px);
   -webkit-backdrop-filter: saturate(150%) blur(20px);
 }
+/* A weigh-in taken outside the morning window, named rather than hidden. */
+.late-tag {
+  margin-left: 7px; padding: 1px 6px; border-radius: 99px;
+  background: color-mix(in srgb, var(--caution) 20%, transparent);
+  color: var(--caution); font-size: 10.5px; white-space: nowrap;
+}
