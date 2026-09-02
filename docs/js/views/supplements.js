@@ -13,6 +13,7 @@ import {
   subscribe,
 } from '../store.js';
 import { SUPPLEMENTS, SUPPLEMENT_TAGS } from '../data/supplements.js';
+import { openLabelScan } from './labelscan.js';
 import {
   caffeineDay, stillInYouAt, latestHourFor, remainingAt, DAILY_CEILING_MG, hourText,
 } from '../data/caffeine.js';
@@ -353,6 +354,26 @@ export function openSupplementPicker(ctx) {
                   }, icon('info', 15)) : null,
                   on ? el('span.conf.weighed', {}, 'ON') : null);
               })))),
+
+      /*
+       * The tub, for anything not on the list.
+       *
+       * Reading a supplement label was already built — the parser handles
+       * seventeen micronutrients and there is a "save as a supplement"
+       * path at the end of it — but the only way in was through the
+       * barcode scanner, which is not where anybody looks for it. A
+       * feature reachable only from somewhere unrelated is one nobody
+       * finds.
+       */
+      el('div.section-label', {}, el('span.micro', {}, 'Not on this list')),
+      el('div.tile', {},
+        el('div.fine', {},
+          'A multivitamin panel has thirty rows on the back and nobody types those in. '
+          + 'Photograph it, or paste the text your phone already reads off it, and the '
+          + 'nutrients are read for you.'),
+        el('button.btn.block', { style: { marginTop: '11px' },
+          onclick: () => openLabelScan(ctx),
+        }, icon('scan', 16), 'Read a supplement label')),
 
       el('div.note.info', {},
         el('div.fine', {},

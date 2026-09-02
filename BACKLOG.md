@@ -27,23 +27,24 @@ target has been running off Whoop alone.
 
 ## Not built
 
-**Indian barcodes, offline.** The scanner works and the OCR label reader
-works, but the food library carries no barcodes of its own — every scan
-goes to OpenFoodFacts, and Indian FMCG coverage there is poor. A local
-barcode set for the snacks people actually scan would fix the common case,
-with the label-scan path as the fallback it already is.
-
-**Scanning a supplement tub.** The label reader handles a nutrition panel;
-a supplement tub is a different shape of data and is not handled.
-
-**Swipe to dismiss a coach note.** There is a close button; the gesture is
-not wired.
+**Seeded Indian barcodes.** The scanner works, the OCR label reader works,
+and a barcode you teach it once is remembered forever — `resolveBarcode`
+checks your own library before it ever asks Open Food Facts. What does not
+exist is a pre-seeded table of Indian product codes, and I am not going to
+invent one: a barcode mapped to the wrong food is worse than a barcode
+that misses, because a miss asks you and a wrong hit does not. This wants
+either a licensed dataset or codes scanned off real packets.
 
 ---
 
 ## Built since the last capture
 
-Medication with its own segment and reference data · caffeine as a
+Supplement tubs — the label parser already handled seventeen
+micronutrients and the save path existed; it was reachable only from the
+barcode scanner, which is not where anyone looks, so Supplements now
+offers it directly · swipe to dismiss a coach note, which was wired all
+along in makeDismissible ·
+medication with its own segment and reference data · caffeine as a
 cross-cutting nutrient with bedtime residue and last-call times ·
 Starbucks as a builder · water on Home · the report with its provenance
 and fabrication checks · Apple Health end to end · the Train tab, the
