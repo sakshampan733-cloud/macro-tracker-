@@ -1233,14 +1233,11 @@ function vitalsSection(s, ctx) {
     /* Native append stringifies null; el() filters it. Building the note
        as an element keeps a literal "null" off the page. */
     wrap.append(
+      /* The band picker lives once, at the top of the tab, where it says
+         plainly that it governs the whole page. A second copy in this
+         header read as a second, narrower setting for this panel alone. */
       el('div.between', { style: { margin: '4px 2px 10px' } },
-        el('h3', {}, 'Vitals'),
-        mode === 'both'
-          ? el('div.flex', { style: { gap: '5px' } },
-              srcChip('all', 'Both', srcFilter, ctx),
-              srcChip('whoop', 'Whoop', srcFilter, ctx),
-              srcChip('apple', 'Apple', srcFilter, ctx))
-          : null),
+        el('h3', {}, 'Vitals')),
       cards.length
         ? el('div.ah-grid', {}, ...cards)
         : el('div.tile', {}, el('div.fine', {},
