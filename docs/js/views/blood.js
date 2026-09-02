@@ -84,8 +84,21 @@ export function bloodTile(s, ctx) {
           style: { fontSize: '13px', color: outOf.length ? 'var(--caution)' : 'var(--good-ink)' },
         }, outOf.length ? `${outOf.length} outside range` : 'all in range')),
 
+      /*
+       * Three rows, and the ones that matter.
+       *
+       * Six markers laid out in full made this the second tallest thing on
+       * the Body tab, for a reading taken twice a year that does not change
+       * between visits. Anything outside its range comes first — that is
+       * the reason to look at all — and the rest is a tap away in the panel
+       * that already exists for it.
+       */
       el('div.tile.flush', { style: { margin: 0, border: '1px solid var(--line)' } },
-        ...vals.slice(0, 6).map(([k, v]) => markerRow(k, v, ctx, latest.date))),
+        ...[...outOf, ...vals.filter(([k]) => !outOf.some(([o]) => o === k))]
+          .slice(0, 3)
+          .map(([k, v]) => markerRow(k, v, ctx, latest.date))),
+      vals.length > 3 ? el('div.fine', { style: { marginTop: '8px' } },
+        `${vals.length - 3} more in this panel.`) : null,
 
       el('div.btn-row', { style: { marginTop: '12px' } },
         el('button.btn.sm', { onclick: () => openPanelList(ctx) }, 'All panels'),

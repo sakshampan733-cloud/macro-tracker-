@@ -2721,8 +2721,8 @@ button.src-tag { cursor: pointer; }
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;            /* rounder than the app's own cards */
-  padding: 12px 13px 10px;
-  display: grid; gap: 4px;
+  padding: 10px 11px 8px;
+  display: grid; gap: 2px;
   align-content: start;
   min-width: 0;
 }
@@ -2730,8 +2730,10 @@ button.src-tag { cursor: pointer; }
    wrapped to, so a column of tiles lines up on the number rather than
    ragging with the text. */
 .ah-card .ah-value { margin-top: auto; }
-.ah-spark { min-height: 26px; display: flex; align-items: flex-end; opacity: .85; }
-.ah-spark svg { width: 100%; height: 26px; }
+/* The sparkline says which way, not how much — twenty pixels is enough
+   for that, and eight cards at twenty-six were a screen and a half. */
+.ah-spark { min-height: 20px; display: flex; align-items: flex-end; opacity: .85; }
+.ah-spark svg { width: 100%; height: 20px; }
 
 .ah-cat {
   display: inline-flex; align-items: center; gap: 6px;
@@ -2748,7 +2750,7 @@ button.src-tag { cursor: pointer; }
 
 .ah-value {
   font-family: var(--cond), var(--sans);
-  font-size: 30px; line-height: 1; letter-spacing: -.9px;
+  font-size: 27px; line-height: 1; letter-spacing: -.8px;
   color: var(--text);
   display: flex; align-items: baseline; gap: 4px;
 }
@@ -2766,7 +2768,7 @@ button.src-tag { cursor: pointer; }
  * across is the shape people already read this kind of dashboard in, and
  * it puts the whole set in a glance rather than a journey.
  */
-.ah-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ah-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 700px) { .ah-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 /* The rings and the night's sleep carry more than a number, so they take
    the full width rather than being squeezed into a half-tile. */
@@ -3280,8 +3282,14 @@ button.src-tag { cursor: pointer; }
 }
 
 /* Steps: one bar a day against the target, so a bad run reads as a run. */
-.step-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; }
+/* Widget height. The shape of a fortnight reads at forty-four pixels. */
+.step-bars { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
 .step-col { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 0; }
 .step-col i { display: block; width: 100%; border-radius: 3px; background: var(--line-2); }
 .step-col i.is-hit { background: var(--h-move); }
 .step-line { margin-top: 5px; text-align: right; }
+
+/* Tighter vitals hero: the ring shrank, so the columns beside it should
+   not keep the spacing of the larger one. */
+.vitals-side { gap: 12px; }
+.vitals-hero { gap: 8px; }

@@ -92,16 +92,20 @@ function stepsTile(s, ctx) {
       el('button.btn.sm.ghost', { onclick: () => openStepTarget(ctx) },
         r.target ? `target ${r.target.toLocaleString()}` : 'set a target')),
 
-    el('div.between', { style: { marginBottom: '10px' } },
+    el('div.between', { style: { marginBottom: '9px' } },
       el('div', {},
         el('div.micro', {}, r.today != null ? 'Today' : 'Typical day'),
-        el('div.num', { style: { fontSize: '26px', marginTop: '2px' } },
-          (r.today != null ? r.today : r.median).toLocaleString())),
+        el('div.num', { style: { fontSize: '25px', marginTop: '2px' } },
+          (r.today != null ? r.today : r.median).toLocaleString()),
+        el('div.micro', { style: { marginTop: '2px' } },
+          `typical ${r.median.toLocaleString()}`)),
       el('div', { style: { textAlign: 'right' } },
-        el('div.micro', {}, `Hit the target`),
+        el('div.micro', {}, 'Hit the target'),
         el('div.num', { style: { fontSize: '18px', marginTop: '2px',
           color: r.hit >= r.days * 0.6 ? 'var(--good-ink)' : 'var(--caution)' } },
-          `${r.hit} of ${r.days} days`))),
+          `${r.hit} of ${r.days}`),
+        r.worst.length ? el('div.micro', { style: { marginTop: '2px' } },
+          `lowest ${r.worst[0].steps.toLocaleString()}`) : null)),
 
     /* One bar a day, against the target line, so a bad run is visible as a
        run rather than as a lower average. */
@@ -112,16 +116,21 @@ function stepsTile(s, ctx) {
           el('i' + (r.target && d.steps >= r.target ? '.is-hit' : ''),
             { style: { height: Math.max(4, h) + '%' } }));
       })),
-    r.target ? el('div.step-line', {}, el('span.micro', {}, `target ${r.target.toLocaleString()}`)) : null,
-
-    el('div.fine', { style: { marginTop: '10px' } },
-      `Typical day ${r.median.toLocaleString()} steps.`
-      + (worth ? ` Roughly ${worth.lo}–${worth.hi} kcal of walking — which is already inside `
-                 + 'the burn your band reports, not on top of it.' : '')),
-
-    r.worst.length && r.target ? el('div.fine', { style: { marginTop: '6px' } },
-      `Lowest days: ${r.worst.map(d => d.steps.toLocaleString()).join(', ')}. `
-      + 'The week is usually lost on those rather than won on the big ones.') : null);
+    /*
+     * Nothing under the bars.
+     *
+     * Everything worth knowing is already above them — today, the target,
+     * how many days hit it — and a paragraph restating that in sentences
+     * turns a widget into an essay. Typical and lowest move up into the
+     * caption row where they cost one line instead of three, and the
+     * reasoning goes behind the Reading setting where it can be read once.
+     */
+    /* The lowest day is already in the caption above, so the sentence
+       repeating it went. What is left is the one thing the numbers cannot
+       say for themselves: that this walking is already counted. */
+    explain(worth
+      ? `≈${worth.lo}–${worth.hi} kcal, already inside your band's burn — not on top of it.`
+      : '', { style: { marginTop: '8px' } }));
 }
 
 function openStepTarget(ctx) {
@@ -346,12 +355,13 @@ function weightTile(ctx) {
           el('div.num', {
             style: { fontSize: '18px', marginTop: '2px', color: change < 0 ? 'var(--good-ink)' : change > 0 ? 'var(--m-c-ink)' : 'var(--text)' },
           }, (change >= 0 ? '+' : '') + toDisp(change).toFixed(1) + ' ' + wu))),
+      /* Why the trend disagrees with the scale is worth saying once, not
+         under every weigh-in. The Reading setting decides. */
       Math.abs(scale - latest.trend) > 0.35
-        ? el('div.fine', { style: { marginTop: '6px' } },
-            `The trend is ${toDisp(Math.abs(scale - latest.trend)).toFixed(1)} ${wu} `
+        ? explain(`The trend is ${toDisp(Math.abs(scale - latest.trend)).toFixed(1)} ${wu} `
             + `${scale < latest.trend ? 'above' : 'below'} today's reading because it is smoothed over `
             + 'ten days — one weigh-in moves it about a tenth of the way. That lag is the point: '
-            + 'it is what stops a salty dinner reading as a gain.')
+            + 'it is what stops a salty dinner reading as a gain.', { style: { marginTop: '6px' } })
         : null,
       pv.ready ? el('div.dl-key', { style: { marginTop: '10px' } },
         el('span.micro', {}, el('i.dl-dash'), 'What your log predicts'),
@@ -359,14 +369,15 @@ function weightTile(ctx) {
       chart,
       pv.ready
         ? el('div.fine', { style: { marginTop: '6px' } },
-            weightVerdict(pv, wu, toDisp)
-            + ` Maintenance ${kcal(pv.maintenance)} kcal, from the ${pv.maintenanceSource} figure.`
-            + (pv.skipped ? ` ${pv.skipped} unlogged day${pv.skipped === 1 ? '' : 's'} `
-                            + 'contributed nothing rather than being assumed.' : ''))
+            weightVerdict(pv, wu, toDisp))
         : el('div.fine', { style: { marginTop: '6px' } },
-            'Thin line is the scale. Thick line is the ten-day trend — that is the one that '
-            + 'means anything. Log food for a fortnight and a second line appears: where your '
-            + 'log says this should be.'))
+            'Thick line is the ten-day trend — that is the one that means anything.'),
+      pv.ready
+        ? explain(`Maintenance ${kcal(pv.maintenance)} kcal, from the ${pv.maintenanceSource} figure.`
+            + (pv.skipped ? ` ${pv.skipped} unlogged day${pv.skipped === 1 ? '' : 's'} `
+                            + 'contributed nothing rather than being assumed.' : ''),
+            { style: { marginTop: '5px' } })
+        : null)
       : el('div.fine', { style: { marginTop: '12px' } },
           'Weigh in most mornings. Four readings and the app can work out your real maintenance calories.'),
   );
@@ -608,15 +619,18 @@ function tdeeTile(s) {
             ready && r.res.sigma ? el('div.micro', { style: { marginTop: '2px' } }, '±' + r.res.sigma) : null));
       })),
 
-    adaptive.ready ? el('div.note', {},
-      el('div', {},
-        `Over ${adaptive.spanDays} days you averaged ${kcal(adaptive.meanIntake)} kcal and your trend weight moved `
-        + `${adaptive.slopeKgPerWeek >= 0 ? '+' : ''}${adaptive.slopeKgPerWeek} kg a week. `
-        + `That puts real maintenance at ${kcal(adaptive.kcal)} ±${adaptive.sigma}. `
-        + `Scale scatter is ${adaptive.scatterKg} kg, which is what the ± is mostly made of.`))
+    /* The working stays available and stops being unavoidable: a note that
+       shows a derivation under a figure that already carries its own ± is
+       the kind of thing you read once. What is not ready is still said
+       outright, because that one is a thing to act on. */
+    adaptive.ready
+      ? explain(`Over ${adaptive.spanDays} days you averaged ${kcal(adaptive.meanIntake)} kcal and your `
+          + `trend weight moved ${adaptive.slopeKgPerWeek >= 0 ? '+' : ''}${adaptive.slopeKgPerWeek} kg a week — `
+          + `real maintenance ${kcal(adaptive.kcal)} ±${adaptive.sigma}, with ${adaptive.scatterKg} kg of `
+          + 'scale scatter making up most of that ±.', { style: { marginTop: '10px' } })
       : el('div.note.info', {},
-        el('div', {}, `The adaptive figure needs ${adaptive.need.intakeDays} logged days and ${adaptive.need.weighIns} weigh-ins. `
-          + `You have ${adaptive.have.intakeDays} and ${adaptive.have.weighIns}. It is worth the wait — a formula can be 15% out on any given person.`)),
+        el('div', {}, `Needs ${adaptive.need.intakeDays} logged days and ${adaptive.need.weighIns} weigh-ins. `
+          + `You have ${adaptive.have.intakeDays} and ${adaptive.have.weighIns}.`)),
   );
 }
 
@@ -783,7 +797,7 @@ function metricCard(s, ctx, scoped, sum, key, latestKey) {
       info.unit ? el('span.ah-unit', {}, info.unit) : null),
     el('div.ah-spark', { style: { color: colour } },
       pts.length >= 2
-        ? miniSpark(pts.map(p => p.v), { colour, w: 96, h: 26 })
+        ? miniSpark(pts.map(p => p.v), { colour, w: 96, h: 20 })
         : el('span.micro', {}, 'first reading')));
 }
 
@@ -1065,7 +1079,7 @@ function vitalsSection(s, ctx) {
         onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, 'recovery', ctx); } },
       },
         (() => {
-          const r = ring({ value: recV, max: 100, size: 152, stroke: 12,
+          const r = ring({ value: recV, max: 100, size: 128, stroke: 11,
                  colour, label: 'RECOVERY', unit: '%',
                  sub: recV == null ? '' : recV >= 67 ? 'ready' : recV >= 34 ? 'moderate' : 'rest' });
           r.style.setProperty('--ring-glow', `color-mix(in srgb, ${colour} 13%, transparent)`);
@@ -1245,15 +1259,17 @@ function vitalsSection(s, ctx) {
       el('div.between', { style: { marginBottom: '10px' } },
         el('h3', {}, 'Recovery', icon('chevron', 14)),
         el('span.micro', {}, `last 14 days · avg ${Math.round(rec.recent.mean)}%`)),
+      /* A widget height, not a chart height. The shape of a fortnight
+         reads at ninety pixels; the rest was padding. */
       healthBars(recentRec.map(p => ({ v: p.v, label: `${p.date}: ${Math.round(p.v)}%` })), {
-        h: 132, unit: '%', dp: 0, colourFor: recoveryColour,
+        h: 92, unit: '%', dp: 0, colourFor: recoveryColour,
       }),
       /* A .between around one long unbreakable line forced the tile wider
          than the screen, and the chart inside it stretched to match — 81px
          of horizontal overflow on the Body tab traced back to this caption.
          It is a caption; it wraps. */
-      el('div.fine', { style: { marginTop: '8px' } },
-        'Green ≥ 67 · amber ≥ 34 · red below'),
+      el('div.micro', { style: { marginTop: '7px' } },
+        'green ≥ 67 · amber ≥ 34 · red below'),
     ));
   }
 
