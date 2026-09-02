@@ -890,6 +890,23 @@ input.num-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   font-size: 21px; font-weight: 500; letter-spacing: -0.02em; margin-top: 2px;
 }
 .vitals-stat .d { font-size: 10.5px; margin-top: 1px; }
+/*
+ * The ring is fixed-width, so the two side columns get whatever is left —
+ * which on a 390px phone was not enough for "Resting HR" or "53 bpm", and
+ * both broke across lines. A label reading "RESTING / HR" above a value
+ * reading "53 / bpm" is four lines for one reading.
+ *
+ * The label may wrap; the number never may. Both columns are also allowed
+ * to shrink below their content width, which is what stops the grid
+ * forcing the break in the first place.
+ */
+.vitals-hero > * { min-width: 0; }
+.vitals-stat .v { white-space: nowrap; }
+.vitals-stat .k { hyphens: none; }
+@media (max-width: 420px) {
+  .vitals-stat .v { font-size: 19px; }
+  .vitals-hero { gap: 6px; }
+}
 @media (max-width: 380px) {
   .vitals-hero { grid-template-columns: 1fr; }
   .vitals-side { flex-direction: row; justify-content: space-around; }
@@ -3246,4 +3263,18 @@ button.src-tag { cursor: pointer; }
   margin-left: 7px; padding: 1px 6px; border-radius: 99px;
   background: color-mix(in srgb, var(--caution) 20%, transparent);
   color: var(--caution); font-size: 10.5px; white-space: nowrap;
+}
+
+/*
+ * A duration is one value, so it breaks as one thing or not at all.
+ *
+ * "7 hr 32 min" was wrapping to "7 hr 32" over "min" on a 390px screen,
+ * and the figure beside it to "-0 hr 13" over "min" — a reading split
+ * across two lines mid-unit reads as two readings.
+ */
+.readout-main, .readout-side .v { white-space: nowrap; }
+.readout { gap: 12px; }
+.readout > * { min-width: 0; }
+@media (max-width: 420px) {
+  .readout-main { font-size: 26px !important; }
 }

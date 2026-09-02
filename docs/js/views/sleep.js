@@ -67,9 +67,20 @@ export function clockText(h) {
   return `${hr12}:${String(mn).padStart(2, '0')} ${ampm}`;
 }
 
+/*
+ * A duration in words, without the zero.
+ *
+ * Thirteen minutes under a sleep goal was rendering as "0 hr 13 min", and
+ * with its sign in front of it, "−0 hr 13 min". Nobody writes a duration
+ * that way; the leading zero reads as a lost digit rather than as an
+ * absent hour. Sixty minutes rounds up to an hour too, rather than coming
+ * out as "0 hr 60 min".
+ */
 const durText = h => {
-  const hr = Math.floor(h);
-  const mn = Math.round((h - hr) * 60);
+  let hr = Math.floor(h);
+  let mn = Math.round((h - hr) * 60);
+  if (mn === 60) { hr += 1; mn = 0; }
+  if (!hr) return `${mn} min`;
   return mn ? `${hr} hr ${mn} min` : `${hr} hr`;
 };
 
