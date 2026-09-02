@@ -1115,6 +1115,19 @@ body::after {
    */
   --h-caffeine: #3DDBC4;
 
+  /*
+   * Opaque surfaces, for when nothing is blurring behind them.
+   *
+   * --surface is 4.5% white: it only ever read as a panel because a
+   * backdrop-filter was frosting the page behind it. With the blur gone
+   * that is a sheet of glass with nothing in it, and a detail panel came
+   * out fully see-through with the tab underneath legible through the
+   * text. These are the values to use whenever a surface has to stand on
+   * its own.
+   */
+  --panel:      #16161A;
+  --panel-2:    #1F1F24;
+
   --ring-move:  #FA114F;
   --ring-exer:  #A6F900;
   --ring-stand: #00E5D1;
@@ -1203,6 +1216,9 @@ body::after {
   --text-2:    #3C3C43;
   --muted:     #6E6E73;
   --dim:       #AEAEB2;
+
+  --panel:      #FFFFFF;
+  --panel-2:    #F2F2F7;
 
   --ring-move:  #E00043;
   --ring-exer:  #5FA800;
@@ -3192,11 +3208,25 @@ button.src-tag { cursor: pointer; }
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+/*
+ * With no blur, every surface that floats over content has to be opaque on
+ * its own. The panel was the visible failure — see-through, with the page
+ * behind it competing with its own text — but the bars had the same fault
+ * in a milder form.
+ */
 :root[data-orb="none"] .tabs,
 :root[data-orb="none"] .topbar,
-:root[data-orb="none"] .sticky-glass { background: var(--glass-solid); }
-:root[data-orb="none"] .sheet { background: var(--surface); }
-:root[data-orb="none"] .scrim { background: rgba(0, 0, 0, .62); }
+:root[data-orb="none"] .sticky-glass { background: var(--panel); }
+:root[data-orb="none"] .sheet { background: var(--panel); }
+:root[data-orb="none"] .sheet-head,
+:root[data-orb="none"] .sheet-foot { background: var(--panel); }
+:root[data-orb="none"] .scrim { background: rgba(0, 0, 0, .72); }
+/* Cards sit on the page rather than over it, so they keep the tint — but
+   a card inside a panel needs to read against the panel, not the page. */
+:root[data-orb="none"] .sheet .tile,
+:root[data-orb="none"] .sheet .ah-card,
+:root[data-orb="none"] .sheet .wit,
+:root[data-orb="none"] .sheet .stat-cell { background: var(--panel-2); }
 
 /*
  * And a ceiling for when an orb IS on: one blur budget for the whole app
