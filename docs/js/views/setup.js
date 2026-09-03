@@ -157,7 +157,19 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
     draft.bodyFatPct = +fBf.value || 0;
     draft.birthYear = +fYear.value || 2000;
     draft.name = fName.value.trim();
-    draft.rate = GOALS[draft.goal].rate;
+    /*
+     * Picking a goal sets its rate. Re-saving the same goal does not.
+     *
+     * Settings -> Body and goal lets you type a rate between the presets —
+     * -0.75 rather than the -0.5 "Lose fat" implies. This line used to run
+     * unconditionally, which was harmless while the form only ever ran
+     * once, and became a quiet clobber the moment it could be reopened:
+     * come back to correct your weight, press save, and a rate you had
+     * tuned by hand snapped back to the preset with nothing said.
+     */
+    if (!existing || draft.goal !== existing.goal || draft.rate == null) {
+      draft.rate = GOALS[draft.goal].rate;
+    }
     return draft;
   };
 
