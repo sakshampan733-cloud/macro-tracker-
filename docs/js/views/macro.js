@@ -80,7 +80,13 @@ function proteinBody(q, mealLeu, targets) {
     el('div.tile', {},
       el('div.macros', {},
         bar('Complete', p.complete, p.covered, 'var(--good)'),
-        bar('Incomplete', p.incomplete, p.covered, 'var(--caution)')),
+        bar('Incomplete', p.incomplete, p.covered, 'var(--caution)'),
+        /* Shown only when there is some, but shown rather than absorbed:
+           without it the two bars quietly failed to add up to the covered
+           total and the difference had nowhere to be. */
+        p.unclassified > 0.5
+          ? bar('Not classified', p.unclassified, p.covered, 'var(--muted)')
+          : null),
       explain('Complete sources — meat, fish, egg, dairy, soy — carry every essential amino acid. '
         + 'Grains are short of lysine, legumes short of methionine. Eaten together they fill each other’s gaps, which is what dal with roti has always been doing.')),
 
@@ -89,11 +95,25 @@ function proteinBody(q, mealLeu, targets) {
       sourceRows(p.sources, s => el('div.row', {},
         el('span.grow', {},
           el('div.title', {}, s.name),
-          el('div.sub', { style: { color: s.complete ? 'var(--good-ink)' : 'var(--caution)' } },
-            s.complete
+          /* Three states, not two. `complete === null` means the food was
+             never classified, and the falsy check that used to sit here
+             sent it down the incomplete branch to render "short on null
+             (its limiting amino acid) · quality null" — a verdict, with
+             two nulls in it, on a food the app could not read. */
+          /* Complete first. A complete protein has no limiting acid by
+             definition, so testing for a missing one before testing for
+             completeness would file whey under "not classified". */
+          el('div.sub', {
+            style: { color: s.complete === true ? 'var(--good-ink)'
+                          : s.complete === false && s.limiting ? 'var(--caution)'
+                          : 'var(--muted)' },
+          },
+            s.complete === true
               ? `has all nine building blocks (complete protein) · quality ${s.diaas}`
-              : `short on ${s.limiting} (its limiting amino acid) · quality ${s.diaas}`),
-          !s.complete && s.pairsWith
+              : s.complete === false && s.limiting
+                ? `short on ${s.limiting} (its limiting amino acid) · quality ${s.diaas}`
+                : 'not classified — counted in the total, left out of the split'),
+          s.complete === false && s.pairsWith
             ? el('div.fine', { style: { marginTop: '2px' } }, `pair with ${s.pairsWith}`)
             : null),
         el('span.kcal', {}, g(s.g, 0) + ' g',

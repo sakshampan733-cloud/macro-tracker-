@@ -155,7 +155,16 @@ export function qualityFor(entry, macros) {
   const cls = classOf(entry.ref, entry);
   if (!cls) return null;
 
+  /*
+   * 'none' is a truthy string, which is how it slipped past the guard
+   * below for so long: a coffee resolves to the `none` protein class, that
+   * class carries complete:false, and the protein sheet duly announced
+   * "short on null (its limiting amino acid) · quality null" about a cup
+   * of coffee. `none` is the absence of a verdict, not a bad one, so it
+   * counts as unclassified exactly like a food we could not read at all.
+   */
   const P = PROTEIN_CLASS[cls.p] || PROTEIN_CLASS.none;
+  const pClassified = !!cls.p && cls.p !== 'none';
   const F = FAT_CLASS[cls.f] || FAT_CLASS.none;
   const C = CARB_CLASS[cls.c] || CARB_CLASS.none;
 
@@ -175,8 +184,8 @@ export function qualityFor(entry, macros) {
       leucine: protein * P.leu,
       /* Unknown is not the same as incomplete. Reporting "incomplete" for
          a food we simply could not classify reads as a verdict on it. */
-      complete: cls.p ? P.complete : null,
-      classified: !!cls.p,
+      complete: pClassified ? P.complete : null,
+      classified: pClassified,
       classLabel: P.label,
       note: P.short || null,
       limiting: P.limiting || null,
@@ -215,7 +224,11 @@ export function qualityFor(entry, macros) {
  */
 export function dayQuality(entries, macrosOf) {
   const acc = {
-    protein: { g: 0, leucine: 0, complete: 0, incomplete: 0, covered: 0, total: 0, sources: [] },
+    /* `unclassified` is its own bucket, not a share of `incomplete`. The
+       per-food record already keeps complete === null distinct from false
+       for exactly this reason; folding it in here would undo that one line
+       later and report a verdict the app never reached. */
+    protein: { g: 0, leucine: 0, complete: 0, incomplete: 0, unclassified: 0, covered: 0, total: 0, sources: [] },
     fat:     { g: 0, sat: 0, mufa: 0, pufa: 0, omega3: 0, trans: 0, covered: 0, total: 0, sources: [] },
     carb:    { g: 0, sugar: 0, fibre: 0, starch: 0, covered: 0, total: 0, sources: [],
                tiers: { good: 0, ok: 0, limit: 0 } },
@@ -233,7 +246,8 @@ export function dayQuality(entries, macrosOf) {
     acc.protein.g += q.protein.g;
     acc.protein.leucine += q.protein.leucine;
     acc.protein.covered += q.protein.g;
-    acc.protein[q.protein.complete ? 'complete' : 'incomplete'] += q.protein.g;
+    acc.protein[q.protein.complete === null ? 'unclassified'
+              : q.protein.complete ? 'complete' : 'incomplete'] += q.protein.g;
     if (q.protein.g > 0.5) {
       acc.protein.sources.push({ name: e.name, g: q.protein.g, leucine: q.protein.leucine,
                                  complete: q.protein.complete, cls: q.protein.classLabel,

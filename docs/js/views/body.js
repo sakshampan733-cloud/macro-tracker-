@@ -647,7 +647,7 @@ function tdeeTile(s) {
       ...rows.map(r => {
         const ready = r.res.kcal != null;
         const inUse = best.source === r.key;
-        return el('div.row.row-wrap', { style: { opacity: ready ? '1' : '.5' } },
+        return el('div.row', { style: { opacity: ready ? '1' : '.5' } },
           el('span.grow', {},
             el('div.title', {}, r.label,
               inUse ? el('span.conf.weighed', { style: { marginLeft: '8px' } }, 'IN USE') : null),

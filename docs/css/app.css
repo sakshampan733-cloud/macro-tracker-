@@ -400,15 +400,25 @@ h3 { font-size: 15px; }
 .row .title.is-clipped {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/*
+ * Subtitles wrap. They used to ellipsise, which is right for a long food
+ * name and wrong for everything else — and everything else is what
+ * actually lives here. It was cutting "From your own intake and weight
+ * trend" mid-phrase, "13 markers · Demo Diagnostics" mid-lab, and, in the
+ * protein sheet, "has all nine building blocks (complete protein)" at
+ * roughly half its width.
+ *
+ * A row that genuinely needs one line opts in with .is-clipped, the same
+ * way .row .title already does, so the truncation is a decision somebody
+ * made rather than a default nobody noticed.
+ */
 .row .sub {
   font-family: var(--mono); font-size: 11px; color: var(--muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-top: 1px;
+  margin-top: 1px; overflow-wrap: anywhere; line-height: 1.35;
 }
-/* A food row truncates its subtitle because the end of a long food name
-   carries nothing. A sentence is not like that — "From your own intake and
-   weight trend" was losing its last three words to the ellipsis. */
-.row.row-wrap .sub { white-space: normal; overflow: visible; text-overflow: clip; }
+.row .sub.is-clipped {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .row .kcal {
   font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums;
   text-align: right; white-space: nowrap;

@@ -370,14 +370,28 @@ export function entrySigma(entry) {
   return kcal * m.sigma * mult;
 }
 
+/*
+ * Defaults after the spread, not before it.
+ *
+ * They used to sit above `...entry`, which meant any caller passing an
+ * explicitly-undefined key — `{ meal: someVar }` where someVar happened to
+ * be undefined — overwrote the computed default with undefined and
+ * defeated the very line meant to protect it. A `meal: undefined` entry
+ * then gave byMeal() a group keyed "undefined", which the log renders as a
+ * meal heading reading exactly that.
+ *
+ * Written this way the defaults are the last word, and an absent value and
+ * an explicitly-undefined one behave the same — which is what anybody
+ * reading the call site would assume.
+ */
 export function addEntry(key, entry) {
   const e = {
+    ...entry,
     id: uid(),
-    ts: Date.now(),
+    ts: entry.ts ?? Date.now(),
     meal: entry.meal || mealForNow(),
     method: entry.method || 'portion',
     grade: entry.grade || 'C',
-    ...entry,
   };
   commit(s => { day(key).entries.push(e); }, 'entry:add');
   return e;

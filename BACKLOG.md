@@ -97,6 +97,53 @@ desk-bound Tuesday.
 
 ---
 
+## Bug sweep — 2026-09-03
+
+A full pass: every route x both themes x Reading on/off (32 combinations),
+72 sheet-opens across both themes, 18 write-path round-trips, an empty
+install, 12 band x filter states, and all 605 foods against the app's own
+Atwater checker. Four real bugs, all fixed.
+
+**1. The Quick Add meal picker never worked.** `segmented()` reads
+`o.value`; that one call site built its options with `o.id`. So every tap
+handed back `undefined`, no option ever rendered as pressed, and the meal
+silently fell back to whatever the clock suggested. One call site out of
+twenty-two had it wrong, which is exactly why nobody caught it.
+
+**2. `addEntry` let a caller defeat its own defaults.** `...entry` came
+*after* `meal:`/`method:`/`grade:`, so passing an explicitly-undefined key
+overwrote the computed default with undefined. Combined with bug 1 this
+produced entries with no meal, and `byMeal()` then built a group keyed
+`"undefined"` — which the log renders as a meal heading reading exactly
+that. Defaults now come last.
+
+**3. "short on null (its limiting amino acid) - quality null".** The
+protein sheet said this about a cup of coffee. `quality.js` deliberately
+keeps `complete === null` distinct from `false` — there is a comment saying
+so — but `'none'` is a truthy string, so the `cls.p ? ... : null` guard
+sailed past it and the `none` class carries `complete: false`. The
+aggregation had the same flaw, counting unclassified grams as incomplete
+protein, so the Complete/Incomplete bars silently failed to add up to the
+covered total. `none` is now unclassified, it has its own bar, and the
+view branches on all three states.
+
+**4. `.row .sub` truncated prose everywhere.** The ellipsis is right for a
+long food name and wrong for everything else, and everything else is what
+actually lives there. It was cutting "From your own intake and weight
+trend" mid-phrase and "has all nine building blocks (complete protein)" at
+roughly half its width. Subtitles now wrap; a row that genuinely needs one
+line opts in with `.is-clipped`, the same way `.row .title` already did.
+Checked against the 605-row reference list: average row height unchanged
+at 61px, zero subtitles wrapped there.
+
+Clean: date handling (DST, leap years, year boundaries all round-trip),
+search against regex metacharacters and 500-character strings, food data
+(no duplicate ids or names, no Atwater violations, no meat leaking into the
+vegetarian filter), `confirmSheet` in both call shapes, and every sheet on
+an empty install.
+
+---
+
 ## Built since the last capture
 
 Supplement tubs — the label parser already handled seventeen

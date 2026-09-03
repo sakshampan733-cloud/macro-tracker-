@@ -301,7 +301,11 @@ export function openQuickAdd(ctx) {
 
       el('div.tile', {},
         el('div.micro', { style: { marginBottom: '8px' } }, 'Meal'),
-        segmented(MEALS.map(m => ({ id: m, label: MEAL_LABELS[m] })), v.meal,
+        /* `value`, not `id` — segmented() reads o.value, so this picker
+           spent its whole life handing back undefined. Nothing looked
+           wrong: no option ever showed as pressed, and the meal quietly
+           fell back to whatever the clock suggested. */
+        segmented(MEALS.map(m => ({ value: m, label: MEAL_LABELS[m] })), v.meal,
           m => { v.meal = m; })),
 
       explain('Entered by hand, so this is graded D and carries a ±25% error bar. '
