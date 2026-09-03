@@ -267,6 +267,23 @@ to "Lose fat" and nobody wanting to get leaner without getting lighter
 could tell that was the one. Hints now render under the picker, and that
 goal is renamed "Lose fat, build muscle".
 
+**Follow-up: existing profiles.** Nobody has to redo setup — the live
+target is recomputed on every render, so it moves on the next app open.
+But `s.targets` is a frozen copy written at profile-save time that a few
+older screens still read, so after this change the live number and the
+frozen one disagreed by six hundred calories with no way to reconcile them
+short of re-saving. It is now recomputed at boot and rewritten only when it
+actually differs. A split set by hand survives, since macroTargets applies
+that too.
+
+The reasoning also moved to where the number is read. It was only on the
+setup screen, which is no use to somebody who chose their goal last month
+and has just watched the app move their target; it now appears on Detail
+alongside the other target explanations. And the "that is brisk" note no
+longer quotes the adult 1%-a-week line to a fifteen-year-old whose ceiling
+is a third of that — reading as permission up to a number they should not
+go near was worse than saying nothing.
+
 ---
 
 ## Built since the last capture

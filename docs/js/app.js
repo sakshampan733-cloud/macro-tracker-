@@ -5,13 +5,13 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.04-age';
+export const VERSION = '2026.09.04-heal';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
-import { get, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
+import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
 import { applyOrb } from './theme.js';
 import { solveDensities } from './dishes.js';
-import { bestTDEE } from './nutrition.js';
+import { bestTDEE, macroTargets } from './nutrition.js';
 import { renderToday } from './views/today.js';
 import { renderHome } from './views/home.js';
 import { renderAdd } from './views/add.js';
@@ -69,6 +69,29 @@ const OWN_HEADER = new Set(['home']);
 /* Before anything reads the open day: midnight cannot be noticed unless
    the app has written down which day it last ran on. */
 noteAppOpen();
+
+/*
+ * Bring the stored target snapshot in line with what this build computes.
+ *
+ * `s.targets` is a copy written when the profile was last saved, and a few
+ * older screens still read it rather than recomputing. Any release that
+ * changes the maths therefore leaves them quoting the previous version's
+ * numbers — after the age-aware update a sixteen-year-old's live target
+ * moved by six hundred calories while the frozen copy kept insisting on
+ * the old split, and the two disagreed on screen with no way to reconcile
+ * them short of re-saving the profile.
+ *
+ * Recomputed at boot, and only written when it actually differs, so this
+ * costs nothing on the overwhelming majority of launches. A split the
+ * person set by hand survives, because macroTargets applies it too.
+ */
+(() => {
+  const s = get();
+  if (!s.profile || !s.targets) return;
+  const fresh = macroTargets(s.profile, bestTDEE(s, s.profile).kcal);
+  const moved = ['kcal', 'p', 'c', 'f'].some(k => fresh[k] !== s.targets[k]);
+  if (moved) commit(st => { st.targets = fresh; }, 'targets');
+})();
 
 const ctx = {
   route: 'home',

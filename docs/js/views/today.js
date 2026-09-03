@@ -342,7 +342,13 @@ function safetyNotes(targets) {
         el('b', {}, b.rate.severe ? 'That is fast' : 'That is brisk'),
         el('div.fine', { style: { marginTop: '3px' } },
           `You are aiming to lose ${b.rate.pctPerWeek.toFixed(1)}% of your bodyweight a week. `
-          + `Past about 1% the weight still comes off, but more of it is muscle. `
+          /* The 1% figure is the adult one. Quoting it to a fifteen-year-old
+             whose ceiling is a third of that is worse than saying nothing —
+             it reads as permission up to a number they should not go near. */
+          + (b.rate.youth
+            ? 'While you are still growing the line is much lower than that, because the '
+              + 'energy a fast loss takes is energy that was going into growing. '
+            : 'Past about 1% the weight still comes off, but more of it is muscle. ')
           + `Around ${b.rate.suggested} kg a week would be the steadier choice at your size.`))));
   }
 
@@ -415,6 +421,32 @@ function targetBasis(targets, s, key) {
    * carry is in play. A person doing the arithmetic and coming up short
    * has been told something false by omission.
    */
+  /*
+   * Why the numbers are what they are, when you are still growing.
+   *
+   * The setup screen says this at the moment the goal is picked, which is
+   * no use to somebody who picked it last month and has just watched the
+   * app move their target by six hundred calories. The reasoning belongs
+   * where the number is read, not only where it was chosen.
+   */
+  if (targets.basis?.youth) {
+    const y = targets.basis.youth;
+    const rate = targets.basis.rate;
+    parts.push(el('div.flex', {},
+      icon('info', 15),
+      el('div', {},
+        el('div', { style: { fontSize: '13px' } },
+          `You are ${y.years}, so this is worked out with Schofield rather than the adult `
+          + `equation, and carbohydrate is held at ${targets.basis.carbRda} g rather than `
+          + 'being whatever is left over.'),
+        el('div.fine', { style: { marginTop: '3px' } },
+          rate
+            ? `Losing ${rate.pctPerWeek.toFixed(2)}% of your bodyweight a week is faster than `
+              + `is sensible while growing — ${rate.suggested} kg a week is the ceiling, and `
+              + 'holding your weight while you get taller works without taking anything away.'
+            : y.why))));
+  }
+
   /*
    * A split you set by hand, and whether it still adds up.
    *
