@@ -396,9 +396,29 @@ export function renderSettings(root, ctx) {
       goalTile(s, ctx)),
 
     group(ctx, 'target', 'Targets',
-      'Where your maintenance figure comes from.',
+      'Where your maintenance figure comes from, and whether it looks back.',
       field('Maintenance source', tdeeBox,
-        'Best available prefers your own adaptive figure, falls back to Whoop, then the formula.')),
+        'Best available prefers your own adaptive figure, falls back to Whoop, then the formula.'),
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', { style: { flex: '1', paddingRight: '12px' } },
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Carry the day forward'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              'Energy balance is cumulative, so a shortfall or a surplus rolls into '
+              + 'the next day rather than vanishing at midnight. Capped at 400 kcal, '
+              + 'expires after three days, and only counts days it can tell were '
+              + 'finished — a half-logged day is never treated as a real deficit. '
+              + 'Calories only: protein is not stored and cannot be repaid, so it is '
+              + 'reported as a seven-day trend instead.')),
+          el('button.btn.sm', {
+            onclick: () => {
+              commit(st => { st.settings.carryForward = st.settings.carryForward !== true; });
+              toast(get().settings.carryForward
+                ? 'Carrying forward. Capped at 400 kcal.'
+                : 'Each day stands on its own again.');
+              ctx.refresh();
+            },
+          }, s.settings.carryForward === true ? 'On' : 'Off')))),
 
     group(ctx, 'food', 'Food',
       'Your library, suggestions, and glass size.',

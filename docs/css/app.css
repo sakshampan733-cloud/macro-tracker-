@@ -405,6 +405,10 @@ h3 { font-size: 15px; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   margin-top: 1px;
 }
+/* A food row truncates its subtitle because the end of a long food name
+   carries nothing. A sentence is not like that — "From your own intake and
+   weight trend" was losing its last three words to the ellipsis. */
+.row.row-wrap .sub { white-space: normal; overflow: visible; text-overflow: clip; }
 .row .kcal {
   font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums;
   text-align: right; white-space: nowrap;

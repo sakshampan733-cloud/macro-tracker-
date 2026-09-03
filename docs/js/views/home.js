@@ -11,7 +11,8 @@
  * than adding your first.
  */
 
-import { el, clear, icon, kcal, toast, sheet, confirmSheet, append } from '../ui.js';
+import { el, clear, icon, kcal, toast, sheet, confirmSheet, append, explain, dateLabel } from '../ui.js';
+import { CARRY_WINDOW } from '../carry.js';
 import { flyToTotals, haptic } from '../feedback.js';
 import { weightUnit, kgToLb, lbToKg } from '../units.js';
 import { EFFORT } from '../data/exercises.js';
@@ -57,6 +58,7 @@ export function renderHome(root, ctx) {
     workoutAsk(key, ctx),
     header(key, ctx),
     readout(t, targets, ctx),
+    carryCard(targets),
     coachCard(s, targets, key, ctx),
     actions(ctx),
     waterStrip(key, targets),
@@ -452,6 +454,62 @@ function readout(t, targets, ctx) {
 
     el('div.readout-more', {}, 'Full breakdown', icon('chevron', 14)),
   );
+}
+
+/*
+ * Why today's number is not the usual number.
+ *
+ * An adjusted target that does not say why is worse than no adjustment —
+ * the person sees an unfamiliar figure, cannot account for it, and stops
+ * trusting every other figure on the screen with it. So the arithmetic is
+ * shown: where it came from, what was left out, and what was trimmed.
+ *
+ * The days it declined to count are named too. Somebody who under-ate on
+ * Tuesday and sees nothing carried should be told it was because Tuesday
+ * was half-logged, not left to conclude the feature is broken.
+ */
+function carryCard(targets) {
+  const c = targets.carry;
+  if (!c?.applied) return null;
+
+  const up = c.applied > 0;
+  const amount = Math.abs(Math.round(c.applied));
+  /* dateLabel already capitalises properly — lowercasing it turned
+     "Tue 1 Sept" into "tue 1 sept". */
+  const from = c.counted
+    .filter(d => Math.abs(d.delta) >= 25)
+    .map(d => `${dateLabel(d.date)} ${d.delta < 0 ? 'under' : 'over'} by ${Math.abs(Math.round(d.delta))}`);
+
+  return el('div.tile', {},
+    el('div.between', {},
+      el('div.micro', {}, up ? 'Carried forward' : 'Carried back'),
+      el('div.micro', { style: { color: up ? 'var(--good-ink)' : 'var(--warn)' } },
+        (up ? '+' : '−') + amount + ' kcal')),
+
+    el('div.fine', { style: { marginTop: '6px' } },
+      from.length
+        ? `${from.join(', ')}. Today's target moved to ${Math.round(targets.kcal)}.`
+        : `Today's target moved to ${Math.round(targets.kcal)}.`),
+
+    c.capped
+      ? el('div.fine', { style: { marginTop: '4px' } },
+          `Trimmed to the ${c.cap} kcal cap — the full gap was ${Math.abs(Math.round(c.raw))}.`)
+      : null,
+
+    c.floored
+      ? el('div.fine', { style: { marginTop: '4px' } },
+          `Held at your floor of ${c.floor.kcal}; the carry would have gone under it.`)
+      : null,
+
+    c.skipped.length
+      ? el('div.fine', { style: { marginTop: '4px' } },
+          'Not counted: ' + c.skipped
+            .map(d => `${dateLabel(d.date)} (${d.why})`).join(', ') + '.')
+      : null,
+
+    explain(`Energy balance is cumulative, so this is real — but only for calories, and only `
+      + `over ${CARRY_WINDOW} days. Protein is not stored and cannot be repaid, so it is never carried.`,
+      { style: { marginTop: '8px' } }));
 }
 
 /*

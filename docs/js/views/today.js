@@ -7,7 +7,7 @@
 
 import {
   el, clear, rail, macroRail, kcal, grams, g, clock, dateLabel, icon,
-  toast, sheet, confirmSheet, empty, append, live,
+  toast, sheet, confirmSheet, empty, append, live, explain,
 } from '../ui.js';
 import {
   get, commit, day, totals, byMeal, MEALS, METHODS, dayKey, shiftDay,
@@ -15,6 +15,7 @@ import {
   subscribe,
 } from '../store.js';
 import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
+import { carryFor, applyCarry, macroTrend } from '../carry.js';
 import { supplementTargetShift } from '../data/supplements.js';
 import { bandName } from '../applehealth.js';
 import { dayFactor } from '../whoop.js';
@@ -45,6 +46,7 @@ export function renderToday(root, ctx) {
     nowCard(s, targets, key, ctx),
     energyTile(t, targets, s, key, ctx),
     macroTile(t, targets, key, ctx),
+    macroTrendTile(s, targets),
     /* Directly under the macros. Buried below the log it may as well not
        have existed — you had to scroll past everything to reach it. */
     caffeineTile(s, key),
@@ -93,20 +95,85 @@ export function dayTargets(s, key) {
   const cutting = (profile.rate ?? 0) < 0;
   const redRecovery = row?.recovery != null && row.recovery < 34;
 
+  /*
+   * What the last few days left on the table, applied last.
+   *
+   * It rides on top of whatever the day already worked out to, because it
+   * is answering a different question — not "what should today be" but
+   * "what is still outstanding from before". Off unless asked for.
+   */
+  const carry = carryFor(s, key, base.kcal);
+
   if (redRecovery && cutting && s.settings.tdeeSource !== 'predicted') {
     const held = macroTargets({ ...profile, rate: 0, goal: 'maintain' }, tdee.kcal);
-    return {
+    const out = {
       ...held, source: 'recovery-hold', tdee, day, base, suppShift,
       hold: { reason: 'red recovery', recovery: Math.round(row.recovery),
               added: Math.max(0, held.kcal - base.kcal) },
     };
+    /* The hold exists to stop today running a deficit. A carry that would
+       push the number back down is the exact thing it is holding against,
+       so on a red morning the carry may only ever add. */
+    return carry?.kcal > 0 ? applyCarry(out, carry, profile) : out;
   }
 
   if (day && s.settings.tdeeSource !== 'predicted') {
     const adjusted = macroTargets(profile, tdee.kcal * day.factor);
-    return { ...adjusted, source: 'whoop-day', tdee, day, base, suppShift };
+    return applyCarry({ ...adjusted, source: 'whoop-day', tdee, day, base, suppShift },
+                      carry, profile);
   }
-  return { ...base, source: tdee.source, tdee, base, suppShift };
+  return applyCarry({ ...base, source: tdee.source, tdee, base, suppShift },
+                    carry, profile);
+}
+
+/*
+ * Macros over the last week, which is the honest version of a macro debt.
+ *
+ * People ask to carry protein forward, and the question underneath it —
+ * "have I been getting enough lately?" — is a good one. It is only the
+ * arithmetic of repayment that is wrong: protein is not stored, so
+ * yesterday's shortfall cannot be settled today and a number saying you
+ * owe 40 g is a fiction with a decimal point.
+ *
+ * A run of low days, though, is real and worth acting on. So: how many of
+ * the last seven came in under, and where the average actually sits. Same
+ * information, nothing invented.
+ *
+ * Thin and unlogged days are excluded rather than counted as zeroes — a
+ * day you did not log is not a day you did not eat, and averaging it in as
+ * one would manufacture a deficiency out of a busy week.
+ */
+function macroTrendTile(s, targets) {
+  const tr = macroTrend(s, 7, () => targets);
+  if (!tr.ready) return null;
+
+  const NAMES = { p: 'Protein', f: 'Fat', fib: 'Fibre' };
+  const rows = ['p', 'f', 'fib']
+    .map(k => ({ k, ...tr[k] }))
+    .filter(r => r.days);
+
+  /* Only worth a card if something is actually running low. Three green
+     lines every day is noise, and noise is what gets scrolled past. */
+  const notable = rows.filter(r => r.under >= 3);
+  if (!notable.length) return null;
+
+  return el('div.tile', {},
+    el('div.tile-head', {}, el('h3', {}, 'Last 7 days'),
+      el('span.micro', {}, `${tr.counted} days counted`)),
+
+    ...notable.map(r => el('div.between', { style: { marginTop: '8px' } },
+      el('div', {},
+        el('div', { style: { fontSize: '14px', fontWeight: '500' } }, NAMES[r.k]),
+        el('div.fine', { style: { marginTop: '2px' } },
+          `under on ${r.under} of ${r.days} days`)),
+      el('div', { style: { textAlign: 'right' } },
+        el('div.num', { style: { fontSize: '17px' } }, `${r.mean} g`),
+        el('div.micro', { style: { marginTop: '2px' } }, `aim ${r.meanTarget} g`)))),
+
+    explain('A run of low days is worth acting on; a single one is not. '
+      + 'Nothing here is owed — protein and fibre are not stored, so yesterday '
+      + 'cannot be made up today, only done differently from here.',
+      { style: { marginTop: '10px' } }));
 }
 
 function dateStrip(key, ctx) {
@@ -324,6 +391,33 @@ function targetBasis(targets, s, key) {
           `, ${targets.basis.delta >= 0 ? '+' : ''}${targets.basis.delta} to ${targets.basis.rateKgPerWeek >= 0 ? 'gain' : 'lose'} ${Math.abs(targets.basis.rateKgPerWeek)} kg a week.`),
         el('div.fine', { style: { marginTop: '3px' } }, tdee.why || ''))));
   }
+
+  /*
+   * The carry, said here as well as on Home.
+   *
+   * Everything above explains the target by way of maintenance and the
+   * day's burn, and none of it adds up to the number on the screen once a
+   * carry is in play. A person doing the arithmetic and coming up short
+   * has been told something false by omission.
+   */
+  if (targets.carry?.applied) {
+    const up = targets.carry.applied > 0;
+    parts.push(el('div.flex', {},
+      icon(up ? 'chevron' : 'back', 15),
+      el('div', {},
+        el('div', { style: { fontSize: '13px' } },
+          `Carried ${up ? 'forward' : 'back'} ${Math.abs(Math.round(targets.carry.applied))} kcal `
+          + `from the last ${targets.carry.counted.length} `
+          + `day${targets.carry.counted.length === 1 ? '' : 's'}, `
+          + `which is what takes it to ${kcal(targets.kcal)}.`),
+        el('div.fine', { style: { marginTop: '3px' } },
+          targets.carry.floored
+            ? `Held at your floor of ${targets.carry.floor.kcal} kcal.`
+            : targets.carry.capped
+              ? `Capped at ${targets.carry.cap} kcal; the full gap was ${Math.abs(Math.round(targets.carry.raw))}.`
+              : 'Calories only — protein is not stored, so it is never carried.'))));
+  }
+
   return el('div.stack', {}, ...parts);
 }
 

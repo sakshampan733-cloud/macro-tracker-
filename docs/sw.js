@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.09.03-hero';
+const CACHE = 'basal-2026.09.03-carry';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',

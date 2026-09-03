@@ -17,6 +17,7 @@ import {
 import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict, planVsActual } from '../nutrition.js';
 import { trainStats } from '../store.js';
 import { stepReport, stepTarget, stepsWorth, suggestedTarget } from '../steps.js';
+import { stepCarry, STEP_SPREAD } from '../carry.js';
 import { calibrationTile } from './dish.js';
 import { bloodTile } from './blood.js';
 import {
@@ -71,6 +72,31 @@ export function renderBody(root, ctx) {
  * Twelve thousand on Saturday does not undo four days of two thousand, and
  * it was the four days the deficit noticed.
  */
+/*
+ * Where the rolling week stands against its own pace.
+ *
+ * Silent unless it has something to say: three settled days before it will
+ * speak at all, and nothing shown when today's suggestion is within a few
+ * hundred steps of the ordinary target, because a widget that announces
+ * "carry on as normal" every day teaches you to stop reading it.
+ */
+function stepWeek() {
+  const w = stepCarry();
+  if (!w?.material) return null;
+
+  const behind = !w.ahead;
+  return el('div', { style: { margin: '2px 0 10px' } },
+    el('div.between', {},
+      el('div.micro', {}, behind ? 'Behind the week' : 'Ahead of the week'),
+      el('div.micro', { style: { color: behind ? 'var(--caution)' : 'var(--good-ink)' } },
+        `${w.done.toLocaleString()} of ${(w.target * w.days).toLocaleString()}`)),
+    el('div.fine', { style: { marginTop: '4px' } },
+      `Today's aim ${w.adjusted.toLocaleString()}`
+      + (w.capped
+        ? ` — the gap is bigger than one day should try to close, so it is capped.`
+        : ` — the ${Math.abs(w.shortfall).toLocaleString()} step gap spread over ${STEP_SPREAD} days.`)));
+}
+
 function stepsTile(s, ctx) {
   const r = stepReport(14);
   if (!r.target && !r.series.length) return null;
@@ -106,6 +132,17 @@ function stepsTile(s, ctx) {
           `${r.hit} of ${r.days}`),
         r.worst.length ? el('div.micro', { style: { marginTop: '2px' } },
           `lowest ${r.worst[0].steps.toLocaleString()}`) : null)),
+
+    /*
+     * The week, when the app is carrying days forward.
+     *
+     * Steps are the one place where carry-forward is unarguable: what the
+     * deficit notices is the week's total, and a long Saturday genuinely
+     * does offset a desk-bound Tuesday. So the target becomes a pace, and
+     * the shortfall lands over several days rather than all on today —
+     * "walk 25,000 today" is not a plan, it is how a number gets ignored.
+     */
+    stepWeek(),
 
     /* One bar a day, against the target line, so a bad run is visible as a
        run rather than as a lower average. */
@@ -610,7 +647,7 @@ function tdeeTile(s) {
       ...rows.map(r => {
         const ready = r.res.kcal != null;
         const inUse = best.source === r.key;
-        return el('div.row', { style: { opacity: ready ? '1' : '.5' } },
+        return el('div.row.row-wrap', { style: { opacity: ready ? '1' : '.5' } },
           el('span.grow', {},
             el('div.title', {}, r.label,
               inUse ? el('span.conf.weighed', { style: { marginLeft: '8px' } }, 'IN USE') : null),

@@ -45,15 +45,17 @@ import { stepTarget, stepSeries } from './steps.js';
  * spends tomorrow instructing you to eat them. The cap is what keeps this
  * a nudge rather than a licence.
  *
- * SPREAD (steps) — a step debt lands over three days rather than all on
+ * SPREAD (steps) — a step debt lands over five days rather than all on
  * today, because "walk 25,000 today" is not a plan, it is a way to teach
- * somebody to ignore the number.
+ * somebody to ignore the number. Three days was the first attempt and it
+ * still produced an 18,000-step Tuesday off an ordinary week; a shortfall
+ * built over a week is allowed most of a week to come back.
  */
 export const CARRY_WINDOW = 3;
 export const CARRY_CAP_KCAL = 400;
 export const CARRY_CAP_FRAC = 0.2;
-export const STEP_SPREAD = 3;
-export const STEP_CAP_FRAC = 0.4;
+export const STEP_SPREAD = 5;
+export const STEP_CAP_FRAC = 0.3;
 
 export const carryOn = (s = get()) => s.settings?.carryForward === true;
 
@@ -169,7 +171,7 @@ export function applyCarry(targets, carry, profile) {
  * flat Tuesday in a way that a big Saturday of eating does not offset a
  * missed protein day. So the honest unit here is the rolling week.
  *
- * The shortfall lands over three days rather than all on today, and is
+ * The shortfall lands over several days rather than all on today, and is
  * capped, for the same reason the calorie carry is capped: a target nobody
  * can hit is a target everybody learns to ignore.
  */
