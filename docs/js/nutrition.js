@@ -300,6 +300,14 @@ export function rateAdvice(profile, rateKgPerWeek) {
 }
 
 export function macroTargets(profile, tdeeKcal) {
+  /* A split you set applies wherever targets are read, including the
+     stored s.targets snapshot that Settings and the older screens use.
+     Applied at the end, so everything below still computes the
+     recommendation that "back to recommended" returns you to. */
+  return applyCustom(computeTargets(profile, tdeeKcal), profile);
+}
+
+function computeTargets(profile, tdeeKcal) {
   const goal = GOALS[profile.goal] || GOALS.maintain;
   const rateKgPerWeek = profile.rate ?? goal.rate;
   const delta = (rateKgPerWeek * KCAL_PER_KG_TISSUE) / 7;
@@ -355,6 +363,65 @@ export function macroTargets(profile, tdeeKcal) {
       rate: rateAdvice(profile, rateKgPerWeek),
     },
   };
+}
+
+/*
+ * The split the app would choose, ignoring anything you have chosen.
+ *
+ * Kept separate so the editor can show both at once — what you have set
+ * against what was suggested — and so "back to recommended" has something
+ * to go back to.
+ */
+export function recommendedTargets(profile, tdeeKcal) {
+  return computeTargets(profile, tdeeKcal);
+}
+
+/*
+ * Your split, if you have set one.
+ *
+ * Applied here rather than at any single screen, so every consumer — the
+ * readout, the coach, the report, the planner — sees the same numbers.
+ * There is no separate "custom mode" flag: a stored split IS custom mode,
+ * and clearing it is how you go back.
+ *
+ * Deliberately permissive. The macros are allowed not to add up to the
+ * calories, because a person typing exact numbers off a plan their coach
+ * gave them is not making an arithmetic mistake, and an app that silently
+ * "corrects" them is worse than one that says plainly what the gap is.
+ * The saying-so lives in the editor and on the Detail screen; the model
+ * just carries the numbers.
+ */
+export function applyCustom(targets, profile) {
+  const c = profile?.custom;
+  if (!c) return targets;
+
+  const has = ['p', 'c', 'f'].every(k => Number.isFinite(c[k]));
+  const kcal = Number.isFinite(c.kcal) ? c.kcal : targets.kcal;
+  const out = { ...targets, kcal };
+
+  if (has) {
+    out.p = Math.round(c.p);
+    out.c = Math.round(c.c);
+    out.f = Math.round(c.f);
+    /* Fibre tracks energy, not the split, so it follows the calorie
+       number rather than being frozen at whatever it was when you dragged
+       a slider. */
+    out.fib = Math.round(Math.min(45, Math.max(25, kcal / 1000 * 14)));
+    out.sug = Math.round((kcal * 0.10) / 4);
+    out.sat = Math.round((kcal * 0.10) / 9);
+  }
+
+  const fromMacros = has ? out.p * 4 + out.c * 4 + out.f * 9 : kcal;
+  out.custom = {
+    ...c,
+    macros: has,
+    fixedKcal: Number.isFinite(c.kcal),
+    /* What the split actually adds up to, against what the day is set to.
+       Only meaningful when they disagree, which only typing can cause. */
+    macroKcal: Math.round(fromMacros),
+    gap: Math.round(fromMacros - kcal),
+  };
+  return out;
 }
 
 /* 35 ml per kg, plus a litre on hard training days. */

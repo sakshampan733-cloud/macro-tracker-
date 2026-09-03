@@ -14,7 +14,7 @@ import {
   removeEntry, addWater, undoWater, entryMacros, setWeight, saveMeal, peekDay,
   subscribe,
 } from '../store.js';
-import { bestTDEE, macroTargets, waterTarget } from '../nutrition.js';
+import { bestTDEE, macroTargets, waterTarget, applyCustom } from '../nutrition.js';
 import { carryFor, applyCarry, macroTrend } from '../carry.js';
 import { supplementTargetShift } from '../data/supplements.js';
 import { bandName } from '../applehealth.js';
@@ -104,6 +104,19 @@ export function dayTargets(s, key) {
    */
   const carry = carryFor(s, key, base.kcal);
 
+  /*
+   * A fixed calorie number is a decision, so the day stops moving it.
+   *
+   * Someone who types 1,800 and then sees 1,950 on a hard training day has
+   * been overruled by a feature they did not ask for. The band's daily
+   * adjustment, the red-recovery hold and the carry all exist to move a
+   * number the app chose; none of them should quietly move a number a
+   * person chose. The split still applies either way.
+   */
+  if (profile.custom?.kcal != null) {
+    return applyCustom({ ...base, source: 'custom', tdee, day, base, suppShift }, profile);
+  }
+
   if (redRecovery && cutting && s.settings.tdeeSource !== 'predicted') {
     const held = macroTargets({ ...profile, rate: 0, goal: 'maintain' }, tdee.kcal);
     const out = {
@@ -114,16 +127,18 @@ export function dayTargets(s, key) {
     /* The hold exists to stop today running a deficit. A carry that would
        push the number back down is the exact thing it is holding against,
        so on a red morning the carry may only ever add. */
-    return carry?.kcal > 0 ? applyCarry(out, carry, profile) : out;
+    return applyCustom(carry?.kcal > 0 ? applyCarry(out, carry, profile) : out, profile);
   }
 
   if (day && s.settings.tdeeSource !== 'predicted') {
     const adjusted = macroTargets(profile, tdee.kcal * day.factor);
-    return applyCarry({ ...adjusted, source: 'whoop-day', tdee, day, base, suppShift },
-                      carry, profile);
+    return applyCustom(
+      applyCarry({ ...adjusted, source: 'whoop-day', tdee, day, base, suppShift }, carry, profile),
+      profile);
   }
-  return applyCarry({ ...base, source: tdee.source, tdee, base, suppShift },
-                    carry, profile);
+  return applyCustom(
+    applyCarry({ ...base, source: tdee.source, tdee, base, suppShift }, carry, profile),
+    profile);
 }
 
 /*
@@ -400,6 +415,33 @@ function targetBasis(targets, s, key) {
    * carry is in play. A person doing the arithmetic and coming up short
    * has been told something false by omission.
    */
+  /*
+   * A split you set by hand, and whether it still adds up.
+   *
+   * Only worth a line when it disagrees with the calorie number, which
+   * only typing can cause — the sliders cannot produce a gap. Said once,
+   * plainly, without nagging: it is a legitimate thing to want, and the
+   * app's job is to make sure you know, not to keep asking.
+   */
+  if (targets.custom) {
+    const c = targets.custom;
+    const bits = [];
+    if (c.fixedKcal) bits.push(`Fixed by you at ${kcal(targets.kcal)} kcal.`);
+    if (c.macros) bits.push('Split set by you.');
+    if (Math.abs(c.gap) > 25) {
+      bits.push(`Those macros come to ${kcal(c.macroKcal)} — `
+        + `${Math.abs(c.gap)} ${c.gap > 0 ? 'over' : 'under'} the target.`);
+    }
+    parts.push(el('div.flex', {},
+      icon('edit', 15),
+      el('div', {},
+        el('div', { style: { fontSize: '13px' } }, bits.join(' ')),
+        el('div.fine', { style: { marginTop: '3px' } },
+          c.fixedKcal
+            ? 'The daily band adjustment and the carry stand down while your own number is set.'
+            : 'Change it in Settings → Targets.'))));
+  }
+
   if (targets.carry?.applied) {
     const up = targets.carry.applied > 0;
     parts.push(el('div.flex', {},

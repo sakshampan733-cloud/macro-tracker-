@@ -178,6 +178,48 @@ protein understates protein exactly as quietly.
 
 ---
 
+## Your own split, and getting back to the setup screen — 2026-09-04
+
+Three things, from handing the app to somebody who is not me.
+
+**Draggable macro targets.** The recommendation follows the goal, and the
+fastest-loss goal spends its whole budget on protein and fat: a 118 kg
+person picking it got 260 g protein and 59 g carbs, 11% of calories. That
+is defensible on paper and miserable to eat for months, which is how diets
+get abandoned in week three. Settings -> Targets now has three sliders.
+Drag one and the other two give way in proportion, so the total holds.
+Type into one and nothing moves, because a typed number is a decision and
+silently rebalancing it throws away the reason the screen was opened.
+
+Typed numbers may not add up, and the app says by how much rather than
+refusing. Protein under 1.6 g/kg and fat under 0.5 g/kg get a warning with
+the reason; low carbs get a note saying plainly that there is no medical
+minimum for carbohydrate, so it is a preference and not a deficiency. A
+fixed calorie number also stands down the daily band adjustment, the
+red-recovery hold and the carry — your number stays your number.
+
+The override lives in `macroTargets`, so the stored snapshot, the readout,
+the coach, the report and the planner all agree. `recommendedTargets` is
+the same computation without it, which is what "Recommended" restores.
+
+**The setup screen, reopenable.** Settings -> Targets -> Your details opens
+the original six questions, seeded from what you answered, saving in place.
+It keeps everything the form does not ask about — a custom split above all,
+so changing your goal re-suggests without discarding numbers you set.
+
+**Bug: "not done yet" trapped you in yesterday.** Saying it pinned openDay
+to yesterday, and the app boots with `date: openDay()`, so every launch and
+refresh dragged you back — even after walking forward with the arrows and
+spending the morning logging today. The prompt only appears once a night,
+so there was no way out. Now the two things that unambiguously mean you
+have moved on both move it: stepping forward onto today, and logging
+anything dated today. The day left behind is stamped closed, which is what
+finishing it is and what carry-forward wants to know. Only ever forward,
+and only onto today, so going back to fix Tuesday's lunch still moves
+nothing.
+
+---
+
 ## Built since the last capture
 
 Supplement tubs — the label parser already handled seventeen

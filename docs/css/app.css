@@ -3320,3 +3320,37 @@ button.src-tag { cursor: pointer; }
    not keep the spacing of the larger one. */
 .vitals-side { gap: 12px; }
 .vitals-hero { gap: 8px; }
+
+/* The macro sliders. The thumb is the thing you grab, so it is big enough
+   to grab on a phone rather than styled to look tidy on a desktop. */
+.macro-range {
+  -webkit-appearance: none; appearance: none;
+  flex: 1; min-width: 0; height: 26px; background: none; margin: 0;
+}
+.macro-range::-webkit-slider-runnable-track {
+  height: 8px; border-radius: 4px;
+  background: linear-gradient(to right,
+    var(--hue) 0 var(--fill, 0%), var(--line) var(--fill, 0%) 100%);
+}
+.macro-range::-moz-range-track {
+  height: 8px; border-radius: 4px;
+  background: linear-gradient(to right,
+    var(--hue) 0 var(--fill, 0%), var(--line) var(--fill, 0%) 100%);
+}
+.macro-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 24px; height: 24px; margin-top: -8px;
+  border-radius: 50%; background: var(--hue);
+  border: 3px solid var(--bg); box-shadow: 0 1px 4px rgba(0,0,0,.45);
+  cursor: grab;
+}
+.macro-range::-moz-range-thumb {
+  width: 24px; height: 24px; border-radius: 50%; background: var(--hue);
+  border: 3px solid var(--bg); box-shadow: 0 1px 4px rgba(0,0,0,.45);
+  cursor: grab;
+}
+.macro-range:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.08); }
+.macro-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+/* The typed field sits beside the slider, so it stays narrow enough to
+   leave the slider the width it needs to be draggable. */
+.macro-range + div .num-in { width: 62px; text-align: right; }

@@ -27,7 +27,7 @@ import {
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
   scannedFoods, builtFoods, addWater, undoWater, peekDay, dismissNote, noteDismissed,
-  commit,
+  commit, noteActiveDay,
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
@@ -301,6 +301,9 @@ function header(key, ctx) {
   const step = n => {
     const next = shiftDay(key, n);
     if (next > today) return;
+    /* Walking forward onto today settles the "not done yet" question, so
+       the next launch does not drag you back to yesterday. */
+    noteActiveDay(next);
     ctx.go('home', { date: next });
   };
 

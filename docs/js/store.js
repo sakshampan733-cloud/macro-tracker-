@@ -272,6 +272,40 @@ export function rolloverAsked() {
   return get().settings?.openDayAsked === dayKey();
 }
 
+/*
+ * Arriving at today is a way of saying you are done with yesterday.
+ *
+ * "Not done yet" is a statement about last night, not a standing
+ * subscription to it. It pinned openDay to yesterday, and since the app
+ * boots with `date: openDay()`, every launch and every refresh dragged you
+ * back there — even after you had walked forward with the arrows and spent
+ * the morning logging today. You could not get out without answering a
+ * prompt that only appears once a night.
+ *
+ * So the two things that unambiguously mean "I have moved on" both move
+ * it: stepping forward onto today, and logging anything dated today. The
+ * day you left behind is stamped closed, because that is exactly what
+ * finishing it is, and the carry-forward wants to know.
+ *
+ * Only ever forward, and only ever onto today — going back to Tuesday to
+ * fix a missed lunch must not move anything.
+ */
+export function noteActiveDay(key) {
+  const today = dayKey();
+  if (key !== today) return false;
+  const prev = state.settings?.openDay;
+  if (!prev || prev === today) return false;
+
+  commit(s => {
+    if (s.days[prev]?.entries?.length) s.days[prev].closedAt = Date.now();
+    s.settings.openDay = today;
+    /* The question has been answered by walking forward, so the prompt
+       should not re-ask tonight. */
+    delete s.settings.openDayAsked;
+  }, 'settings');
+  return true;
+}
+
 export function shiftDay(key, n) {
   const d = new Date(key + 'T12:00:00');
   d.setDate(d.getDate() + n);
@@ -394,6 +428,7 @@ export function addEntry(key, entry) {
     grade: entry.grade || 'C',
   };
   commit(s => { day(key).entries.push(e); }, 'entry:add');
+  noteActiveDay(key);
   return e;
 }
 
@@ -486,6 +521,7 @@ export function byMeal(key = dayKey()) {
 
 export function addWater(key, ml) {
   commit(s => { day(key).water.push({ ts: Date.now(), ml }); }, 'water');
+  noteActiveDay(key);
 }
 
 export function undoWater(key) {
@@ -881,6 +917,7 @@ export function logMeal(key, id, opts = {}) {
     s.meals[id].lastUsed = Date.now();
     s.meals[id].uses = (s.meals[id].uses || 0) + 1;
   }, 'entry:add');
+  noteActiveDay(key);
   return m.items.length;
 }
 

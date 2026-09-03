@@ -12,6 +12,7 @@ import {
 } from '../nutrition.js';
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
+import { openTargetEditor } from './targets.js';
 import { generateDemo } from '../demo.js';
 import { openSleepGoal, sleepSchedule, sleepHours, clockText } from './sleep.js';
 import { goalTile } from './goal.js';
@@ -28,13 +29,29 @@ import { SUPPLEMENTS, SUPPLEMENT_TAGS, supplementTargetShift } from '../data/sup
 
 /* ── Onboarding ─────────────────────────────────────────────────────── */
 
-export function renderOnboarding(root, ctx) {
+/*
+ * The opening questions, openable again.
+ *
+ * Everything here is a thing about you that changes — your weight, your
+ * training, what you are actually training for — and the only way to
+ * revisit it was a scattering of individual controls in Settings that
+ * never added up to the same page. Six answers went in together; they
+ * should be reviewable together.
+ *
+ * With a profile already saved this seeds from it and edits in place. The
+ * supplements list is deliberately not re-seeded — it is a live record of
+ * what you take, kept elsewhere, and quietly rewriting it from a setup
+ * screen would lose changes made since.
+ */
+export function renderOnboarding(root, ctx, { editing = false } = {}) {
   clear(root);
 
+  const existing = editing ? (get().profile || null) : null;
   const draft = {
     name: '', sex: 'male', birthYear: new Date().getFullYear() - 25,
     heightCm: 175, weightKg: 70, bodyFatPct: 0,
     activity: 'moderate', goal: 'lean', rate: null,
+    ...(existing || {}),
   };
 
   const preview = el('div.tile');
@@ -182,11 +199,20 @@ export function renderOnboarding(root, ctx) {
   [fHeight, fFt, fIn, fWeight, fBf, fYear, fName].forEach(i => i.addEventListener('input', update));
 
   root.append(
-    el('div', { style: { padding: '30px 0 18px' } },
-      el('div.brand', {}, 'BAS', el('span', {}, 'AL')),
-      el('h1', { style: { marginTop: '14px', fontSize: '30px' } }, 'Measure what you eat.'),
-      el('p', { style: { color: 'var(--text-2)', lineHeight: '1.55', marginTop: '8px' } },
-        'Six answers and you are logging. Every one of them is used in a calculation you can see.')),
+    /* First run gets the wordmark and the pitch. Coming back to it does
+       not — the app is already open above this, and repeating the brand
+       bar under the brand bar just looks like a bug. */
+    existing
+      ? el('div', { style: { padding: '4px 0 14px' } },
+          el('h1', { style: { fontSize: '26px' } }, 'Your details'),
+          el('p', { style: { color: 'var(--text-2)', lineHeight: '1.55', marginTop: '8px' } },
+            'The same six answers you started with. Changing your weight or goal re-suggests '
+            + 'your calories and split; anything you set by hand in Targets stays as you set it.'))
+      : el('div', { style: { padding: '30px 0 18px' } },
+          el('div.brand', {}, 'BAS', el('span', {}, 'AL')),
+          el('h1', { style: { marginTop: '14px', fontSize: '30px' } }, 'Measure what you eat.'),
+          el('p', { style: { color: 'var(--text-2)', lineHeight: '1.55', marginTop: '8px' } },
+            'Six answers and you are logging. Every one of them is used in a calculation you can see.')),
 
     field('Name', fName),
     field('Height in', heightUnitBox),
@@ -213,16 +239,19 @@ export function renderOnboarding(root, ctx) {
         if (!(p.heightCm > 100 && p.weightKg > 25)) { toast('Check your height and weight.', 'err'); return; }
         const tdee = predictedTDEE(p);
         commit(s => {
-          s.profile = p;
-          s.targets = macroTargets(p, tdee.kcal);
-          s.supplementsTaken = [...draft.supplements];
+          /* Editing keeps what this form does not ask about — a custom
+             split above all. Changing your goal here should re-suggest,
+             not silently discard numbers you set by hand. */
+          s.profile = existing ? { ...existing, ...p } : p;
+          s.targets = macroTargets(s.profile, tdee.kcal);
+          if (!existing) s.supplementsTaken = [...draft.supplements];
           s.settings.heightUnit = units.height;
           s.settings.weightUnit = units.weight;
         }, 'profile');
-        toast('Ready.');
-        ctx.go('today');
+        toast(existing ? 'Updated.' : 'Ready.');
+        ctx.go(existing ? 'settings' : 'today');
       },
-    }, 'Start logging'),
+    }, existing ? 'Save changes' : 'Start logging'),
     el('div', { style: { height: '30px' } }),
   );
 
@@ -396,7 +425,27 @@ export function renderSettings(root, ctx) {
       goalTile(s, ctx)),
 
     group(ctx, 'target', 'Targets',
-      'Where your maintenance figure comes from, and whether it looks back.',
+      'Your calories and split, where the figure comes from, and whether it looks back.',
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', { style: { flex: '1', paddingRight: '12px' } },
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Calories and split'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              s.profile?.custom
+                ? `Yours: ${s.targets?.p ?? '—'} g protein · ${s.targets?.c ?? '—'} g carbs · `
+                  + `${s.targets?.f ?? '—'} g fat.`
+                : 'Drag protein, carbs and fat against your calorie total, or type exact '
+                  + 'numbers. The app suggests; you decide.')),
+          el('button.btn.sm', { onclick: () => openTargetEditor(ctx) },
+            s.profile?.custom ? 'Edit' : 'Adjust'))),
+      el('div.tile', {},
+        el('div.between', {},
+          el('div', { style: { flex: '1', paddingRight: '12px' } },
+            el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Your details'),
+            el('div.fine', { style: { marginTop: '3px' } },
+              'Height, weight, age, training and goal — the six answers you gave at the start, '
+              + 'on the same screen you gave them on.')),
+          el('button.btn.sm', { onclick: () => ctx.go('profile') }, 'Open'))),
       field('Maintenance source', tdeeBox,
         'Best available prefers your own adaptive figure, falls back to Whoop, then the formula.'),
       el('div.tile', {},

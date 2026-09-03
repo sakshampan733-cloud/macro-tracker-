@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.03-scan';
+export const VERSION = '2026.09.04-yours';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
@@ -54,6 +54,9 @@ ROUTES.add = renderAdd;      // no tab; kept for old links and the shortcut
 ROUTES.foods = renderFoods;  // reached from Settings, not a tab of its own
 ROUTES.plan = renderPlan;    // no longer a tab; still reachable from Body and old links
 ROUTES.today = renderToday;  // old bookmarks land on Detail
+/* The opening questions, reachable again from Settings. Same screen, same
+   order, seeded from what you already answered. */
+ROUTES.profile = (root, c) => renderOnboarding(root, c, { editing: true });
 
 /* Screens that pin their own header. The brand bar scrolls away on these
    so two sticky bars never fight for the same few pixels. */
