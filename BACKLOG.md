@@ -220,6 +220,55 @@ nothing.
 
 ---
 
+## Age, sex and what the app is allowed to recommend — 2026-09-04
+
+Prompted by the app telling a sixteen-year-old to eat 100 g of carbs on an
+aggressive cut. Three separate defects underneath one bad recommendation.
+
+**The equation was the wrong one.** Mifflin-St Jeor was derived in adults
+aged 19-78 and reads low on an adolescent, who runs a higher resting burn
+per kilo and is spending energy on growth besides. Under 18 now uses
+Schofield, as adopted by FAO/WHO/UNU. For a 16-year-old at 95 kg that moves
+resting burn from 1,924 to 2,314 kcal — and the deficit used to come off
+the low figure.
+
+**Carbohydrate was whatever was left.** Protein and fat took what they
+wanted and carbs got the remainder, with a 40 g backstop no real diet would
+reach. So an aggressive goal quietly pushed carbohydrate under the amount
+the brain runs on, and the app presented that as its recommendation. The
+RDA is 130 g for everyone over one year old and it is set by brain glucose,
+not by fashion. Fat now yields toward its floor to make room; if even that
+is not enough the shortfall is reported rather than printed silently.
+
+**Protein scaled off total bodyweight.** 2.2 g/kg is right for a lean
+athlete and wrong for someone carrying a lot of fat, because requirements
+track lean mass and fat mass does not ask to be fed. At 118 kg it asked for
+260 g — half an aggressive target — which is what left 76 g of carbs.
+Protein is now also capped at 40% of energy, never below the 1.6 g/kg that
+protects muscle in a deficit.
+
+Net effect for the reported case, a 16-year-old at 95 kg picking "Lose fat":
+was roughly 2,400 kcal with ~100 g carbs; is now 3,037 kcal with 365 g carbs
+(48% of energy), 190 g protein, 91 g fat.
+
+**What it says, not just what it computes.** Under 18 the app now suggests
+holding weight while height catches up — the standard clinical answer to
+adolescent obesity, and a genuinely better recommendation rather than a
+softer one, because the ratio improves without energy being taken from
+growth, bone or puberty. A deficit is still allowed and still counted
+honestly; it is just never the thing the app proposed, and it comes with
+the line that this is worth doing with a doctor watching. The deficit
+ceiling drops from 0.55% of bodyweight a week to 0.35%, and the 1,200 kcal
+adult floor does not apply — the floor is their whole resting burn.
+
+**Goals.** Every goal has carried an explanation since the beginning and
+the picker rendered labels alone, so "Recomposition" was a bare word next
+to "Lose fat" and nobody wanting to get leaner without getting lighter
+could tell that was the one. Hints now render under the picker, and that
+goal is renamed "Lose fat, build muscle".
+
+---
+
 ## Built since the last capture
 
 Supplement tubs — the label parser already handled seventeen

@@ -41,9 +41,15 @@ export const ACTIVITY = {
  * case that motivated it, since it is not defined by a rate at all.
  */
 export const GOALS = {
-  cut:      { label: 'Lose fat',      rate: -0.5, hint: 'Deficit, protein held high' },
-  lean:     { label: 'Lean slowly',   rate: -0.25, hint: 'Small deficit, keeps training quality' },
-  maintain: { label: 'Maintain',      rate: 0,    hint: 'Hold weight, no particular push' },
+  cut:      { label: 'Lose fat',      rate: -0.5,
+              hint: 'A real deficit with protein held high. The fastest of the sensible '
+                  + 'options, and the one that asks the most of you to stick to.' },
+  lean:     { label: 'Lean slowly',   rate: -0.25,
+              hint: 'Half the deficit, most of the result, and your training stays good. '
+                  + 'The one most people should pick and do not.' },
+  maintain: { label: 'Maintain',      rate: 0,
+              hint: 'Hold your weight. Not a lack of a goal — if you are still growing, '
+                  + 'or coming off a long diet, it is the goal.' },
   /*
    * Build muscle without the scale moving.
    *
@@ -56,10 +62,14 @@ export const GOALS = {
    * It works best for people newer to training or carrying some fat to
    * spend; it is slow for everyone, and honest about that.
    */
-  recomp:   { label: 'Recomposition', rate: 0, protein: 2.4, recomp: true,
-              hint: 'Hold weight, build muscle — the scale stays put on purpose' },
-  gain:     { label: 'Build',         rate: 0.25, hint: 'Slow surplus, minimal fat gain' },
-  bulk:     { label: 'Gain fast',     rate: 0.5,  hint: 'Larger surplus' },
+  recomp:   { label: 'Lose fat, build muscle', rate: 0, protein: 2.4, recomp: true,
+              hint: 'Calories at maintenance so the scale holds, protein high enough to build '
+                  + 'on. You get leaner without getting lighter, so judge it by the mirror, '
+                  + 'the tape and your lifts — the scale will not move, by design.' },
+  gain:     { label: 'Build',         rate: 0.25,
+              hint: 'A slow surplus. Muscle with as little fat alongside it as possible.' },
+  bulk:     { label: 'Gain fast',     rate: 0.5,
+              hint: 'A bigger surplus. Faster, and more of what you gain will be fat.' },
 };
 
 export function age(birthYear, birthMonth = 6) {
@@ -67,7 +77,8 @@ export function age(birthYear, birthMonth = 6) {
   return now.getFullYear() - birthYear - (now.getMonth() + 1 < birthMonth ? 1 : 0);
 }
 
-/* Mifflin-St Jeor — the best-validated prediction equation for BMR. */
+/* Mifflin-St Jeor — the best-validated prediction equation for BMR.
+   Derived in adults aged 19–78, which is why it is not used below that. */
 export function bmrMifflin({ sex, weightKg, heightCm, years }) {
   const base = 10 * weightKg + 6.25 * heightCm - 5 * years;
   return Math.round(sex === 'female' ? base - 161 : base + 5);
@@ -80,12 +91,54 @@ export function bmrKatch({ weightKg, bodyFatPct }) {
   return Math.round(370 + 21.6 * lean);
 }
 
+/*
+ * Schofield, as adopted by FAO/WHO/UNU — the equations for people who are
+ * still growing.
+ *
+ * Mifflin-St Jeor was derived in adults and reads low on an adolescent,
+ * who runs a higher resting burn per kilo and is spending energy on growth
+ * besides. Feeding a sixteen-year-old off an adult equation understates
+ * what he needs before any deficit is applied, and then the deficit comes
+ * off that.
+ *
+ * Weight-based rather than weight-and-height, which is the form these are
+ * normally quoted and used in. For somebody carrying a lot of fat it reads
+ * high, since fat mass is less metabolically active than the equation
+ * assumes — an error in the safe direction here, and one that disappears
+ * as soon as body fat % is known.
+ */
+const SCHOFIELD = {
+  male:   [[3, 10, 22.7, 495], [10, 18, 17.5, 651], [18, 30, 15.3, 679], [30, 60, 11.6, 879]],
+  female: [[3, 10, 22.5, 499], [10, 18, 12.2, 746], [18, 30, 14.7, 496], [30, 60, 8.7, 829]],
+};
+
+export function bmrSchofield({ sex, weightKg, years }) {
+  const bands = SCHOFIELD[sex === 'female' ? 'female' : 'male'];
+  const b = bands.find(([lo, hi]) => years >= lo && years < hi) || bands[bands.length - 1];
+  return Math.round(b[2] * weightKg + b[3]);
+}
+
+/* Still growing, in the sense that matters here: peak bone mass is still
+   being laid down, height may still be increasing, and puberty is either
+   under way or recent. Eighteen is the line the equations themselves draw. */
+export const isYouth = profile => age(profile?.birthYear) < 18;
+
 export function bmrFor(profile) {
+  const years = age(profile.birthYear);
+
+  if (years < 18) {
+    return {
+      kcal: bmrSchofield({ ...profile, years }),
+      method: 'Schofield',
+      note: 'the equation used for people still growing',
+      youth: true,
+    };
+  }
   if (profile.bodyFatPct > 0) {
     return { kcal: bmrKatch(profile), method: 'Katch-McArdle', note: 'uses your lean mass' };
   }
   return {
-    kcal: bmrMifflin({ ...profile, years: age(profile.birthYear) }),
+    kcal: bmrMifflin({ ...profile, years }),
     method: 'Mifflin-St Jeor',
     note: 'add body fat % for a sharper figure',
   };
@@ -275,9 +328,75 @@ export function bestTDEE(store, profile) {
  * So the target never drops below resting burn, and the app says when it
  * has stepped in rather than quietly handing back a smaller number.
  */
+/*
+ * The carbohydrate figure nobody should be recommended below.
+ *
+ * 130 g a day is the RDA for everyone over one year old, and it is not a
+ * lifestyle number — it is set by what the brain burns as glucose. Low-carb
+ * diets run under it deliberately and adults are entitled to make that
+ * choice, which is why this constrains what the app RECOMMENDS and not
+ * what you are allowed to set.
+ *
+ * It matters most for the people least able to argue with an app. A
+ * sixteen-year-old told to eat 100 g of carbs by software he trusts has
+ * been given a number below the RDA by something that sounded official.
+ */
+export const CARB_RDA = 130;
+
+/*
+ * What changes when the person is still growing.
+ *
+ * Adolescence is when peak bone mass is laid down, when height is still
+ * being added, and when the hormonal machinery is still coming online.
+ * Energy restriction across that window is not the same intervention it is
+ * at thirty: it can cost final height, it can delay or disrupt puberty, and
+ * bone laid down poorly is not laid down again later.
+ *
+ * Which is why the standard clinical answer to adolescent obesity is not a
+ * deficit at all — it is holding weight steady while height keeps coming.
+ * The ratio improves without anything being taken away, because the
+ * denominator is still moving. That is a genuinely better recommendation
+ * than a cut, not a softer one, and it is what the app now suggests.
+ *
+ * Nothing here is a block. A sixteen-year-old who insists on a deficit can
+ * still set one, and the app will still count it honestly. But it should
+ * never be the thing the app proposed.
+ */
+export function youthGuidance(profile) {
+  const years = age(profile?.birthYear);
+  if (years >= 18) return null;
+
+  const w = profile?.weightKg || 0;
+  return {
+    years,
+    /* A third of a percent of bodyweight a week, against the 0.55% an
+       adult can run without comment. Slow enough that growth is not
+       competing with the deficit for the same energy. */
+    maxRate: +(w * 0.0035).toFixed(2),
+    holdInstead: true,
+    why: 'Still growing: holding your weight while you get taller lowers the ratio '
+       + 'on its own, without taking energy away from growth, bone and puberty. '
+       + 'That is what doctors do first at your age, and it is the recommendation here.',
+    seeSomeone: 'Losing weight on purpose before eighteen is worth doing with a doctor '
+       + 'rather than an app — not because the goal is wrong, but because someone should '
+       + 'be checking growth and bloods while it happens.',
+  };
+}
+
 export function safeFloor(profile) {
   const bmr = bmrFor(profile).kcal;
-  return { kcal: Math.max(1200, Math.round(bmr)), bmr, reason: bmr > 1200 ? 'resting burn' : 'absolute minimum' };
+  const youth = youthGuidance(profile);
+  /* For someone still growing the floor is their whole resting burn, with
+     no 1,200 kcal escape hatch underneath it — that figure is an adult
+     convention and has no business being applied to a fifteen-year-old. */
+  const hard = youth ? bmr : 1200;
+  return {
+    kcal: Math.max(hard, Math.round(bmr)),
+    bmr,
+    youth: !!youth,
+    reason: youth ? 'your resting burn, and you are still growing'
+          : bmr > 1200 ? 'resting burn' : 'absolute minimum',
+  };
 }
 
 /*
@@ -289,8 +408,25 @@ export function safeFloor(profile) {
  * it scales with the person.
  */
 export function rateAdvice(profile, rateKgPerWeek) {
+  const youth = youthGuidance(profile);
+
+  /* Gaining fast is its own question at this age and not one the app
+     should be pushing either, but the thing that does damage is the
+     deficit, so that is what is checked. */
   if (rateKgPerWeek >= 0) return null;
+
   const pctPerWeek = (Math.abs(rateKgPerWeek) / profile.weightKg) * 100;
+
+  if (youth) {
+    if (pctPerWeek <= 0.35) return null;
+    return {
+      pctPerWeek,
+      severe: pctPerWeek > 0.7,
+      suggested: youth.maxRate,
+      youth,
+    };
+  }
+
   if (pctPerWeek <= 0.55) return null;
   return {
     pctPerWeek,
@@ -321,20 +457,77 @@ function computeTargets(profile, tdeeKcal) {
     ? profile.weightKg * (1 - profile.bodyFatPct / 100)
     : null;
 
+  const youth = youthGuidance(profile);
   const cutting = rateKgPerWeek < 0;
   /* A goal may set its own protein rule. Recomposition does, because
      building at maintenance calories depends on protein far more than a
      surplus does — it is the only lever left once energy is fixed. */
-  const perKg = goal.protein ?? (cutting ? 2.2 : 1.8);
-  const leanPerKg = goal.protein ? goal.protein * 1.15 : (cutting ? 2.6 : 2.2);
-  const proteinG = Math.round(lean ? lean * leanPerKg : profile.weightKg * perKg);
+  let perKg = goal.protein ?? (cutting ? 2.2 : 1.8);
+  let leanPerKg = goal.protein ? goal.protein * 1.15 : (cutting ? 2.6 : 2.2);
+  /*
+   * Protein is capped while growing, which sounds backwards and is not.
+   * Adolescents need generous protein and get it easily; what they cannot
+   * afford is protein so high that it crowds carbohydrate out of a budget
+   * that also has to fund growth. 2.0 g/kg is ample at this age and leaves
+   * the room the rest of this function then spends on carbs.
+   */
+  if (youth) { perKg = Math.min(perKg, 2.0); leanPerKg = Math.min(leanPerKg, 2.3); }
+  let proteinG = Math.round(lean ? lean * leanPerKg : profile.weightKg * perKg);
 
-  const fatFloor = Math.round(profile.weightKg * 0.8);
+  /*
+   * Protein also gets a ceiling as a share of energy, not just per kilo.
+   *
+   * Grams-per-kilo of TOTAL bodyweight overshoots badly for anyone
+   * carrying a lot of fat, because protein requirements track lean mass
+   * and fat mass does not ask to be fed. At 118 kg the 2.2 g/kg rule
+   * asked for 260 g — more than a thousand calories, roughly half an
+   * aggressive target — which then left 76 g of carbohydrate for the day.
+   * The number was not wrong for a lean 118 kg athlete; it was wrong for
+   * the person actually typing it in.
+   *
+   * Above about 40% of energy there is no further benefit to protein, so
+   * that is where it stops, and the room goes back to the other two. The
+   * per-kilo floor still applies underneath — this trims excess, it never
+   * cuts into what protects muscle in a deficit. Knowing your body fat %
+   * sidesteps the whole thing, since lean mass is then used directly.
+   */
+  const proteinCeil = Math.floor((kcal * 0.40) / 4);
+  const proteinFloorG = Math.round(profile.weightKg * 1.6);
+  if (proteinG > proteinCeil) proteinG = Math.max(proteinFloorG, proteinCeil);
+
+  const fatFloorG = Math.round(profile.weightKg * 0.8);
   const fatFromPct = Math.round((kcal * 0.27) / 9);
-  const fatG = Math.max(fatFloor, fatFromPct);
+  let fatG = Math.max(fatFloorG, fatFromPct);
 
-  const remaining = kcal - proteinG * 4 - fatG * 9;
-  const carbG = Math.max(40, Math.round(remaining / 4));
+  /*
+   * Carbohydrate gets what is left — unless what is left is under the RDA,
+   * in which case fat gives way down to its own floor to make room.
+   *
+   * This is the line that produced "100 g of carbs" for a sixteen-year-old.
+   * Carbs were simply the remainder after protein and fat had taken what
+   * they wanted, with a token 40 g backstop that no real diet would ever
+   * hit — so an aggressive goal quietly pushed carbohydrate below the
+   * amount the brain runs on, and the app presented that as its
+   * recommendation.
+   *
+   * Fat yields first because it has the more generous margin above its
+   * floor. If even that is not enough the shortfall is reported rather
+   * than hidden: a target that cannot fund 130 g of carbohydrate alongside
+   * its own protein and fat is a target set too low, and saying so is more
+   * use than silently printing a smaller number.
+   */
+  let carbG = Math.round((kcal - proteinG * 4 - fatG * 9) / 4);
+  let carbFloored = false;
+
+  if (carbG < CARB_RDA) {
+    const needKcal = (CARB_RDA - carbG) * 4;
+    const fatRoomKcal = Math.max(0, (fatG - fatFloorG) * 9);
+    const takeKcal = Math.min(needKcal, fatRoomKcal);
+    fatG = Math.round(fatG - takeKcal / 9);
+    carbG = Math.round((kcal - proteinG * 4 - fatG * 9) / 4);
+    carbFloored = carbG < CARB_RDA;
+  }
+  carbG = Math.max(40, carbG);
 
   return {
     kcal,
@@ -361,6 +554,12 @@ function computeTargets(profile, tdeeKcal) {
       proteinPerKg: lean ? null : perKg,
       floored, floor, wanted,
       rate: rateAdvice(profile, rateKgPerWeek),
+      youth,
+      /* True when even a floor-level fat figure could not free up the RDA,
+         which says the calorie target itself is too low rather than the
+         split being badly chosen. */
+      carbFloored,
+      carbRda: CARB_RDA,
     },
   };
 }

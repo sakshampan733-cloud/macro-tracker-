@@ -5,7 +5,7 @@
  * each answer changes, and then gets out of the way.
  */
 
-import { el, clear, field, segmented, toast, icon, sheet, confirmSheet, kcal, empty, append } from '../ui.js';
+import { el, clear, field, segmented, toast, icon, sheet, confirmSheet, kcal, empty, append, replaceKids } from '../ui.js';
 import { get, commit, exportJSON, importJSON, reset, pushBackup } from '../store.js';
 import {
   ACTIVITY, GOALS, bmrFor, predictedTDEE, macroTargets, bestTDEE, waterTarget, age,
@@ -141,10 +141,22 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
     Object.entries(ACTIVITY).map(([k, v]) => ({ value: k, label: v.label })),
     draft.activity, v => { draft.activity = v; update(); }, { wrap: true }));
 
+  /*
+   * The goal hint, shown.
+   *
+   * Every goal has carried an explanation of what it actually does since
+   * the beginning, and the picker rendered the labels alone — so
+   * "Recomposition" was a bare word next to "Lose fat", and somebody who
+   * wanted to get leaner without getting lighter had no way of knowing
+   * that was the one. Naming it "Lose fat, build muscle" helps; saying
+   * what it means helps more.
+   */
+  const goalHint = el('div.fine', { style: { marginTop: '8px' } });
   const goalBox = el('div');
   goalBox.append(segmented(
     Object.entries(GOALS).map(([k, v]) => ({ value: k, label: v.label })),
-    draft.goal, v => { draft.goal = v; update(); }, { wrap: true }));
+    draft.goal, v => { draft.goal = v; update(); }, { wrap: true }),
+    goalHint);
 
   const read = () => {
     draft.heightCm = units.height === 'ftin'
@@ -175,6 +187,7 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
 
   function update() {
     const p = read();
+    goalHint.textContent = (GOALS[p.goal] || {}).hint || '';
     const bmr = bmrFor(p);
     const tdee = predictedTDEE(p);
     const t = macroTargets(p, tdee.kcal);
@@ -187,7 +200,10 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
         + 'most of how it works.'
       : '';
 
-    preview.replaceChildren(
+    /* replaceChildren stringifies null where the app's own append() drops
+       it — the notes below are conditional, so they have to be filtered
+       rather than passed straight in. */
+    replaceKids(preview,
       el('div.micro', {}, 'Your starting numbers'),
       el('div.readout', { style: { marginTop: '6px' } },
         el('div', {},
@@ -205,6 +221,14 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
         `${bmr.method} puts your resting burn at ${kcal(bmr.kcal)} kcal. `
         + `These are a starting point only — once you have logged ten days and weighed in four times, `
         + `the app replaces them with your measured maintenance.`),
+
+      /*
+       * Said here, where the goal is being chosen, rather than buried in a
+       * screen nobody opens. If the app is going to hand a fifteen-year-old
+       * a number, it owes them the reason it is the number it is.
+       */
+      youthNote(p, t),
+      compositionNote(p, t),
     );
   }
 
@@ -268,6 +292,71 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
   );
 
   update();
+}
+
+/*
+ * When the target is too low to be composed well.
+ *
+ * Not a warning about the split — the split is doing the best it can. It
+ * is a warning about the calorie number, which is the thing that has to
+ * move. If protein at its ceiling and fat at its floor still cannot leave
+ * 130 g of carbohydrate, the pace is the problem, and printing a smaller
+ * carb figure without comment would be the app quietly agreeing to it.
+ */
+function compositionNote(p, t) {
+  if (!t.basis?.carbFloored) return null;
+  const rate = t.basis?.rate;
+  return el('div.tile', {
+    style: { marginTop: '12px', borderLeft: '3px solid var(--caution)' },
+  },
+    el('div', { style: { fontSize: '13.5px', fontWeight: '600' } },
+      'This pace does not leave room to eat well'),
+    el('div.fine', { style: { marginTop: '5px' } },
+      `At ${kcal(t.kcal)} kcal there is no way to fit enough protein, the fat you need for `
+      + `hormones, and the ${t.basis.carbRda} g of carbohydrate your brain runs on. Carbs come `
+      + `out at ${t.c} g because they are what is left, not because that is a good amount.`),
+    el('div.fine', { style: { marginTop: '6px' } },
+      rate?.suggested
+        ? `A slower ${rate.suggested} kg a week fits, and loses roughly the same fat over a `
+          + 'few months with a lot less taken away from you.'
+        : 'A slower pace, or a smaller deficit, would fit.'));
+}
+
+/*
+ * What the app says to somebody who is still growing.
+ *
+ * Two things, and only when they apply: that holding weight is the better
+ * plan at this age and why, and — if a deficit has been chosen anyway —
+ * that the pace is steeper than it should be. Stated once, in the place
+ * the decision is made, and never as a refusal. The goal is not wrong; it
+ * is a thing to do with a doctor watching rather than alone with an app.
+ */
+function youthNote(p, t) {
+  const y = t.basis?.youth;
+  if (!y) return null;
+
+  const rate = t.basis?.rate;
+  const cutting = (t.basis?.rateKgPerWeek ?? 0) < 0;
+
+  return el('div.tile', {
+    style: { marginTop: '12px', borderLeft: '3px solid var(--caution)' },
+  },
+    el('div', { style: { fontSize: '13.5px', fontWeight: '600' } },
+      `You are ${y.years}, so the numbers work differently`),
+    el('div.fine', { style: { marginTop: '5px' } }, y.why),
+    cutting
+      ? el('div.fine', { style: { marginTop: '6px' } },
+          (rate?.suggested
+            ? `At this pace you are losing faster than is sensible while growing. `
+              + `${rate.suggested} kg a week would be the ceiling — or pick Maintain and let `
+              + `height do the work. `
+            : '')
+          + y.seeSomeone)
+      : null,
+    el('div.fine', { style: { marginTop: '6px' } },
+      `Your resting burn is calculated with Schofield rather than the adult equation, and `
+      + `carbohydrate is held at ${t.basis?.carbRda ?? 130} g — the amount your brain runs on — `
+      + `rather than being whatever is left over.`));
 }
 
 const stat = (label, value, hue) =>

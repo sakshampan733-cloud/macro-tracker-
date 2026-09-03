@@ -23,7 +23,7 @@
  * app's decision, and it is not.
  */
 
-import { el, sheet, toast, explain, kcal as kcalFmt } from '../ui.js';
+import { el, sheet, toast, explain, append, kcal as kcalFmt } from '../ui.js';
 import { get, commit } from '../store.js';
 import { recommendedTargets, bestTDEE, safeFloor, macroTargets } from '../nutrition.js';
 
@@ -262,7 +262,10 @@ export function openTargetEditor(ctx) {
     },
   }, 'Save');
 
-  body.append(
+  /* The app's append(), not the DOM's — explain() returns null when the
+     Reading setting is off, and Element.append stringifies that into a
+     literal "null" at the foot of the sheet. */
+  append(body,
     el('div.fine', {},
       'Drag a slider and the other two move to keep the total. Type a number and nothing else '
       + 'moves — the app will tell you if it stops adding up, and then leave it to you.'),
