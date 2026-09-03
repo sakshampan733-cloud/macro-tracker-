@@ -907,12 +907,22 @@ function picker(s, ctx, key) {
       if (mine !== seq) return;
       clear(grid);
       grid.append(remote);
-      remote.replaceChildren(food.found
-        ? cells([toItem(food)])
-        : el('div.grid-empty', {}, 'No entry for that barcode.',
-            el('button.btn.sm', { style: { marginTop: '10px' },
-              onclick: () => openBuilder({ barcode: digits, onSaved: ctx.refresh }) },
-              'Enter it from the packet')));
+      /* Found-but-empty is its own case. The entry exists, so "no entry
+         for that barcode" would be a lie, and showing it as a tappable
+         cell would log it as zero calories. */
+      remote.replaceChildren(
+        food.found && food.complete
+          ? cells([toItem(food)])
+          : el('div.grid-empty', {},
+              food.found
+                ? `${food.n} is in the database, but with no nutrition on it.`
+                : 'No entry for that barcode.',
+              el('button.btn.sm', { style: { marginTop: '10px' },
+                onclick: () => openBuilder({
+                  food: food.found ? food : null,
+                  barcode: digits, onSaved: ctx.refresh,
+                }) },
+                'Enter it from the packet')));
       return;
     }
 

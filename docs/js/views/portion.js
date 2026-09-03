@@ -59,6 +59,22 @@ export function openPortion(food, {
     return null;
   }
 
+  /*
+   * A panel that exists but has no energy in it is the same trap wearing a
+   * disguise, and it is the one that actually bit: Open Food Facts returns
+   * a per100 object for entries nobody has filled in, so the check above
+   * passes, macrosFor turns every null into a 0, and the packet logs as
+   * free food. Nothing on screen said so — the sheet opened normally and
+   * the day's total simply did not move.
+   *
+   * Energy is the one field with no sensible default. Refuse here, at the
+   * single door every food goes through, rather than at each caller.
+   */
+  if (food.per100.kcal == null) {
+    toast('No calories on that entry — fill it in from the packet.', 'err');
+    return null;
+  }
+
   const servings = (food.serv || []).map(s => Array.isArray(s) ? { l: s[0], g: s[1] } : s);
   const units = [...servings, { l: 'grams', g: 1, raw: true }];
   const grade = food.grade || (food.src === 'openfoodfacts' || food.barcode ? 'B' : 'C');

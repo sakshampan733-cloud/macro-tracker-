@@ -144,6 +144,40 @@ an empty install.
 
 ---
 
+## Scanned foods logging 0 kcal — 2026-09-03
+
+Reported from real use. Two separate faults stacked.
+
+**Per-serving-only products were read as having no nutrition.** Plenty of
+entries — US and Indian ones especially — carry only the `_serving` block,
+because that is what their label prints. The panel is complete, just
+expressed per biscuit rather than per hundred grams. `normalizeOFF` read
+only `_100g`, so all of those came back null. Now derived from
+`_serving` whenever the serving weight is known (`serving_quantity`, or
+parsed out of `serving_size`), and `_100g` still wins when both exist.
+A 190 kcal / 40 g bar now reads 475 kcal per 100 g instead of nothing.
+
+**A null then logged as zero, silently.** `macrosFor` maps `v == null` to
+0, which is right for fibre and wrong for energy. Nothing on screen said
+the panel was empty: the portion sheet opened as normal, the food logged
+as free, the day's total did not move, and `adaptiveTDEE` — which learns
+from logged intake — was fed a meal that never happened.
+
+The guard went into `openPortion`, the single door every food passes
+through, rather than into each of the four callers. It already refused a
+missing `per100`; it now also refuses one whose `kcal` is null. Deliberately
+`== null` and not falsy, so black coffee and water still log at a genuine 0.
+
+Scans that come back without a usable panel now route to the builder
+pre-filled with everything the lookup did return — name, brand, barcode,
+serving size, and any macros it had — so what is left is typing the numbers
+off the packet, not starting from a blank form. `complete` now turns on
+kcal alone (energy is the one field with no sensible default), with
+`hasMacros` alongside it, because a product logging 300 kcal and 0 g
+protein understates protein exactly as quietly.
+
+---
+
 ## Built since the last capture
 
 Supplement tubs — the label parser already handled seventeen

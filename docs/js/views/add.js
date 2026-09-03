@@ -29,6 +29,39 @@ import { openMealLogger } from './meallog.js';
 import { dayTargets } from './today.js';
 
 /*
+ * Where a scanned product actually goes.
+ *
+ * A lookup can succeed and still be useless: Open Food Facts is
+ * contributor-built, and plenty of entries carry a name, a brand and a
+ * photo with no energy figure behind them. `found` only says the barcode
+ * is known.
+ *
+ * That gap used to run straight into the portion sheet, where macrosFor
+ * turns a null into a zero — so the packet logged as free food, moved the
+ * day's total, and fed adaptiveTDEE a meal that never happened. Silently:
+ * nothing on screen said the panel was empty.
+ *
+ * So energy decides the destination. With it, the portion sheet as before.
+ * Without it, the builder, pre-filled with everything the lookup *did*
+ * bring back — name, brand, barcode, serving size, and any macros it had —
+ * so what is left is typing the numbers off the packet in front of you,
+ * not starting from a blank form. Saved once, it is yours permanently.
+ */
+export function logScanned(food, ctx, { onSaved } = {}) {
+  const done = onSaved || ctx.refresh;
+  /* Macros as well as energy: a product logging 300 kcal and 0 g protein
+     understates the protein total exactly as silently. The builder arrives
+     pre-filled either way, so the cost of routing through it is a glance. */
+  if (food.complete && food.hasMacros) {
+    openPortion(toItem(food), { dateKey: ctx.date || dayKey(), onSaved: done });
+    return 'portion';
+  }
+  toast('No nutrition on that entry — fill it in once.');
+  openBuilder({ food, barcode: food.barcode, onSaved: done });
+  return 'builder';
+}
+
+/*
  * A live header of what you have eaten so far, pinned above the search.
  *
  * Adding food and watching the day fill up were on separate tabs, so you
@@ -203,8 +236,8 @@ export function foodSurface(ctx) {
     pending.remove();
 
     if (food.found) {
-      results.append(listTile([toItem(food)], ctx));
-      openPortion(toItem(food), { dateKey: ctx.date || dayKey(), onSaved: ctx.refresh });
+      if (food.complete) results.append(listTile([toItem(food)], ctx));
+      logScanned(food, ctx);
       return;
     }
 
@@ -556,7 +589,7 @@ export function openScanner(ctx) {
 
     scanner && scanner.stop();
     s.close();
-    openPortion(toItem(food), { dateKey: ctx.date || dayKey(), onSaved: ctx.refresh });
+    logScanned(food, ctx);
   }
 
   function notFound(code, food, ctx) {

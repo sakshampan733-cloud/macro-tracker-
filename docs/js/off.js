@@ -60,24 +60,6 @@ const num = v => {
 export function normalizeOFF(product, code) {
   const n = product.nutriments || {};
 
-  let kcal = num(n['energy-kcal_100g']);
-  if (kcal == null) {
-    const kj = num(n['energy_100g']) ?? num(n['energy-kj_100g']);
-    if (kj != null) kcal = Math.round((kj / 4.184) * 10) / 10;
-  }
-
-  const sodium = num(n.sodium_100g);
-  const per100 = {
-    kcal,
-    p: num(n.proteins_100g),
-    c: num(n.carbohydrates_100g),
-    f: num(n.fat_100g),
-    fib: num(n.fiber_100g),
-    sug: num(n.sugars_100g),
-    sat: num(n['saturated-fat_100g']),
-    na: sodium != null ? Math.round(sodium * 1000) : null,   // OFF stores grams
-  };
-
   const name = (product.product_name || product.product_name_en
              || product.generic_name || '').trim();
 
@@ -87,6 +69,49 @@ export function normalizeOFF(product, code) {
     const m = servingLabel.match(/([\d.]+)\s*(g|ml)/i);
     if (m) servingG = num(m[1]);
   }
+
+  /*
+   * Per-serving is a legitimate second source, not a last resort.
+   *
+   * Plenty of products — US and Indian ones especially — carry only the
+   * `_serving` block, because that is what their label prints. The panel
+   * is complete, it is simply expressed per biscuit rather than per
+   * hundred grams, and OFF hands it over exactly as the contributor typed
+   * it. Reading only `_100g` treated all of those as having no nutrition
+   * at all, and a scan of a perfectly well-documented packet logged zero.
+   *
+   * The conversion is only safe when the serving weight is known, so the
+   * scale is a real number rather than an assumption about what "1 bar"
+   * weighs. Without it there is nothing to divide by and the field stays
+   * null, which is the honest answer.
+   */
+  const per = servingG > 0 ? 100 / servingG : null;
+  const pick = (base, unit100, unitServ) => {
+    const direct = num(n[unit100 || base + '_100g']);
+    if (direct != null) return direct;
+    if (per == null) return null;
+    const s = num(n[unitServ || base + '_serving']);
+    return s == null ? null : Math.round(s * per * 100) / 100;
+  };
+
+  let kcal = pick(null, 'energy-kcal_100g', 'energy-kcal_serving');
+  if (kcal == null) {
+    const kj = pick(null, 'energy_100g', 'energy_serving')
+            ?? pick(null, 'energy-kj_100g', 'energy-kj_serving');
+    if (kj != null) kcal = Math.round((kj / 4.184) * 10) / 10;
+  }
+
+  const sodium = pick('sodium');
+  const per100 = {
+    kcal,
+    p: pick('proteins'),
+    c: pick('carbohydrates'),
+    f: pick('fat'),
+    fib: pick('fiber'),
+    sug: pick('sugars'),
+    sat: pick(null, 'saturated-fat_100g', 'saturated-fat_serving'),
+    na: sodium != null ? Math.round(sodium * 1000) : null,   // OFF stores grams
+  };
 
   let packG = null;
   const q = (product.quantity || '').trim();
@@ -114,7 +139,18 @@ export function normalizeOFF(product, code) {
     img: product.image_front_small_url,
     nova: product.nova_group,
     src: 'openfoodfacts',
-    complete: per100.kcal != null && per100.p != null,
+    /*
+     * Energy is the one field the app cannot work around. A missing
+     * protein figure costs you one number in a breakdown; a missing kcal
+     * silently logs the food as free, moves the day's total, and teaches
+     * adaptiveTDEE from a figure that never happened. So `complete` turns
+     * on kcal alone, and callers are expected to check it before logging.
+     */
+    complete: per100.kcal != null,
+    hasMacros: per100.p != null && per100.c != null && per100.f != null,
+    /* Which fields the panel actually carried, so the builder can say what
+       it is asking you to fill in rather than presenting a blank form. */
+    missing: ['kcal', 'p', 'c', 'f'].filter(k => per100[k] == null),
   };
 }
 
