@@ -901,10 +901,23 @@ input.num-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
  * forcing the break in the first place.
  */
 .vitals-hero > * { min-width: 0; }
-.vitals-stat .v { white-space: nowrap; }
+/*
+ * Those two rules together are a trap, and it took a report of the ring
+ * "overlapping again" to see it: min-width:0 lets a side column get
+ * narrower than its contents, and white-space:nowrap then refuses to break
+ * the number, so the number renders straight out of its box and across the
+ * ring. Nothing collides in the layout — the boxes never intersect — which
+ * is why it measures clean and still looks broken.
+ *
+ * Between 381px and 420px the columns are tight enough for that to bite,
+ * and anyone running larger system text hits it at any width, because the
+ * ring is a fixed 128px while everything around it scales with the font.
+ *
+ * So the number is allowed to shrink before it is allowed to escape.
+ */
+.vitals-stat .v { white-space: nowrap; font-size: clamp(15px, 4.6vw, 21px); }
 .vitals-stat .k { hyphens: none; }
 @media (max-width: 420px) {
-  .vitals-stat .v { font-size: 19px; }
   .vitals-hero { gap: 6px; }
 }
 @media (max-width: 380px) {

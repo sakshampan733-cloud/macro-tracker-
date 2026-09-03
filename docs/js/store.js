@@ -239,8 +239,24 @@ export function dayPending() {
   return openDay() !== dayKey();
 }
 
+/*
+ * Starting a new day also closes the old one.
+ *
+ * Pressing this is a person saying "I am done eating" — the only moment in
+ * the app where a day's completeness is stated rather than inferred. Worth
+ * writing down: carry-forward will not roll a shortfall into tomorrow
+ * unless it can tell the day it came from was actually finished, and being
+ * told beats every guess available.
+ */
 export function startNewDay() {
-  commit(s => { s.settings.openDay = dayKey(); }, 'settings');
+  commit(s => {
+    const prev = s.settings?.openDay;
+    const today = dayKey();
+    if (prev && prev !== today && s.days[prev]?.entries?.length) {
+      s.days[prev].closedAt = Date.now();
+    }
+    s.settings.openDay = today;
+  }, 'settings');
 }
 
 /* Staying put explicitly: the same value the getter already returns, but
