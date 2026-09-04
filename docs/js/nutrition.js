@@ -40,16 +40,37 @@ export const ACTIVITY = {
  * the default protein rule where a goal needs one — recomposition is the
  * case that motivated it, since it is not defined by a rate at all.
  */
+/*
+ * `rate` is the weight change aimed for, in kg a week. `protein` overrides
+ * the default protein rule where a goal needs one — recomposition is the
+ * case that motivated it, since it is not defined by a rate at all.
+ *
+ * `group` sorts them into losing, holding and gaining so the picker can be
+ * read rather than scanned. The three loss rates are the ones every
+ * calorie calculator offers — a quarter, a half and a full kilo a week —
+ * because somebody arriving from one of those should find the option they
+ * came looking for rather than having to work out which of two vague
+ * labels means what they picked elsewhere.
+ *
+ * Including the aggressive ones is not the app endorsing them. A kilo a
+ * week trips the pace warning for almost everybody, trips it as "severe"
+ * for most, and on a young person trips the growth guidance as well. The
+ * option exists, the arithmetic is honest about it, and the person decides.
+ */
 export const GOALS = {
-  cut:      { label: 'Lose fat',      rate: -0.5,
-              hint: 'A real deficit with protein held high. The fastest of the sensible '
-                  + 'options, and the one that asks the most of you to stick to.' },
-  lean:     { label: 'Lean slowly',   rate: -0.25,
-              hint: 'Half the deficit, most of the result, and your training stays good. '
-                  + 'The one most people should pick and do not.' },
-  maintain: { label: 'Maintain',      rate: 0,
-              hint: 'Hold your weight. Not a lack of a goal — if you are still growing, '
-                  + 'or coming off a long diet, it is the goal.' },
+  extreme:  { label: 'Fast fat loss',    rate: -1.0, group: 'lose',
+              hint: 'About a kilo a week. The most aggressive option here, and the one '
+                  + 'hardest to hold on to — expect to be hungry, and expect some of what '
+                  + 'you lose to be muscle unless protein and training are both good.' },
+  cut:      { label: 'Lose fat',         rate: -0.5, group: 'lose',
+              hint: 'Half a kilo a week. A real deficit with protein held high — the fastest '
+                  + 'of the sensible options, and the one that asks the most of you to stick to.' },
+  lean:     { label: 'Lean slowly',      rate: -0.25, group: 'lose',
+              hint: 'A quarter kilo a week. Half the deficit, most of the result, and your '
+                  + 'training stays good. The one most people should pick and do not.' },
+  maintain: { label: 'Maintain',         rate: 0, group: 'hold',
+              hint: 'Hold your weight. Not a lack of a goal — if you are still growing, or '
+                  + 'coming off a long diet, it is the goal.' },
   /*
    * Build muscle without the scale moving.
    *
@@ -62,15 +83,26 @@ export const GOALS = {
    * It works best for people newer to training or carrying some fat to
    * spend; it is slow for everyone, and honest about that.
    */
-  recomp:   { label: 'Lose fat, build muscle', rate: 0, protein: 2.4, recomp: true,
+  recomp:   { label: 'Lose fat, build muscle', rate: 0, protein: 2.4, recomp: true, group: 'hold',
               hint: 'Calories at maintenance so the scale holds, protein high enough to build '
                   + 'on. You get leaner without getting lighter, so judge it by the mirror, '
                   + 'the tape and your lifts — the scale will not move, by design.' },
-  gain:     { label: 'Build',         rate: 0.25,
-              hint: 'A slow surplus. Muscle with as little fat alongside it as possible.' },
-  bulk:     { label: 'Gain fast',     rate: 0.5,
-              hint: 'A bigger surplus. Faster, and more of what you gain will be fat.' },
+  gain:     { label: 'Build',            rate: 0.25, group: 'gain',
+              hint: 'A quarter kilo a week. Muscle with as little fat alongside it as '
+                  + 'possible — roughly the fastest muscle is actually built.' },
+  bulk:     { label: 'Gain faster',      rate: 0.5, group: 'gain',
+              hint: 'Half a kilo a week. Faster on the scale, and a larger share of what you '
+                  + 'gain will be fat, because muscle does not build any quicker for being fed more.' },
+  bulkfast: { label: 'Fast gain',        rate: 1.0, group: 'gain',
+              hint: 'A kilo a week. Past the point where extra food becomes extra muscle, so '
+                  + 'most of this is fat you will spend a later diet removing.' },
 };
+
+export const GOAL_GROUPS = [
+  ['lose', 'Lose weight'],
+  ['hold', 'Hold weight'],
+  ['gain', 'Gain weight'],
+];
 
 export function age(birthYear, birthMonth = 6) {
   const now = new Date();

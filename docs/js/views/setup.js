@@ -8,7 +8,7 @@
 import { el, clear, field, segmented, toast, icon, sheet, confirmSheet, kcal, empty, append, replaceKids } from '../ui.js';
 import { get, commit, exportJSON, importJSON, reset, pushBackup } from '../store.js';
 import {
-  ACTIVITY, GOALS, bmrFor, predictedTDEE, macroTargets, bestTDEE, waterTarget, age,
+  ACTIVITY, GOALS, GOAL_GROUPS, bmrFor, predictedTDEE, macroTargets, bestTDEE, waterTarget, age,
 } from '../nutrition.js';
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
@@ -151,12 +151,50 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
    * that was the one. Naming it "Lose fat, build muscle" helps; saying
    * what it means helps more.
    */
+  /*
+   * The goal, in three groups rather than one row of eight.
+   *
+   * Losing, holding and gaining are different questions, and a flat list
+   * made you read all eight labels to find which two were even relevant.
+   * Grouped, you pick the question first and the pace second — which is
+   * also the order people actually decide in.
+   */
   const goalHint = el('div.fine', { style: { marginTop: '8px' } });
   const goalBox = el('div');
-  goalBox.append(segmented(
-    Object.entries(GOALS).map(([k, v]) => ({ value: k, label: v.label })),
-    draft.goal, v => { draft.goal = v; update(); }, { wrap: true }),
-    goalHint);
+  for (const [g, title] of GOAL_GROUPS) {
+    const inGroup = Object.entries(GOALS).filter(([, v]) => v.group === g);
+    goalBox.append(
+      el('div.micro', { style: { margin: '10px 0 5px', color: 'var(--dim)' } }, title),
+      segmented(inGroup.map(([k, v]) => ({ value: k, label: v.label })),
+        draft.goal, v => { draft.goal = v; draft.rate = GOALS[v].rate; fRate.value = String(GOALS[v].rate); update(); },
+        { wrap: true }));
+  }
+  goalBox.append(goalHint);
+
+  /*
+   * And the pace, typed.
+   *
+   * The presets are the rates every calorie calculator offers, but they
+   * are still somebody else's three numbers. A person who has been told
+   * 0.6 by a coach, or who wants 0.4 because 0.5 was too much last time,
+   * should be able to say so rather than picking the nearest preset and
+   * living with the difference. Picking a goal resets this to that goal's
+   * rate; typing over it keeps what you typed.
+   */
+  const fRate = el('input.num-in', {
+    type: 'number', inputmode: 'decimal', step: '0.05',
+    value: String(draft.rate ?? GOALS[draft.goal].rate),
+    'aria-label': 'Kilograms per week',
+  });
+  fRate.addEventListener('input', () => {
+    const v = parseFloat(fRate.value);
+    if (Number.isFinite(v)) { draft.rate = v; update(); }
+  });
+  const rateNote = el('div.fine', { style: { marginTop: '6px' } });
+  const rateBox = el('div', {},
+    el('div.flex', { style: { gap: '8px', alignItems: 'center' } },
+      fRate, el('span.micro', {}, 'kg a week')),
+    rateNote);
 
   const read = () => {
     draft.heightCm = units.height === 'ftin'
@@ -179,15 +217,31 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
      * come back to correct your weight, press save, and a rate you had
      * tuned by hand snapped back to the preset with nothing said.
      */
-    if (!existing || draft.goal !== existing.goal || draft.rate == null) {
-      draft.rate = GOALS[draft.goal].rate;
-    }
+    /*
+     * Only fill a missing rate. The goal picker already sets it when the
+     * goal changes, and the Pace field sets it when you type — so anything
+     * more than a null-check here would undo one of them on the very next
+     * read. This ran unconditionally on first-run onboarding, which meant
+     * a typed pace was overwritten the instant anything else on the form
+     * was touched.
+     */
+    if (draft.rate == null) draft.rate = GOALS[draft.goal].rate;
     return draft;
   };
 
   function update() {
     const p = read();
     goalHint.textContent = (GOALS[p.goal] || {}).hint || '';
+
+    /* What the pace actually costs a day, which is the number that makes
+       a rate mean something. 7,700 kcal is the energy in a kilo of tissue. */
+    const perDay = Math.round((p.rate * 7700) / 7);
+    const wk = Math.abs(p.rate);
+    rateNote.textContent = p.rate === 0
+      ? 'Holding steady, so no deficit or surplus.'
+      : `${Math.abs(perDay)} kcal ${p.rate < 0 ? 'under' : 'over'} maintenance every day. `
+        + `At ${wk} kg a week that is about ${(wk * 4.3).toFixed(1)} kg a month, `
+        + `if you hold it.`;
     const bmr = bmrFor(p);
     const tdee = predictedTDEE(p);
     const t = macroTargets(p, tdee.kcal);
@@ -262,6 +316,8 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
     field('Sex', sexBox, 'Used by the resting-metabolism equation.'),
     field('Training', actBox),
     field('Goal', goalBox),
+    field('Pace', rateBox,
+      'Set by the goal you picked. Type your own if you want a pace between them.'),
     field('Anything you take', suppBox,
       'Optional, and changeable later. Some of these move your targets.'),
     suppNote,
@@ -456,8 +512,16 @@ export function renderSettings(root, ctx) {
     p.activity, v => save({ activity: v }), { wrap: true }));
 
   const goalBox = el('div');
-  goalBox.append(segmented(Object.entries(GOALS).map(([k, v]) => ({ value: k, label: v.label })),
-    p.goal, v => save({ goal: v, rate: GOALS[v].rate }), { wrap: true }));
+  /* Grouped the same way the setup screen groups them, so the two places
+     you can change your goal do not present it as two different lists. */
+  for (const [g, title] of GOAL_GROUPS) {
+    goalBox.append(
+      el('div.micro', { style: { margin: '10px 0 5px', color: 'var(--dim)' } }, title),
+      segmented(Object.entries(GOALS).filter(([, v]) => v.group === g)
+        .map(([k, v]) => ({ value: k, label: v.label })),
+        p.goal, v => save({ goal: v, rate: GOALS[v].rate }), { wrap: true }));
+  }
+  goalBox.append(el('div.fine', { style: { marginTop: '8px' } }, GOALS[p.goal]?.hint || ''));
 
   const dietBox = el('div');
   dietBox.append(segmented([

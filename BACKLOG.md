@@ -342,6 +342,30 @@ doubted — "these are the demo's numbers, not yours" — rather than only in a
 collapsed group in Settings, which is not where anybody looks when their
 figure disagrees with a calculator.
 
+**Goals, in more detail — 2026-09-04.** Nine of them now, sorted into
+Lose / Hold / Gain so you pick the question before the pace, which is the
+order people decide in. The three loss rates are the ones every calorie
+calculator offers — a quarter, a half and a full kilo a week — so somebody
+arriving from one finds the option they came for instead of guessing which
+vague label matches what they picked elsewhere. Same on the gain side.
+
+Including the aggressive ones is not the app endorsing them. A kilo a week
+trips the pace warning as *severe*, lands on the resting-burn floor, and
+sets carbFloored so the "this pace does not leave room to eat well" note
+fires. On a sixteen-year-old it trips the growth guidance too. The option
+exists, the arithmetic is honest about it, and the person decides.
+
+And a Pace field: type your own kg-a-week if you want something between the
+presets — 0.6 because a coach said so, or 0.4 because 0.5 was too much last
+time. Picking a goal sets it, typing overrides it, and it now says what the
+pace costs a day (`660 kcal under maintenance every day. At 0.6 kg a week
+that is about 2.6 kg a month, if you hold it`), which is the number that
+makes a rate mean anything.
+
+Bug found while building it: `read()` reset the rate unconditionally on
+first-run onboarding, so a typed pace was overwritten the moment anything
+else on the form was touched. It now only fills a missing value.
+
 ---
 
 ## Built since the last capture
