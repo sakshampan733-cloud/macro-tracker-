@@ -301,6 +301,26 @@ to recommend, not about which formula produced the starting figure. The
 sixteen-year-old case is 2,502 kcal with 265 g of carbs — the carb problem
 was never the equation, it was carbs being the leftover.
 
+**BMI.** On the Body tab, under the weight card, computed from what the
+app already holds — asking for height and weight again would be asking you
+to retype something it is tracking. Read off the trend weight rather than
+this morning's number, since a kilo of water swinging BMI by 0.3 is noise
+reported as a change. Shows the figure, the adult category, and what the
+healthy band works out to in kilos at your height, which is the question
+people are actually asking when they look BMI up.
+
+Under 18 it shows the number and no category. Adolescent BMI is read as a
+percentile against age and sex off a growth chart, and the adult bands are
+simply wrong there — a fourteen-year-old and a forty-year-old at BMI 24 are
+not in comparable situations. Rather than embed percentile tables from
+memory the app says where it is properly read. A wrong category on a
+teenager is worse than no category, and it would be the same mistake as
+using an adult equation on a growing body.
+
+It also says what BMI cannot do. A lifter at 12% body fat reads
+"Overweight" at 27.2, so when the app knows a body fat percentage it says
+to treat that as the real number instead.
+
 ---
 
 ## Built since the last capture

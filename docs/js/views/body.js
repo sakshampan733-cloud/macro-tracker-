@@ -14,7 +14,7 @@ import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
   nutritionVsRecovery, stats,
 } from '../whoop.js';
-import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict, planVsActual } from '../nutrition.js';
+import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict, planVsActual, bmiFor } from '../nutrition.js';
 import { trainStats } from '../store.js';
 import { stepReport, stepTarget, stepsWorth, suggestedTarget } from '../steps.js';
 import { stepCarry, STEP_SPREAD } from '../carry.js';
@@ -51,6 +51,7 @@ export function renderBody(root, ctx) {
     stepsTile(s, ctx) || el('div'),
     checkInTile(s, ctx),
     weightTile(ctx),
+    bmiTile(ctx) || el('div'),
     tdeeTile(s),
     calibrationTile(s) || el('div'),
     bloodTile(s, ctx),
@@ -290,6 +291,68 @@ function openCadencePicker(s, ctx) {
 }
 
 /* ── Weight ─────────────────────────────────────────────────────────── */
+
+/*
+ * BMI, from what the app already knows.
+ *
+ * Not a calculator with its own inputs — it has your height and it has
+ * your weight, and asking for them again would be asking you to tell it
+ * something it is already tracking. Read off the trend weight rather than
+ * this morning's number, because a kilo of water swinging your BMI by 0.3
+ * is noise being reported as a change.
+ */
+function bmiTile(ctx) {
+  const s = get();
+  const series = weightSeries();
+  const withTrend = trendWeight(series);
+  const latest = withTrend[withTrend.length - 1];
+  const weight = latest?.trend ?? latest?.kg ?? s.profile?.weightKg;
+
+  const b = bmiFor(s.profile, weight);
+  if (!b) return null;
+
+  const wu = weightUnit(s);
+  const disp = kg => (wu === 'lb' ? kgToLb(kg) : kg).toFixed(1);
+  const tone = { good: 'var(--good-ink)', caution: 'var(--caution)',
+                 warn: 'var(--warn)', note: 'var(--muted)' }[b.tone] || 'var(--muted)';
+
+  return el('div.tile', {},
+    el('div.tile-head', {}, el('h3', {}, 'BMI'),
+      el('span.micro', {}, latest ? 'from your trend weight' : 'from your profile')),
+
+    el('div.between', { style: { alignItems: 'baseline' } },
+      el('div.num', { style: { fontSize: '30px', color: tone } }, b.bmi.toFixed(1)),
+      el('div', { style: { textAlign: 'right' } },
+        b.label
+          ? el('div', { style: { fontSize: '13.5px', fontWeight: '600', color: tone } }, b.label)
+          : el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, `Age ${b.years}`),
+        el('div.micro', { style: { marginTop: '2px' } },
+          `healthy ${disp(b.healthyLow)}–${disp(b.healthyHigh)} ${wu}`))),
+
+    /*
+     * The under-18 case gets the number and no verdict, because the adult
+     * bands genuinely do not apply and inventing a category would be the
+     * same mistake as using an adult equation on a growing body.
+     */
+    b.youth
+      ? el('div.fine', { style: { marginTop: '9px' } },
+          'Under 18 this number is read as a percentile against your age and sex on a growth '
+          + 'chart, not against the adult categories — at your age the healthy range moves as '
+          + 'you grow, so the app shows the figure and leaves the reading to a doctor or a '
+          + 'growth chart rather than guessing at a label.')
+      : null,
+
+    b.bodyFatPct
+      ? el('div.fine', { style: { marginTop: '9px' } },
+          `You have logged ${b.bodyFatPct}% body fat, which answers the question BMI is `
+          + 'usually being asked and answers it better. Treat that as the real number.')
+      : null,
+
+    explain('BMI cannot tell muscle from fat — it is weight against height and nothing else, '
+      + 'so somebody who lifts reads high on it without being over-fat. It is a screening '
+      + 'figure for populations that got adopted as a verdict on individuals.',
+      { style: { marginTop: '9px' } }));
+}
 
 function weightTile(ctx) {
   const s = get();

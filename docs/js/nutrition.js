@@ -163,6 +163,59 @@ export function bmrFor(profile) {
   };
 }
 
+/*
+ * BMI, and the honest limits of it.
+ *
+ * Weight over height squared. It is a screening number for populations
+ * that got adopted as a verdict on individuals, and it cannot tell muscle
+ * from fat — a lifter and a sedentary person at the same height and weight
+ * get the same figure and are not in the same shape. Body fat percentage
+ * answers the question BMI is usually being asked, so when the app knows
+ * it, it says so.
+ *
+ * The bands below are the WHO adult ones and they apply to adults. For
+ * anyone under 18 they are simply wrong: adolescent BMI is read as a
+ * percentile against age and sex off a growth chart, because a fourteen-
+ * year-old and a forty-year-old at BMI 24 are not in comparable
+ * situations. Rather than fabricate percentile tables the app reports the
+ * number, says the adult bands do not apply, and says where it is properly
+ * read. A wrong category on a teenager is worse than no category.
+ */
+const BMI_BANDS = [
+  [0,    18.5, 'Underweight',      'warn'],
+  [18.5, 25,   'Healthy range',    'good'],
+  [25,   30,   'Overweight',       'caution'],
+  [30,   35,   'Obese, class I',   'warn'],
+  [35,   40,   'Obese, class II',  'warn'],
+  [40,   Infinity, 'Obese, class III', 'warn'],
+];
+
+export function bmiFor(profile, weightKg = null) {
+  const w = weightKg ?? profile?.weightKg;
+  const h = (profile?.heightCm || 0) / 100;
+  if (!(w > 0) || !(h > 0)) return null;
+
+  const bmi = w / (h * h);
+  const years = age(profile.birthYear);
+  const youth = years < 18;
+
+  const band = BMI_BANDS.find(([lo, hi]) => bmi >= lo && bmi < hi);
+
+  return {
+    bmi: Math.round(bmi * 10) / 10,
+    years, youth,
+    /* Deliberately null for under-18s: see above. */
+    label: youth ? null : band?.[2] ?? null,
+    tone: youth ? 'note' : band?.[3] ?? null,
+    /* What the healthy band works out to at this height, which is the
+       question people are actually asking when they look up their BMI. */
+    healthyLow: Math.round(18.5 * h * h * 10) / 10,
+    healthyHigh: Math.round(24.9 * h * h * 10) / 10,
+    /* Body fat answers the question better, so the app says when it has it. */
+    bodyFatPct: profile?.bodyFatPct > 0 ? profile.bodyFatPct : null,
+  };
+}
+
 export function predictedTDEE(profile) {
   const bmr = bmrFor(profile);
   const f = (ACTIVITY[profile.activity] || ACTIVITY.moderate).f;
