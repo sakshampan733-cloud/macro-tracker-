@@ -5,13 +5,13 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.04-goals';
+export const VERSION = '2026.09.04-onegoal';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
 import { applyOrb } from './theme.js';
 import { solveDensities } from './dishes.js';
-import { bestTDEE, macroTargets } from './nutrition.js';
+import { bestTDEE, macroTargets, goalRate } from './nutrition.js';
 import { renderToday } from './views/today.js';
 import { renderHome } from './views/home.js';
 import { renderAdd } from './views/add.js';
@@ -87,9 +87,27 @@ noteAppOpen();
  */
 (() => {
   const s = get();
-  if (!s.profile || !s.targets) return;
-  const fresh = macroTargets(s.profile, bestTDEE(s, s.profile).kcal);
-  const moved = ['kcal', 'p', 'c', 'f'].some(k => fresh[k] !== s.targets[k]);
+  if (!s.profile) return;
+
+  /*
+   * A dated goal sets the pace, and the pace is recomputed every launch.
+   *
+   * The rate has to live on the profile because that is what macroTargets
+   * reads, but it must not be a stale copy of what the goal implied on the
+   * day it was set — a week later you are a week closer to the date and
+   * some distance closer to the weight, and the pace that gets you there
+   * has moved. Recomputing at boot is what makes the goal actually govern
+   * the calories rather than merely describe them.
+   */
+  const gr = goalRate(s, s.profile);
+  if (gr && !gr.done && !gr.arrived && s.profile.rate !== gr.rate) {
+    commit(st => { st.profile.rate = gr.rate; }, 'profile');
+  }
+
+  const s2 = get();
+  if (!s2.targets) return;
+  const fresh = macroTargets(s2.profile, bestTDEE(s2, s2.profile).kcal);
+  const moved = ['kcal', 'p', 'c', 'f'].some(k => fresh[k] !== s2.targets[k]);
   if (moved) commit(st => { st.targets = fresh; }, 'targets');
 })();
 

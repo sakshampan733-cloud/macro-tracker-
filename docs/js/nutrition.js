@@ -970,6 +970,68 @@ function checkInStatus(ci, targetRateKgPerWeek) {
  * app compares the pace the goal needs against the pace actually happening
  * and reports the gap, rather than quietly moving the finish line.
  */
+/*
+ * The pace your dated goal actually implies, in kg a week.
+ *
+ * This is the join that was missing. A goal of "78 kg by 14 March" was
+ * stored, drawn on a card, checked for feasibility — and then had no
+ * effect whatsoever on the calorie target, which went on being driven by a
+ * separate goal picker in Settings. Two goals, one of them decorative,
+ * and no way to tell from the screen which was which.
+ *
+ * Derived rather than stored, so it self-corrects: as the date approaches
+ * and your weight moves, the pace needed to still arrive on time is
+ * recomputed from where you actually are. Fall behind and it steepens,
+ * get ahead and it eases.
+ *
+ * Which is also why it needs a ceiling. A goal you have slipped on would
+ * otherwise quietly demand 1.5 kg a week, and the app would set a target
+ * to match without anyone having decided that. Past the cap it holds and
+ * says the date is the thing that has to give.
+ */
+const GOAL_RATE_CAP = 1.0;              // kg a week, hard ceiling
+const GOAL_RATE_PCT = 0.0125;           // and no more than 1.25% of bodyweight
+
+export function goalRate(store, profile, today = new Date()) {
+  const goal = store?.goal;
+  if (!goal?.targetKg || !goal?.byDate) return null;
+
+  const end = new Date(goal.byDate + 'T12:00:00');
+  const daysLeft = Math.round((end - today) / 86400000);
+  if (daysLeft <= 0) return { done: true, rate: 0, daysLeft: 0 };
+
+  /* From where you are now, not from where you started — a goal is about
+     the distance still in front of you. */
+  const series = Object.entries(store.days || {})
+    .filter(([, d]) => d.weight > 0)
+    .map(([date, d]) => ({ date, kg: d.weight }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const withTrend = trendWeight(series);
+  const current = withTrend.length ? withTrend[withTrend.length - 1].trend
+    : (goal.startKg ?? profile?.weightKg);
+  if (!(current > 0)) return null;
+
+  const remaining = goal.targetKg - current;
+  const weeksLeft = Math.max(1 / 7, daysLeft / 7);
+  const needed = remaining / weeksLeft;
+
+  const cap = Math.min(GOAL_RATE_CAP, (profile?.weightKg || current) * GOAL_RATE_PCT);
+  const rate = Math.max(-cap, Math.min(cap, needed));
+
+  return {
+    rate: +rate.toFixed(3),
+    needed: +needed.toFixed(3),
+    capped: Math.abs(needed) > cap + 0.001,
+    cap: +cap.toFixed(2),
+    current: +current.toFixed(1),
+    remaining: +remaining.toFixed(1),
+    daysLeft,
+    /* Within a couple of hundred grams, you are there. */
+    arrived: Math.abs(remaining) < 0.25,
+    done: false,
+  };
+}
+
 export function goalStatus(store, profile, today = new Date()) {
   const goal = store.goal;
   if (!goal || !goal.targetKg || !goal.byDate) return null;

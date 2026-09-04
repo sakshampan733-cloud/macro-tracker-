@@ -5,7 +5,7 @@
  * each answer changes, and then gets out of the way.
  */
 
-import { el, clear, field, segmented, toast, icon, sheet, confirmSheet, kcal, empty, append, replaceKids } from '../ui.js';
+import { el, clear, field, segmented, toast, icon, sheet, confirmSheet, kcal, empty, append, replaceKids, dateLabel } from '../ui.js';
 import { get, commit, exportJSON, importJSON, reset, pushBackup } from '../store.js';
 import {
   ACTIVITY, GOALS, GOAL_GROUPS, bmrFor, predictedTDEE, macroTargets, bestTDEE, waterTarget, age,
@@ -13,6 +13,7 @@ import {
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
 import { openTargetEditor } from './targets.js';
+import { openGoalEditor } from './goal.js';
 import { generateDemo } from '../demo.js';
 import { openSleepGoal, sleepSchedule, sleepHours, clockText } from './sleep.js';
 import { goalTile } from './goal.js';
@@ -315,9 +316,25 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
 
     field('Sex', sexBox, 'Used by the resting-metabolism equation.'),
     field('Training', actBox),
+    /*
+     * One place for the goal, once a dated one exists.
+     *
+     * A target weight with a date now sets the pace, and it recomputes
+     * every launch from how far you still have to go. Leaving a second
+     * pace control here would show a number the goal overwrites on the
+     * next boot — two goals again, with the losing one still on screen.
+     */
     field('Goal', goalBox),
-    field('Pace', rateBox,
-      'Set by the goal you picked. Type your own if you want a pace between them.'),
+    get().goal
+      ? field('Pace', el('div.tile', {},
+          el('div.fine', {},
+            `Set by your goal: ${get().goal.targetKg} kg by `
+            + `${dateLabel(get().goal.byDate)}. It updates itself as you go, so there is `
+            + 'nothing to set here.'),
+          el('button.btn.sm', { style: { marginTop: '10px' },
+            onclick: () => openGoalEditor(ctx) }, 'Edit goal')))
+      : field('Pace', rateBox,
+          'Set by the goal you picked. Type your own if you want a pace between them.'),
     field('Anything you take', suppBox,
       'Optional, and changeable later. Some of these move your targets.'),
     suppNote,

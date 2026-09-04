@@ -366,6 +366,42 @@ Bug found while building it: `read()` reset the rate unconditionally on
 first-run onboarding, so a typed pace was overwritten the moment anything
 else on the form was touched. It now only fills a missing value.
 
+**The two goals become one — 2026-09-04.** The app had a goal picker in
+Settings that drove the calorie target, and a separate dated goal widget
+("82 kg by 14 March") that was stored, drawn on a card, checked for
+feasibility, and had *no effect whatsoever* on the calories. Two goals, one
+of them decorative, and nothing on screen to say which was which. Setting a
+target weight and a date changed nothing you could see, which is exactly
+what it looked like.
+
+`goalRate()` derives the pace from the dated goal — distance still to go
+over weeks still left — and `app.js` writes it into `profile.rate` on every
+launch, which is what `macroTargets` already reads. So the goal now governs
+the food rather than describing it, and it self-corrects: fall behind and
+the pace steepens, get ahead and it eases.
+
+Which is why it needs a ceiling. A goal you have slipped on would otherwise
+quietly demand 1.66 kg a week and the app would set a target to match with
+nobody having decided that. Capped at 1 kg a week or 1.25% of bodyweight,
+whichever is lower; past that the pace holds and the date is what gives.
+
+The editor is now the single detailed place. A real date field replaces the
+1/2/3/6-month chips, because people are aiming at a wedding or a check-up
+rather than at "2 months". Pace chips (Slow / Steady / Fast, as shares of
+bodyweight) fill the date in rather than being a separate setting — "how
+fast" and "by when" are two ways of asking one question, and the app used
+to ask both in different places and let only one touch the calories. The
+resulting calorie target is shown live before you save.
+
+Settings no longer offers a competing Pace control once a dated goal
+exists; it shows what the goal is doing and links to it.
+
+Verified: rate derivation across on-track, behind, impossible, ahead,
+arrived, expired and gaining goals; the cap holding at -1.0 where -1.66 and
+-5.0 were demanded; setting a goal moving the day's target from 2,498 to
+2,144; 36 route x theme x goal-present combinations and the editor in both
+themes with and without an existing goal.
+
 ---
 
 ## Built since the last capture

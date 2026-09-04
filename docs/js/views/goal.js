@@ -14,7 +14,7 @@ import {
   el, sheet, toast, kcal, g, icon, dateLabel, confirmSheet, explain, append,
 } from '../ui.js';
 import { get, commit, dayKey, weightSeries } from '../store.js';
-import { goalStatus, goalFeasibility, trendWeight } from '../nutrition.js';
+import { goalStatus, goalFeasibility, trendWeight, macroTargets, bestTDEE } from '../nutrition.js';
 import { healthBars } from '../charts.js';
 
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000)
@@ -162,15 +162,29 @@ export function openGoalDetail(ctx) {
 
 /* ── Setting one ────────────────────────────────────────────────────── */
 
+/*
+ * Pace, expressed as a share of bodyweight so it scales with the person.
+ *
+ * These pick a DATE rather than being a separate setting. "How fast" and
+ * "by when" are two ways of asking the same question, and the app used to
+ * ask both in different places and then let only one of them touch the
+ * calories.
+ */
+const PACES = [
+  { id: 'slow',   label: 'Slow',   pct: 0.0035, hint: 'Gentle. Training and mood barely notice it.' },
+  { id: 'steady', label: 'Steady', pct: 0.0065, hint: 'The usual answer. Fast enough to see, slow enough to keep.' },
+  { id: 'fast',   label: 'Fast',   pct: 0.0100, hint: 'Aggressive. Hungry, and harder to hold on to.' },
+];
+
 export function openGoalEditor(ctx) {
   const s = get();
   const existing = s.goal;
-  const startKg = existing?.startKg
-    ?? (weightSeries().slice(-1)[0]?.kg || s.profile.weightKg);
+  const startKg = weightSeries().slice(-1)[0]?.kg || s.profile.weightKg;
 
-  let days = existing
-    ? Math.max(7, Math.round((new Date(existing.byDate) - new Date(existing.startDate)) / 86400000))
-    : 60;
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const defaultEnd = new Date(); defaultEnd.setDate(defaultEnd.getDate() + 60);
+
+  let byDate = existing?.byDate || iso(defaultEnd);
 
   const targetInput = el('input.num-in', {
     type: 'number', inputmode: 'decimal', step: '0.5', min: '30',
@@ -178,31 +192,78 @@ export function openGoalEditor(ctx) {
     style: { fontSize: '24px', textAlign: 'center', padding: '12px' },
   });
 
-  const preview = el('div');
-  const presetRow = el('div.chips');
+  /*
+   * A real date field, not three month-chips.
+   *
+   * People have actual dates — a wedding, a match, a holiday, a check-up —
+   * and "2 months" was never the thing they were aiming at. The chips
+   * survive as a way to fill this in quickly, but they write into it
+   * rather than replacing it.
+   */
+  const dateInput = el('input.num-in', {
+    type: 'date', value: byDate, min: iso(tomorrow),
+    'aria-label': 'Target date',
+    style: { padding: '11px', width: '100%' },
+  });
 
-  const syncPresets = () => {
-    [...presetRow.children].forEach(c =>
-      c.setAttribute('aria-pressed', String(+c.dataset.days === days)));
+  const preview = el('div');
+  const paceRow = el('div.chips');
+
+  const daysOut = () => {
+    const d = new Date(dateInput.value + 'T12:00:00');
+    if (isNaN(d)) return 60;
+    return Math.max(1, Math.round((d - new Date()) / 86400000));
   };
 
-  for (const p of PRESETS) {
-    presetRow.append(el('button.chip', {
-      type: 'button', dataset: { days: String(p.days) },
-      onclick: () => { days = p.days; syncPresets(); render(); },
+  /* A pace chip sets the date that pace implies for the target you typed. */
+  for (const p of PACES) {
+    paceRow.append(el('button.chip', {
+      type: 'button', dataset: { pace: p.id },
+      onclick: () => {
+        const target = +targetInput.value || startKg;
+        const perWeek = startKg * p.pct;
+        const weeks = Math.abs(target - startKg) / Math.max(0.01, perWeek);
+        const end = new Date();
+        end.setDate(end.getDate() + Math.max(7, Math.round(weeks * 7)));
+        dateInput.value = iso(end);
+        render();
+      },
     }, p.label));
   }
 
   function render() {
     const target = +targetInput.value || startKg;
+    const days = daysOut();
     const f = goalFeasibility(startKg, target, days);
-    const end = new Date(); end.setDate(end.getDate() + days);
+
+    /* Which pace chip this date currently corresponds to. */
+    const pct = Math.abs(f.perWeek) / startKg;
+    let nearest = null, best = Infinity;
+    for (const p of PACES) {
+      const d = Math.abs(pct - p.pct);
+      if (d < best) { best = d; nearest = p; }
+    }
+    [...paceRow.children].forEach(c =>
+      c.setAttribute('aria-pressed', String(c.dataset.pace === nearest?.id && best < 0.002)));
 
     const tone = f.verdict === 'sensible' ? 'good'
       : f.verdict === 'very gentle' ? 'info'
       : f.verdict === 'aggressive' ? 'info' : 'warn';
 
-    preview.replaceChildren(
+    /*
+     * What this goal does to the food, shown before it is saved.
+     *
+     * The whole complaint was that setting a goal changed nothing you
+     * could see. So the calorie target the goal implies is computed right
+     * here, from the same functions the rest of the app uses, and shown
+     * next to the pace it comes from.
+     */
+    const profile = { ...s.profile, rate: f.perWeek };
+    const tdee = bestTDEE(s, profile);
+    const t = macroTargets(profile, tdee.kcal);
+    const floored = t.basis?.floored;
+
+    append(preview,
       el('div.tile', {},
         el('div.between', {},
           el('div', {},
@@ -210,8 +271,36 @@ export function openGoalEditor(ctx) {
             el('div.num', { style: { fontSize: '23px', marginTop: '3px' } },
               `${Math.abs(f.perWeek).toFixed(2)} kg/wk`)),
           el('div', { style: { textAlign: 'right' } },
-            el('div.micro', {}, 'By'),
-            el('div.num', { style: { fontSize: '15px', marginTop: '5px' } }, iso(end)))),
+            el('div.micro', {}, 'Which means eating'),
+            el('div.num', { style: { fontSize: '23px', marginTop: '3px' } },
+              `${kcal(t.kcal)}`),
+            /* The everyday level, not today's figure. A red-recovery hold
+               or a carry can move the day off this, and showing 1,852 here
+               while Home says 2,144 would look like one of them was wrong. */
+            el('div.micro', { style: { marginTop: '2px' } }, 'kcal on a normal day'))),
+
+        el('div.fine', { style: { marginTop: '9px' } },
+          `${dateLabel(dateInput.value)} is ${days} day${days === 1 ? '' : 's'} away. `
+          + `Maintenance is ${kcal(tdee.kcal)}, so this is `
+          + (Math.round(t.kcal) === Math.round(tdee.kcal)
+            ? 'maintenance.'
+            : `${kcal(Math.abs(t.kcal - tdee.kcal))} ${t.kcal < tdee.kcal ? 'under' : 'over'} it.`)),
+
+        /* Two different things can floor a target: an over-ambitious date,
+           or a maintenance figure that already sits close to resting burn.
+           Saying "the date asks too much" in the second case contradicts a
+           verdict of "sensible pace" three lines below it. */
+        floored
+          ? el('div.fine', { style: { marginTop: '5px', color: 'var(--caution)' } },
+              `Held at ${t.basis.floor.kcal} kcal, your resting burn. `
+              + (Math.abs(f.pctPerWeek) > 0.7
+                ? 'This date needs a deficit deeper than the app will point anyone at, so the '
+                  + 'weight will arrive later than the date says.'
+                : `The pace itself is fine — it is that your maintenance (${kcal(tdee.kcal)}) is `
+                  + 'close enough to your resting burn that there is not much room to cut. '
+                  + 'Moving more opens it up; eating less does not.'))
+          : null,
+
         el('div', { class: 'note ' + tone, style: { marginTop: '12px' } },
           el('div', {},
             el('b', {}, feasibilityHead(f)),
@@ -220,7 +309,8 @@ export function openGoalEditor(ctx) {
   }
 
   targetInput.addEventListener('input', render);
-  syncPresets();
+  dateInput.addEventListener('input', render);
+  dateInput.addEventListener('change', render);
   render();
 
   const sh = sheet({
@@ -235,32 +325,66 @@ export function openGoalEditor(ctx) {
             el('div.micro', { style: { marginBottom: '5px' } }, 'Target'),
             targetInput))),
 
-      el('div.section-label', {}, el('span.micro', {}, 'By when')),
-      presetRow,
+      el('div.section-label', {}, el('span.micro', {}, 'How fast')),
+      paceRow,
+      el('div.fine', { style: { marginTop: '6px' } },
+        PACES.map(p => `${p.label}: ${p.hint}`).join(' ')),
+
+      el('div.section-label', { style: { marginTop: '14px' } },
+        el('span.micro', {}, 'By when')),
+      dateInput,
 
       el('div', { style: { height: '14px' } }),
       preview,
+
+      explain('The pace is worked out from where you are now and how long is left, so it '
+        + 'updates itself: fall behind and it steepens, get ahead and it eases. Your calorie '
+        + 'target follows it. It will not steepen without limit — past about 1% of bodyweight '
+        + 'a week the app holds the pace and lets the date slip instead.',
+        { style: { marginTop: '12px' } }),
     ),
-    foot: el('button.btn.primary.block', {
-      onclick: () => {
-        const target = +targetInput.value;
-        if (!(target > 30 && target < 400)) { toast('That is not a weight in kg.', 'err'); return; }
-        if (Math.abs(target - startKg) < 0.3) { toast('Pick a target different from where you are.', 'err'); return; }
-        const end = new Date(); end.setDate(end.getDate() + days);
-        commit(st => {
-          st.goal = {
-            startKg: +startKg.toFixed(1),
-            targetKg: +target.toFixed(1),
-            startDate: existing?.startDate || dayKey(),
-            byDate: iso(end),
-            createdAt: Date.now(),
-          };
-        }, 'goal');
-        toast('Goal set.');
-        sh.close();
-        ctx.refresh();
-      },
-    }, existing ? 'Save goal' : 'Set goal'),
+    foot: el('div.btn-row', {},
+      existing ? el('button.btn.ghost.grow', {
+        onclick: async () => {
+          if (!(await confirmSheet({
+            title: 'Clear this goal?',
+            message: 'Your calorie target goes back to the pace set in your details.',
+            confirmLabel: 'Clear it', danger: true,
+          }))) return;
+          commit(st => { delete st.goal; }, 'goal');
+          toast('Goal cleared.');
+          sh.close();
+          ctx.refresh();
+        },
+      }, 'Clear') : null,
+      el('button.btn.primary.grow', {
+        onclick: () => {
+          const target = +targetInput.value;
+          if (!(target > 30 && target < 400)) { toast('That is not a weight in kg.', 'err'); return; }
+          if (Math.abs(target - startKg) < 0.3) { toast('Pick a target different from where you are.', 'err'); return; }
+          const days = daysOut();
+          if (days < 1) { toast('Pick a date in the future.', 'err'); return; }
+
+          const f = goalFeasibility(startKg, target, days);
+          commit(st => {
+            st.goal = {
+              startKg: +startKg.toFixed(1),
+              targetKg: +target.toFixed(1),
+              startDate: existing?.startDate || dayKey(),
+              byDate: dateInput.value,
+              createdAt: Date.now(),
+            };
+            /* The join. macroTargets reads profile.rate, so the goal writes
+               it — and app.js recomputes it every launch from how far you
+               still have to go. */
+            st.profile.rate = f.perWeek;
+            st.profile.goal = f.perWeek < 0 ? 'cut' : f.perWeek > 0 ? 'gain' : 'maintain';
+          }, 'goal');
+          toast(`Goal set. ${kcal(macroTargets({ ...get().profile }, bestTDEE(get(), get().profile).kcal).kcal)} kcal a day.`);
+          sh.close();
+          ctx.refresh();
+        },
+      }, existing ? 'Save goal' : 'Set goal')),
   });
   return sh;
 }
