@@ -321,6 +321,27 @@ It also says what BMI cannot do. A lifter at 12% body fat reads
 "Overweight" at 27.2, so when the app knows a body fat percentage it says
 to treat that as the real number instead.
 
+**Bug: loading demo data destroyed the real profile.** The demo carries its
+own body — birth year 1996, 178 cm, its own weight — and it was written
+straight over the profile with `{...st.profile, ...demo.profile}`, so every
+key it holds won. Anyone who tapped "Load demo data" ended up calculating
+against the demo's body instead of their own, which is why two people who
+both tried it saw *identical* maintenance figures that matched neither of
+their calculators. Clearing the demo did not undo it: it wiped days, whoop,
+blood, meals and library, and left the profile as the demo's, permanently.
+
+The real profile and the settings the demo overwrites (healthSource,
+sleepGoal, workoutHour) are now kept in `settings.preDemo` before the
+overwrite and handed back on clear. Verified: a real 16-year-old profile at
+172 cm / 88 kg becomes the demo's 178 cm / 84.4 kg on load and comes back
+intact on clear, with maintenance returning from the demo's 2,809 to his
+own 2,585.
+
+While the demo is loaded, Detail now says so where the number is actually
+doubted — "these are the demo's numbers, not yours" — rather than only in a
+collapsed group in Settings, which is not where anybody looks when their
+figure disagrees with a calculator.
+
 ---
 
 ## Built since the last capture

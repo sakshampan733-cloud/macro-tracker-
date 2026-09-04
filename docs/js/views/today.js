@@ -422,6 +422,26 @@ function targetBasis(targets, s, key) {
    * has been told something false by omission.
    */
   /*
+   * Demo data, said where the number is doubted.
+   *
+   * The demo brings its own body — its own age, height and weight — so
+   * while it is loaded the maintenance figure on this screen belongs to
+   * the demo and not to you. It said so only in a collapsed group in
+   * Settings, which is not where anybody goes when they are wondering why
+   * their number disagrees with a calculator.
+   */
+  if (s.settings?.isDemo) {
+    parts.push(el('div.flex', {},
+      icon('info', 15),
+      el('div', {},
+        el('div', { style: { fontSize: '13px' } },
+          'Demo data is loaded, so these are the demo\u2019s numbers, not yours.'),
+        el('div.fine', { style: { marginTop: '3px' } },
+          'It carries its own age, height and weight. Clear it in Settings \u2192 Data and '
+          + 'your own details come back.'))));
+  }
+
+  /*
    * Why the numbers are what they are, when you are still growing.
    *
    * The setup screen says this at the moment the goal is picked, which is

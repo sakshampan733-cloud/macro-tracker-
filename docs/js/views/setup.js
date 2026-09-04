@@ -820,6 +820,27 @@ export function renderSettings(root, ctx) {
               setTimeout(() => {
                 const demo = generateDemo({ years: 2 });
                 commit(st => {
+                  /*
+                   * Keep what the demo is about to overwrite.
+                   *
+                   * The demo carries its own profile — birth year 1996,
+                   * 178 cm, its own weight — and it was written straight
+                   * over the real one, so anybody who tapped this button
+                   * ended up with the demo's body. Two people who both
+                   * tried it got identical maintenance figures, and
+                   * neither matched a calorie calculator run on their own
+                   * numbers, with nothing on screen connecting the two
+                   * facts. Clearing the demo did not undo it either: the
+                   * profile was simply gone.
+                   */
+                  st.settings.preDemo = {
+                    profile: st.profile ? { ...st.profile } : null,
+                    settings: {
+                      healthSource: st.settings.healthSource ?? null,
+                      sleepGoal: st.settings.sleepGoal ?? null,
+                      workoutHour: st.settings.workoutHour ?? null,
+                    },
+                  };
                   st.days = demo.days;
                   st.whoop = demo.whoop;
                   st.blood = demo.blood;
@@ -852,6 +873,15 @@ export function renderSettings(root, ctx) {
                 st.days = {}; st.whoop = { rows: {}, importedAt: null };
                 st.blood = {}; st.meals = {}; st.library = {};
                 st.supplementsTaken = []; st.settings.isDemo = false;
+                /* Hand back the body the demo borrowed. */
+                const kept = st.settings.preDemo;
+                if (kept) {
+                  if (kept.profile) st.profile = kept.profile;
+                  for (const [k, v] of Object.entries(kept.settings || {})) {
+                    if (v == null) delete st.settings[k]; else st.settings[k] = v;
+                  }
+                  delete st.settings.preDemo;
+                }
               }, 'import');
               location.reload();
             },
