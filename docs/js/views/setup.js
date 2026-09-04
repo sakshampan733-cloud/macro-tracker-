@@ -6,14 +6,15 @@
  */
 
 import { el, clear, field, segmented, toast, icon, sheet, confirmSheet, kcal, empty, append, replaceKids, dateLabel } from '../ui.js';
-import { get, commit, exportJSON, importJSON, reset, pushBackup } from '../store.js';
+import { get, commit, exportJSON, importJSON, reset, pushBackup, dayKey } from '../store.js';
 import {
-  ACTIVITY, GOALS, GOAL_GROUPS, bmrFor, predictedTDEE, macroTargets, bestTDEE, waterTarget, age,
+  ACTIVITY, GOALS, bmrFor, predictedTDEE, macroTargets, bestTDEE, waterTarget, age,
+  goalFeasibility,
 } from '../nutrition.js';
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
 import { openTargetEditor } from './targets.js';
-import { openGoalEditor } from './goal.js';
+import { openGoalEditor, feasibilityHead } from './goal.js';
 import { generateDemo } from '../demo.js';
 import { openSleepGoal, sleepSchedule, sleepHours, clockText } from './sleep.js';
 import { goalTile } from './goal.js';
@@ -153,49 +154,99 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
    * what it means helps more.
    */
   /*
-   * The goal, in three groups rather than one row of eight.
+   * The goal, asked the way it is actually held in someone's head.
    *
-   * Losing, holding and gaining are different questions, and a flat list
-   * made you read all eight labels to find which two were even relevant.
-   * Grouped, you pick the question first and the pace second — which is
-   * also the order people actually decide in.
+   * "Which of nine presets" and "how many kg a week" are both the app's
+   * framing. Nobody thinks in kilos per week. They think "I want to be 78
+   * by March", and the pace falls out of that — which is also the only
+   * version that stays true as time passes, because the app can recompute
+   * it from how far there still is to go.
+   *
+   * So this asks for a destination and a date, and the weekly rate is
+   * derived. Holding weight is its own branch, because "stay here and get
+   * stronger" has no target weight to aim at and never did.
    */
-  const goalHint = el('div.fine', { style: { marginTop: '8px' } });
-  const goalBox = el('div');
-  for (const [g, title] of GOAL_GROUPS) {
-    const inGroup = Object.entries(GOALS).filter(([, v]) => v.group === g);
-    goalBox.append(
-      el('div.micro', { style: { margin: '10px 0 5px', color: 'var(--dim)' } }, title),
-      segmented(inGroup.map(([k, v]) => ({ value: k, label: v.label })),
-        draft.goal, v => { draft.goal = v; draft.rate = GOALS[v].rate; fRate.value = String(GOALS[v].rate); update(); },
-        { wrap: true }));
-  }
-  goalBox.append(goalHint);
+  const isoDate = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 10);
 
-  /*
-   * And the pace, typed.
-   *
-   * The presets are the rates every calorie calculator offers, but they
-   * are still somebody else's three numbers. A person who has been told
-   * 0.6 by a coach, or who wants 0.4 because 0.5 was too much last time,
-   * should be able to say so rather than picking the nearest preset and
-   * living with the difference. Picking a goal resets this to that goal's
-   * rate; typing over it keeps what you typed.
-   */
-  const fRate = el('input.num-in', {
-    type: 'number', inputmode: 'decimal', step: '0.05',
-    value: String(draft.rate ?? GOALS[draft.goal].rate),
-    'aria-label': 'Kilograms per week',
+  const existingGoal = existing ? get().goal : null;
+  const startW = () => draft.weightKg || 70;
+
+  let dir = existingGoal
+    ? (existingGoal.targetKg < existingGoal.startKg ? 'lose' : 'gain')
+    : (['gain', 'bulk', 'bulkfast'].includes(draft.goal)) ? 'gain'
+    : (['maintain', 'recomp'].includes(draft.goal)) ? 'hold' : 'lose';
+
+  let holdKind = draft.goal === 'recomp' ? 'recomp' : 'maintain';
+
+  const fTarget = el('input.num-in', {
+    type: 'number', inputmode: 'decimal', step: '0.5', min: '30',
+    'aria-label': 'Target weight',
+    value: existingGoal?.targetKg != null ? String(existingGoal.targetKg) : '',
   });
-  fRate.addEventListener('input', () => {
-    const v = parseFloat(fRate.value);
-    if (Number.isFinite(v)) { draft.rate = v; update(); }
+
+  const defEnd = new Date(); defEnd.setDate(defEnd.getDate() + 90);
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const fDate = el('input.num-in', {
+    type: 'date', min: isoDate(tomorrow),
+    'aria-label': 'Target date',
+    value: existingGoal?.byDate || isoDate(defEnd),
+    style: { padding: '11px', width: '100%' },
   });
-  const rateNote = el('div.fine', { style: { marginTop: '6px' } });
-  const rateBox = el('div', {},
+
+  const holdBox = el('div');
+  const paceRow = el('div.chips');
+  const targetBox = el('div');
+  const goalNote = el('div.fine', { style: { marginTop: '8px' } });
+
+  const dirBox = el('div', {}, segmented([
+    { value: 'lose', label: 'Lose weight' },
+    { value: 'hold', label: 'Hold weight' },
+    { value: 'gain', label: 'Gain weight' },
+  ], dir, v => {
+    dir = v;
+    if (v !== 'hold' && !fTarget.value) {
+      fTarget.value = String(+(startW() + (v === 'lose' ? -5 : 5)).toFixed(1));
+    }
+    update();
+  }));
+
+  holdBox.append(segmented([
+    { value: 'maintain', label: 'Just maintain' },
+    { value: 'recomp', label: 'Build muscle at this weight' },
+  ], holdKind, v => { holdKind = v; update(); }, { wrap: true }));
+
+  /* Pace chips write the date, exactly as they do in the goal editor —
+     one concept, one behaviour, in both places it appears. */
+  for (const q of ONBOARD_PACES) {
+    paceRow.append(el('button.chip', {
+      type: 'button', dataset: { pace: q.id },
+      onclick: () => {
+        const target = +fTarget.value || startW();
+        const perWeek = startW() * q.pct;
+        const weeks = Math.abs(target - startW()) / Math.max(0.01, perWeek);
+        const end = new Date();
+        end.setDate(end.getDate() + Math.max(7, Math.round(weeks * 7)));
+        fDate.value = isoDate(end);
+        update();
+      },
+    }, q.label));
+  }
+
+  targetBox.append(
+    el('div.micro', { style: { margin: '12px 0 5px', color: 'var(--dim)' } }, 'Target weight'),
     el('div.flex', { style: { gap: '8px', alignItems: 'center' } },
-      fRate, el('span.micro', {}, 'kg a week')),
-    rateNote);
+      fTarget, el('span.micro', {}, 'kg')),
+    el('div.micro', { style: { margin: '12px 0 5px', color: 'var(--dim)' } }, 'How fast'),
+    paceRow,
+    el('div.micro', { style: { margin: '12px 0 5px', color: 'var(--dim)' } }, 'By when'),
+    fDate);
+
+  fTarget.addEventListener('input', update);
+  fDate.addEventListener('input', update);
+  fDate.addEventListener('change', update);
+
+  const goalBox = el('div', {}, dirBox, holdBox, targetBox, goalNote);
 
   const read = () => {
     draft.heightCm = units.height === 'ftin'
@@ -208,41 +259,64 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
     draft.bodyFatPct = +fBf.value || 0;
     draft.birthYear = +fYear.value || 2000;
     draft.name = fName.value.trim();
+
     /*
-     * Picking a goal sets its rate. Re-saving the same goal does not.
+     * The weekly rate is a consequence now, not an input.
      *
-     * Settings -> Body and goal lets you type a rate between the presets —
-     * -0.75 rather than the -0.5 "Lose fat" implies. This line used to run
-     * unconditionally, which was harmless while the form only ever ran
-     * once, and became a quiet clobber the moment it could be reopened:
-     * come back to correct your weight, press save, and a rate you had
-     * tuned by hand snapped back to the preset with nothing said.
+     * Holding weight has no destination, so it keeps its own two goals.
+     * Losing or gaining derives the pace from how far it is to the target
+     * and how long there is to get there — the same arithmetic the goal
+     * editor and the boot-time refresh use, so all three agree rather than
+     * each keeping their own copy of the answer.
      */
-    /*
-     * Only fill a missing rate. The goal picker already sets it when the
-     * goal changes, and the Pace field sets it when you type — so anything
-     * more than a null-check here would undo one of them on the very next
-     * read. This ran unconditionally on first-run onboarding, which meant
-     * a typed pace was overwritten the instant anything else on the form
-     * was touched.
-     */
-    if (draft.rate == null) draft.rate = GOALS[draft.goal].rate;
+    if (dir === 'hold') {
+      draft.goal = holdKind;
+      draft.rate = 0;
+      draft.targetKg = null;
+      draft.byDate = null;
+    } else {
+      const target = +fTarget.value;
+      const days = Math.max(1, Math.round(
+        (new Date(fDate.value + 'T12:00:00') - new Date()) / 86400000));
+      draft.goal = dir === 'lose' ? 'cut' : 'gain';
+      draft.targetKg = Number.isFinite(target) && target > 30 ? target : null;
+      draft.byDate = fDate.value;
+      draft.rate = draft.targetKg
+        ? +((draft.targetKg - draft.weightKg) / (days / 7)).toFixed(3)
+        : GOALS[draft.goal].rate;
+    }
     return draft;
   };
 
   function update() {
     const p = read();
-    goalHint.textContent = (GOALS[p.goal] || {}).hint || '';
 
-    /* What the pace actually costs a day, which is the number that makes
-       a rate mean something. 7,700 kcal is the energy in a kilo of tissue. */
-    const perDay = Math.round((p.rate * 7700) / 7);
-    const wk = Math.abs(p.rate);
-    rateNote.textContent = p.rate === 0
-      ? 'Holding steady, so no deficit or surplus.'
-      : `${Math.abs(perDay)} kcal ${p.rate < 0 ? 'under' : 'over'} maintenance every day. `
-        + `At ${wk} kg a week that is about ${(wk * 4.3).toFixed(1)} kg a month, `
-        + `if you hold it.`;
+    /* Only one branch of the goal question is ever relevant. */
+    holdBox.hidden = dir !== 'hold';
+    targetBox.hidden = dir === 'hold';
+
+    if (dir === 'hold') {
+      goalNote.textContent = (GOALS[p.goal] || {}).hint || '';
+    } else if (!p.targetKg) {
+      goalNote.textContent = 'Put in the weight you are aiming for and the app works out the pace.';
+    } else {
+      const wk = Math.abs(p.rate);
+      const perDay = Math.abs(Math.round((p.rate * 7700) / 7));
+      const days = Math.max(1, Math.round(
+        (new Date(fDate.value + 'T12:00:00') - new Date()) / 86400000));
+      const f = goalFeasibility(p.weightKg, p.targetKg, days);
+      /* Mark whichever pace chip this date corresponds to. */
+      const pct = Math.abs(f.perWeek) / (p.weightKg || 70);
+      let near = null, best = Infinity;
+      for (const q of ONBOARD_PACES) { const d = Math.abs(pct - q.pct); if (d < best) { best = d; near = q; } }
+      [...paceRow.children].forEach(c =>
+        c.setAttribute('aria-pressed', String(c.dataset.pace === near?.id && best < 0.002)));
+
+      goalNote.textContent =
+        `${wk.toFixed(2)} kg a week — ${perDay} kcal ${p.rate < 0 ? 'under' : 'over'} `
+        + `maintenance every day. ${Math.abs(p.targetKg - p.weightKg).toFixed(1)} kg `
+        + `over ${days} days. ${feasibilityHead(f)}.`;
+    }
     const bmr = bmrFor(p);
     const tdee = predictedTDEE(p);
     const t = macroTargets(p, tdee.kcal);
@@ -324,17 +398,9 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
      * pace control here would show a number the goal overwrites on the
      * next boot — two goals again, with the losing one still on screen.
      */
-    field('Goal', goalBox),
-    get().goal
-      ? field('Pace', el('div.tile', {},
-          el('div.fine', {},
-            `Set by your goal: ${get().goal.targetKg} kg by `
-            + `${dateLabel(get().goal.byDate)}. It updates itself as you go, so there is `
-            + 'nothing to set here.'),
-          el('button.btn.sm', { style: { marginTop: '10px' },
-            onclick: () => openGoalEditor(ctx) }, 'Edit goal')))
-      : field('Pace', rateBox,
-          'Set by the goal you picked. Type your own if you want a pace between them.'),
+    field('Goal', goalBox,
+      'Where you want to be, and by when. The weekly pace and your calories both '
+      + 'follow from that, and keep following it as you go.'),
     field('Anything you take', suppBox,
       'Optional, and changeable later. Some of these move your targets.'),
     suppNote,
@@ -351,7 +417,22 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
           /* Editing keeps what this form does not ask about — a custom
              split above all. Changing your goal here should re-suggest,
              not silently discard numbers you set by hand. */
-          s.profile = existing ? { ...existing, ...p } : p;
+          /* The destination is not part of the profile — it lives in
+             s.goal, which is what the goal card, the feasibility check and
+             the boot-time pace refresh all read. */
+          const { targetKg, byDate, ...prof } = p;
+          s.profile = existing ? { ...existing, ...prof } : prof;
+          if (targetKg && byDate) {
+            s.goal = {
+              startKg: prof.weightKg,
+              targetKg,
+              startDate: s.goal?.startDate || dayKey(),
+              byDate,
+              createdAt: s.goal?.createdAt || Date.now(),
+            };
+          } else {
+            delete s.goal;
+          }
           s.targets = macroTargets(s.profile, tdee.kcal);
           if (!existing) s.supplementsTaken = [...draft.supplements];
           s.settings.heightUnit = units.height;
@@ -439,6 +520,14 @@ function youthNote(p, t, bmr) {
         : '')));
 }
 
+/* Same three paces the goal editor offers, as shares of bodyweight so
+   they scale with the person. Shared so the two screens cannot drift. */
+const ONBOARD_PACES = [
+  { id: 'slow',   label: 'Slow',   pct: 0.0035 },
+  { id: 'steady', label: 'Steady', pct: 0.0065 },
+  { id: 'fast',   label: 'Fast',   pct: 0.0100 },
+];
+
 const stat = (label, value, hue) =>
   el('div', {},
     el('div.micro', { style: { color: hue } }, label),
@@ -521,24 +610,11 @@ export function renderSettings(root, ctx) {
   hIn.addEventListener('change', () => save({ heightCm: Math.round(ftInToCm(hFt.value, hIn.value)) }));
   const fBf = num(p.bodyFatPct || '', '0.1');
   const fYear = num(p.birthYear);
-  const fRate = num(p.rate ?? GOALS[p.goal].rate, '0.05');
   const fGlass = num(s.settings.glassMl, '10');
 
   const actBox = el('div');
   actBox.append(segmented(Object.entries(ACTIVITY).map(([k, v]) => ({ value: k, label: v.label })),
     p.activity, v => save({ activity: v }), { wrap: true }));
-
-  const goalBox = el('div');
-  /* Grouped the same way the setup screen groups them, so the two places
-     you can change your goal do not present it as two different lists. */
-  for (const [g, title] of GOAL_GROUPS) {
-    goalBox.append(
-      el('div.micro', { style: { margin: '10px 0 5px', color: 'var(--dim)' } }, title),
-      segmented(Object.entries(GOALS).filter(([, v]) => v.group === g)
-        .map(([k, v]) => ({ value: k, label: v.label })),
-        p.goal, v => save({ goal: v, rate: GOALS[v].rate }), { wrap: true }));
-  }
-  goalBox.append(el('div.fine', { style: { marginTop: '8px' } }, GOALS[p.goal]?.hint || ''));
 
   const dietBox = el('div');
   dietBox.append(segmented([
@@ -575,11 +651,10 @@ export function renderSettings(root, ctx) {
         : (+fWeight.value || p.weightKg),
       bodyFatPct: +fBf.value || 0,
       birthYear: +fYear.value || p.birthYear,
-      rate: +fRate.value,
     });
     toast('Saved.');
   };
-  [fHeight, fWeight, fBf, fYear, fRate].forEach(i => i.addEventListener('change', applyBody));
+  [fHeight, fWeight, fBf, fYear].forEach(i => i.addEventListener('change', applyBody));
 
   const best = bestTDEE(s, p);
   const targets = macroTargets(p, best.kcal);
@@ -605,12 +680,13 @@ export function renderSettings(root, ctx) {
     el('div.field-2', {}, field('Show height in', hUnitBox), field('Show weight in', wUnitBox)),
       el('div.field-2', {}, field('Born', fYear), field('Body fat %', fBf)),
       field('Training', actBox),
-      field('Goal', goalBox),
-      field('Rate (kg per week)', fRate,
-        'Negative loses, positive gains. Beyond about 0.75 kg a week in either direction the cost lands on muscle.'),
 
-      /* A goal with a deadline is configuration, not a daily reading, so it
-         belongs here rather than taking space on a screen you check hourly. */
+      /*
+       * The goal is asked once, in Your details, as a destination and a
+       * date. A third copy of it here — a nine-way picker and a raw weekly
+       * rate, both of which the dated goal overwrites on the next launch —
+       * was the duplication this was meant to end.
+       */
       goalTile(s, ctx)),
 
     group(ctx, 'target', 'Targets',

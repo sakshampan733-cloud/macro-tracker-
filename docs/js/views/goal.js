@@ -389,7 +389,7 @@ export function openGoalEditor(ctx) {
   return sh;
 }
 
-const feasibilityHead = f => ({
+export const feasibilityHead = f => ({
   'sensible': 'A sensible pace',
   'very gentle': 'Very gentle',
   'aggressive': 'Aggressive but doable',

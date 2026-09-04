@@ -402,6 +402,30 @@ arrived, expired and gaining goals; the cap holding at -1.0 where -1.66 and
 2,144; 36 route x theme x goal-present combinations and the editor in both
 themes with and without an existing goal.
 
+**Onboarding asks for the destination too.** The goal picker and the typed
+pace are gone from the first-run form and from Settings -> Body and goal.
+In their place, the same question the goal editor asks: lose / hold / gain,
+then a target weight, a pace chip that fills in a date, and a real date
+field. Nobody thinks in kilos per week — they think "78 by March" — and
+that framing is also the only one that stays true as time passes, because
+the pace can be recomputed from how far there still is to go.
+
+Holding weight keeps its own branch (Just maintain / Build muscle at this
+weight), because "stay here and get stronger" has no target weight to aim
+at and never did.
+
+Saving writes `s.goal` rather than a rate on the profile, so the goal card,
+the feasibility check and the boot-time pace refresh all read one record.
+The weekly rate is derived in three places now — onboarding, the goal
+editor, `goalRate()` — from the same arithmetic, so they agree instead of
+each keeping a copy of the answer. Settings' Body and goal group keeps the
+goal card and nothing else.
+
+Verified: a first run setting 95 -> 85 kg on the Steady chip produces
+0.62 kg/wk, 681 kcal under maintenance, a starting target of 2,292 against
+a 2,973 maintenance, and a stored goal that survives reload with the rate
+recomputed to the same figure.
+
 ---
 
 ## Built since the last capture
