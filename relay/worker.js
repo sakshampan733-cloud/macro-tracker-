@@ -97,7 +97,13 @@ function page(title, body) {
  * does not reach a phone that was never told to collect it.
  */
 const FIELDS = ['rhr', 'hrv', 'sleepH', 'remH', 'swsH', 'deepH',
-                'kcal', 'activeKcal', 'steps', 'weightKg', 'vo2max',
+                /* Total burn, and the two halves it is made of. The app
+                   already knows how to add active and basal when it is
+                   given them separately — it just had no way to receive
+                   basal, so that path could never fire and every Shortcut
+                   had to do the addition itself. */
+                'kcal', 'activeKcal', 'basalKcal',
+                'steps', 'weightKg', 'vo2max',
                 'spo2', 'resp', 'temp',
                 /* The three Activity rings. Move is active energy — the
                    same number the red ring fills with — kept separate

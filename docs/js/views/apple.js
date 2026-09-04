@@ -95,13 +95,26 @@ export function openAppleHealth(ctx) {
             el('li', {}, 'Add ', el('b', {}, 'Find Health Samples'), '. Set it to ',
               el('b', {}, 'Steps'), ', filter ', el('b', {}, 'Start Date is today'),
               ', and set ', el('b', {}, 'Statistic → Sum'), '.'),
+            /*
+             * This used to say steps were the only field a Whoop owner
+             * needed, which was true before this screen existed. Anything
+             * Apple sends is now kept whole and shown here, rings
+             * included — so "only steps" was telling somebody wearing both
+             * to throw away the whole reason they opened this page.
+             */
+            el('li', {}, 'Repeat for whatever else you want to see: ',
+              el('b', {}, 'Active Energy'), ', ', el('b', {}, 'Apple Exercise Time'), ', ',
+              el('b', {}, 'Apple Stand Hours'), ' (the three rings), and any of ',
+              el('b', {}, 'Resting Heart Rate'), ', ', el('b', {}, 'Heart Rate Variability'),
+              ', ', el('b', {}, 'Sleep Analysis'), ', ', el('b', {}, 'Blood Oxygen'), ', ',
+              el('b', {}, 'Respiratory Rate'), ', ', el('b', {}, 'Wrist Temperature'), ', ',
+              el('b', {}, 'VO2 Max'), '.'),
             both
-              ? el('li', {}, 'That is the only one you need. Whoop measures everything '
-                  + 'else already, and steps are the one thing its API will not hand over.')
-              : el('li', {}, 'Repeat for ', el('b', {}, 'Resting Heart Rate'), ', ',
-                  el('b', {}, 'Heart Rate Variability'), ', ', el('b', {}, 'Sleep Analysis'),
-                  ' and ', el('b', {}, 'Active Energy'), ' — sorted by ',
-                  el('b', {}, 'End Date'), ', limit ', el('b', {}, '1'), '.'),
+              ? el('li', {}, 'Wearing both, only ', el('b', {}, 'steps'),
+                  ' joins your main numbers — Whoop measures the rest better. Everything '
+                  + 'else you send is kept and shown under the Apple chip on this tab, '
+                  + 'which is where your rings live.')
+              : null,
             el('li', {}, 'Add ', el('b', {}, 'Get Contents of URL'), ' and set it up as below.'),
             el('li', {}, 'Then ', el('b', {}, 'Automation → Time of Day'),
               ', pick something after you normally wake, and run it daily.')),
@@ -118,11 +131,15 @@ export function openAppleHealth(ctx) {
           el('div.fine', { style: { marginTop: '12px', marginBottom: '8px' } },
             'The JSON fields, each set to the matching variable from the steps above. '
             + 'Send only the ones you set up — anything missing is simply not recorded.'),
-          codeRow('JSON', both
-            ? '{ "date": "<Current Date, formatted yyyy-MM-dd>", "steps": <Steps> }'
-            : '{ "date": "<Current Date, formatted yyyy-MM-dd>", '
-              + '"steps": <Steps>, "rhr": <Resting Heart Rate>, "hrv": <HRV>, '
-              + '"sleepH": <Sleep hours>, "activeKcal": <Active Energy> }'),
+          codeRow('JSON', '{ "date": "<yyyy-MM-dd>", "steps": <Steps>, '
+            + '"activeKcal": <Active Energy>, "exerciseMin": <Exercise Time>, '
+            + '"standHours": <Stand Hours>, "rhr": <Resting HR>, "hrv": <HRV>, '
+            + '"sleepH": <Sleep hours>, "spo2": <Blood Oxygen>, "resp": <Respiratory Rate>, '
+            + '"temp": <Wrist Temp>, "vo2max": <VO2 Max>, "weightKg": <Body Mass> }'),
+          el('div.fine', { style: { marginTop: '8px' } },
+            'Every field the relay accepts: rhr, hrv, sleepH, remH, swsH, deepH, kcal, '
+            + 'activeKcal, basalKcal, steps, weightKg, vo2max, spo2, resp, temp, '
+            + 'exerciseMin, standHours, moveGoal. Anything else is dropped.'),
           both ? el('div.fine', { style: { marginTop: '10px' } },
             'Only steps, deliberately. You wear a Whoop, so heart rate, HRV and sleep '
             + 'already come from it — and Apple\u2019s HRV is SDNN while Whoop\u2019s is '

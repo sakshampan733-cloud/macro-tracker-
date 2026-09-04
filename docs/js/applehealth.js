@@ -155,8 +155,6 @@ export function bandName(mode = null) {
   return 'your band';
 }
 
-export const APPLE_GAP_FIELDS = ['steps', 'standH', 'exerciseMin'];
-
 /*
  * Where one metric's numbers came from, judged on the recent rows rather
  * than on a global setting — the setting says what you wear now, the rows
