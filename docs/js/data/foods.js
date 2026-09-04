@@ -1190,6 +1190,18 @@ export const FOODS = [
     162,3.0,16.0,10.0,2.0,4.0,4.5,440,[['1 katori (150 g)',150]]),
   F('jeera-aloo','Jeera aloo','Prepared','veg','as-served','C',
     126,2.2,17.0,6.0,2.2,1.0,2.5,330,[['1 katori (150 g)',150]]),
+  /* Home-style rasedar sabji: potato and tomato in a thin gravy. Lighter
+     per 100 g than jeera aloo because the tomato brings water rather than
+     starch — the same katori is more volume for fewer calories. */
+  F('aloo-tamatar','Aloo tamatar sabji','Prepared','veg','as-served','C',
+    102,2.0,13.5,4.8,1.9,2.6,1.0,340,[['1 katori (150 g)',150],['1 bowl (200 g)',200]],
+    'alu tamatar, potato tomato curry, rasedar aloo, tamatar aloo, tari wale aloo'),
+  /* Deep-fried and stuffed, so the oil is most of the story and how much
+     it takes up varies hugely between kitchens — graded D for that reason
+     rather than for any doubt about what is in it. */
+  F('aloo-kachori','Aloo kachori, homemade','Prepared','veg','as-served','D',
+    355,6.0,42.0,18.5,2.6,1.4,4.6,420,[['1 kachori (55 g)',55],['2 kachori (110 g)',110]],
+    'kachodi, aloo kachodi, khasta kachori, alu kachori, potato kachori'),
   F('mix-veg','Mixed vegetable curry','Prepared','veg','as-served','C',
     100,2.8,10.5,5.8,3.0,3.5,2.4,390,[['1 katori (150 g)',150]]),
   F('sarson-saag','Sarson ka saag','Prepared','veg','as-served','C',
