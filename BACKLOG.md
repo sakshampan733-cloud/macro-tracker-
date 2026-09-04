@@ -284,6 +284,23 @@ longer quotes the adult 1%-a-week line to a fifteen-year-old whose ceiling
 is a third of that — reading as permission up to a number they should not
 go near was worse than saying nothing.
 
+**Follow-up: match the calculators.** The Schofield switch made the app
+disagree with every calorie calculator on the internet by several hundred
+kcal, and a number that disagrees with every other number a person can find
+is a number they stop believing. Mifflin-St Jeor (or Katch-McArdle when
+body fat is known) is what those sites use, so it is what the app uses now,
+for every age. Verified identical to a reference implementation across
+seven age/sex/weight/body-fat profiles, BMR and TDEE both.
+
+Schofield is still computed for under-18s and reported alongside — "the
+equation meant for your age would put it nearer 2,314 kcal" — because
+informing beats overruling. None of the guardrails depended on the
+equation: the 130 g carbohydrate RDA, the protein ceiling, the slower
+deficit limit and the resting-burn floor are about what the app is willing
+to recommend, not about which formula produced the starting figure. The
+sixteen-year-old case is 2,502 kcal with 265 g of carbs — the carb problem
+was never the equation, it was carbs being the leftover.
+
 ---
 
 ## Built since the last capture

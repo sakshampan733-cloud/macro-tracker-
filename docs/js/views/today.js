@@ -436,9 +436,8 @@ function targetBasis(targets, s, key) {
       icon('info', 15),
       el('div', {},
         el('div', { style: { fontSize: '13px' } },
-          `You are ${y.years}, so this is worked out with Schofield rather than the adult `
-          + `equation, and carbohydrate is held at ${targets.basis.carbRda} g rather than `
-          + 'being whatever is left over.'),
+          `You are ${y.years}, so carbohydrate is held at ${targets.basis.carbRda} g rather `
+          + 'than being whatever is left over, and the pace you can safely lose at is slower.'),
         el('div.fine', { style: { marginTop: '3px' } },
           rate
             ? `Losing ${rate.pctPerWeek.toFixed(2)}% of your bodyweight a week is faster than `

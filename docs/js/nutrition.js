@@ -123,46 +123,43 @@ export function bmrSchofield({ sex, weightKg, years }) {
    under way or recent. Eighteen is the line the equations themselves draw. */
 export const isYouth = profile => age(profile?.birthYear) < 18;
 
+/*
+ * Which equation the app actually uses.
+ *
+ * Mifflin-St Jeor, or Katch-McArdle when body fat is known — which is
+ * exactly what the calorie calculators everybody checks against do, and
+ * matching them is the point. A number that disagrees with every other
+ * number a person can find is a number they stop believing, however well
+ * it is argued.
+ *
+ * For under-18s Schofield reads higher (see above) and there is a real
+ * case for it. It is not used, but it is not hidden either: the figure
+ * comes back alongside so the screens can say what the age-specific
+ * equation would have given. Informing beats overruling.
+ *
+ * None of the guardrails depend on this choice. The carbohydrate RDA, the
+ * protein ceiling, the slower deficit limit for people still growing and
+ * the resting-burn floor all still apply, because those are about what the
+ * app is willing to RECOMMEND rather than about which equation produced
+ * the starting figure.
+ */
 export function bmrFor(profile) {
   const years = age(profile.birthYear);
+  const youth = years < 18;
+  /* What the age-specific equation would say, carried for comparison. */
+  const schofield = youth ? bmrSchofield({ ...profile, years }) : null;
 
-  if (years < 18) {
-    /*
-     * Schofield stays primary even when body fat is known, and the app
-     * says so rather than silently discarding the figure.
-     *
-     * Weight-based equations do read high for someone carrying a lot of
-     * fat — fat mass is less metabolically active than the equation
-     * assumes — and a lean-mass equation would be sharper on that count.
-     * But Katch-McArdle was derived in adults and knows nothing about the
-     * energy growth itself costs, so on a fifteen-year-old it reads low
-     * for a different reason. At 95 kg and 35% fat the two disagree by
-     * 600 kcal and the truth sits between them.
-     *
-     * Underfeeding someone who is still growing is the worse of the two
-     * errors, so the higher, age-appropriate equation wins — and the whole
-     * argument expires in ten days, when measured maintenance replaces
-     * every estimate on this screen.
-     */
-    const fat = profile.bodyFatPct > 0;
-    return {
-      kcal: bmrSchofield({ ...profile, years }),
-      method: 'Schofield',
-      note: fat
-        ? 'the equation for people still growing — it works off weight, so your body fat '
-          + 'figure is not used here, and it reads a little high the more fat you carry'
-        : 'the equation used for people still growing',
-      youth: true,
-      bodyFatUnused: fat,
-    };
-  }
   if (profile.bodyFatPct > 0) {
-    return { kcal: bmrKatch(profile), method: 'Katch-McArdle', note: 'uses your lean mass' };
+    return {
+      kcal: bmrKatch(profile), method: 'Katch-McArdle',
+      note: 'uses your lean mass', youth, schofield,
+    };
   }
   return {
     kcal: bmrMifflin({ ...profile, years }),
     method: 'Mifflin-St Jeor',
     note: 'add body fat % for a sharper figure',
+    youth, schofield,
   };
 }
 

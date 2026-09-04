@@ -227,7 +227,7 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
        * screen nobody opens. If the app is going to hand a fifteen-year-old
        * a number, it owes them the reason it is the number it is.
        */
-      youthNote(p, t),
+      youthNote(p, t, bmr),
       compositionNote(p, t),
     );
   }
@@ -331,7 +331,7 @@ function compositionNote(p, t) {
  * the decision is made, and never as a refusal. The goal is not wrong; it
  * is a thing to do with a doctor watching rather than alone with an app.
  */
-function youthNote(p, t) {
+function youthNote(p, t, bmr) {
   const y = t.basis?.youth;
   if (!y) return null;
 
@@ -353,10 +353,17 @@ function youthNote(p, t) {
             : '')
           + y.seeSomeone)
       : null,
+    /* The number matches a calorie calculator, deliberately. Saying what
+       the age-specific equation would have given is information; quietly
+       using it instead would be the app overruling a choice. */
     el('div.fine', { style: { marginTop: '6px' } },
-      `Your resting burn is calculated with Schofield rather than the adult equation, and `
-      + `carbohydrate is held at ${t.basis?.carbRda ?? 130} g — the amount your brain runs on — `
-      + `rather than being whatever is left over.`));
+      `Carbohydrate is held at ${t.basis?.carbRda ?? 130} g — the amount your brain runs on — `
+      + 'rather than being whatever is left over after protein and fat.'
+      + (bmr.schofield
+        ? ` Your resting burn uses the same equation a calorie calculator does. The equation `
+          + `meant for your age would put it nearer ${kcal(bmr.schofield)} kcal, so if you find `
+          + `this hard to eat to, that is why.`
+        : '')));
 }
 
 const stat = (label, value, hue) =>
