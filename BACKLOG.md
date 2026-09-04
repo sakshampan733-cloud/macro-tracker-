@@ -426,6 +426,20 @@ Verified: a first run setting 95 -> 85 kg on the Steady chip produces
 a 2,973 maintenance, and a stored goal that survives reload with the rate
 recomputed to the same figure.
 
+**Where the goal card lives.** Tried it on Home; it does not belong there.
+A countdown is not something to hand somebody every time they open the app
+to log a snack. It is set during onboarding — destination and date, in the
+same sheet as everything else — and reviewed or changed in Settings ->
+Body and goal, which is where it was.
+
+**Bug found while moving it: dateLabel dropped the year.** A goal moving at
+0.06 kg a week against 6.5 kg genuinely lands in September 2028, and the
+card rendered that as "Sun 17 Sept" — read as a fortnight away. The
+projection was right the whole time; only the label was lying. The year is
+now shown whenever the date is not in the current year, which leaves
+"Today", "Yesterday" and same-year dates untouched and fixes every
+projection at once.
+
 ---
 
 ## Built since the last capture

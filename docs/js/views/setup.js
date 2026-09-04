@@ -14,10 +14,9 @@ import {
 import { openWhoopImport, openWhoopConnect } from './body.js';
 import { openTrust } from './trust.js';
 import { openTargetEditor } from './targets.js';
-import { openGoalEditor, feasibilityHead } from './goal.js';
+import { openGoalEditor, feasibilityHead, goalTile } from './goal.js';
 import { generateDemo } from '../demo.js';
 import { openSleepGoal, sleepSchedule, sleepHours, clockText } from './sleep.js';
-import { goalTile } from './goal.js';
 import { openGuide } from './guide.js';
 import { openAppleHealth } from './apple.js';
 import { openHealthSetup } from './body.js';
@@ -682,10 +681,10 @@ export function renderSettings(root, ctx) {
       field('Training', actBox),
 
       /*
-       * The goal is asked once, in Your details, as a destination and a
-       * date. A third copy of it here — a nine-way picker and a raw weekly
-       * rate, both of which the dated goal overwrites on the next launch —
-       * was the duplication this was meant to end.
+       * The goal lives here, not on Home. It is set during onboarding as a
+       * destination and a date, and this is where it is reviewed and
+       * changed afterwards — a countdown is not something to be handed to
+       * somebody every time they open the app to log a snack.
        */
       goalTile(s, ctx)),
 

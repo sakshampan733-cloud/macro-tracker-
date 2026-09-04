@@ -147,7 +147,19 @@ export function dateLabel(key) {
   const y = new Date(); y.setDate(y.getDate() - 1);
   if (key === today) return 'Today';
   if (key === y.toISOString().slice(0, 10)) return 'Yesterday';
-  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  /*
+   * The year, once it is not this one.
+   *
+   * Dropping it is right for a weigh-in last Tuesday and badly wrong for a
+   * projection: a goal moving at 0.06 kg a week genuinely lands in 2028,
+   * and "Sun 17 Sept" read as a fortnight away. The date was correct the
+   * whole time; only the label was lying.
+   */
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
 }
 
 export const pct = (a, b) => (b > 0 ? Math.max(0, Math.min(140, (a / b) * 100)) : 0);
