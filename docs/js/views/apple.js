@@ -11,8 +11,9 @@ import { el, sheet, toast, icon, field, confirmSheet, append } from '../ui.js';
 import { get, commit } from '../store.js';
 import {
   healthKey, makeHealthKey, forgetHealthKey, pushUrl, syncApple, existingSource,
-  healthSource,
+  healthSource, relayBase,
 } from '../applehealth.js';
+import { checkRelay } from '../whooprelay.js';
 
 const copy = async (text, what) => {
   try { await navigator.clipboard.writeText(text); toast(what + ' copied.'); }
@@ -50,13 +51,45 @@ export function openAppleHealth(ctx) {
           + 'Clear the Whoop import in Settings first if you are switching.'))));
     }
 
+    /*
+     * Setting the relay address from here, rather than sending people to
+     * the Whoop screen for it.
+     *
+     * The old copy said "set it up under Settings → Whoop first", which is
+     * accurate and useless. Someone handed this app who has never owned a
+     * Whoop reads that, opens a screen about OAuth clients and redirect
+     * URIs, and reasonably concludes the feature is not for them — and
+     * meanwhile every step below this point stays hidden, because they all
+     * hang off a relay address they were never given a way to enter. The
+     * address is one shared field that happens to have been introduced by
+     * the Whoop flow; it is not a Whoop thing, so it is asked for here too.
+     */
     if (!relay) {
-      kids.push(el('div.note.warn', {}, el('div', {},
-        el('b', {}, 'No relay address set.'),
-        el('div.fine', { style: { marginTop: '4px' } },
-          'Apple Health needs the same relay Whoop uses. Set it up under '
-          + 'Settings → Whoop first — the address is all that is needed here, '
-          + 'not a Whoop account.'))));
+      const relayInput = el('input', {
+        type: 'url', placeholder: 'https://basal-whoop.<name>.workers.dev',
+        autocapitalize: 'none', spellcheck: 'false',
+      });
+      kids.push(
+        el('div.section-label', {}, el('span.micro', {}, 'Step 0 — the relay')),
+        el('div.tile', {},
+          el('div.fine', {}, 'The small server your phone pushes to. Whoever set this '
+            + 'app up for you has the address — it is the same one on their phone, and '
+            + 'sharing it is fine. Your data is kept separate by the key below, not by '
+            + 'the address.'),
+          field('Relay address', relayInput),
+          el('button.btn.primary.block', {
+            onclick: async e => {
+              const btn = e.currentTarget;
+              const v = relayBase(relayInput.value);
+              if (!v) { toast('That is not a usable web address.', 'err'); return; }
+              btn.disabled = true; btn.textContent = 'Checking…';
+              const res = await checkRelay(v);
+              btn.disabled = false; btn.textContent = 'Save and test';
+              if (!res.ok) { toast(res.error, 'err'); return; }
+              commit(st => { st.settings.relayUrl = v; });
+              toast('Relay reachable.');
+              render();
+            } }, 'Save and test')));
     }
 
     kids.push(
