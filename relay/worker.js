@@ -202,11 +202,35 @@ function num(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+/*
+ * Fields where a literal zero is not a measurement, it is an absence.
+ *
+ * This exists because of how Shortcuts behaves, not because of anything the
+ * phone got wrong. "Find Health Samples ... Calculate Statistics: Sum" over
+ * an empty match returns 0, not nothing — so a day the watch was never worn
+ * arrives here indistinguishable from a day of total stillness. Stored as-is
+ * it becomes "Move 0/500", which reads as a verdict on the person rather than
+ * a gap in the data, and quietly poisons any trend built on top of it.
+ *
+ * Only fields whose zero is physically impossible in a living, watch-wearing
+ * person belong on this list. Resting energy is never zero. Active energy is
+ * never exactly zero across a whole day. Stand hours never reach midnight at
+ * zero on a worn watch, and a resting heart rate of zero is not a reading.
+ *
+ * Steps and exerciseMin are deliberately NOT here: a genuine zero-step,
+ * zero-exercise day is a real thing that happens and is worth recording.
+ */
+const NEVER_ZERO = new Set(['basalKcal', 'activeKcal', 'standHours',
+                            'rhr', 'hrv', 'spo2', 'resp', 'temp',
+                            'weightKg', 'vo2max', 'sleepH']);
+
 function clean(row) {
   const out = {};
   for (const f of FIELDS) {
     const v = num(row[f]);
-    if (v != null && v >= 0) out[f] = v;
+    if (v == null || v < 0) continue;
+    if (v === 0 && NEVER_ZERO.has(f)) continue;
+    out[f] = v;
   }
   return out;
 }
@@ -283,6 +307,10 @@ export default {
              must not wipe the heart rate an earlier one sent. */
           const prevRaw = await env.HEALTH.get(`${key}:${date}`);
           const prev = prevRaw ? JSON.parse(prevRaw) : {};
+          /* Self-heal rows written before NEVER_ZERO existed. A stored zero
+             for one of those fields is an artefact of an empty Shortcuts Sum,
+             and merging would otherwise preserve it forever. */
+          for (const f of NEVER_ZERO) if (prev[f] === 0) delete prev[f];
           const merged = { ...prev, ...clean(row), date, src: 'apple',
                            updatedAt: new Date().toISOString() };
           await env.HEALTH.put(`${key}:${date}`, JSON.stringify(merged),
