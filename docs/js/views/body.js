@@ -31,7 +31,7 @@ import { sleepTile, sleepSchedule, sleepHours, clockText } from './sleep.js';
 import { weightUnit, kgToLb, lbToKg, showWeight } from '../units.js';
 import {
   existingSource, sourceForMetric, healthSource, setHealthSource, canMeasure, bandName,
-  relayBase, rowsFor,
+  relayBase, rowsFor, syncApple, healthKey,
 } from '../applehealth.js';
 import {
   relayUrl, isConnected, connectUrl, checkRelay, syncWhoop, disconnect, captureFromUrl,
@@ -905,12 +905,37 @@ function appleVitals(s, ctx, scoped, sum) {
   const latestKey = Object.keys(scoped.rows || {}).sort().pop();
   const today = scoped.rows?.[latestKey] || {};
 
+  /*
+   * Sync, on the Apple screen, meaning Apple.
+   *
+   * This button used to open the Whoop relay sheet — a screen about OAuth
+   * clients and redirect URIs, reached by pressing Sync on a page with an
+   * Apple Watch in the header. The Whoop view's own Sync does the right
+   * thing, and this was written by copying that line without changing where
+   * it points. Apple's equivalent is pulling the relay, so that is what it
+   * does now, in one tap rather than by way of somebody else's setup screen.
+   */
+  const syncBtn = el('button.btn.sm.ghost', {
+    onclick: async e => {
+      const btn = e.currentTarget;
+      if (!healthKey()) { openAppleHealth(ctx); return; }
+      btn.disabled = true; btn.textContent = 'Syncing…';
+      const r = await syncApple({});
+      btn.disabled = false; btn.textContent = 'Sync';
+      if (!r.ok) { toast(r.error, 'err'); return; }
+      if (!r.days) { toast(r.note || 'Nothing new on the relay yet.'); return; }
+      toast(`${r.days} day${r.days === 1 ? '' : 's'} in.`);
+      ctx.refresh();
+    } }, 'Sync');
+
   const wrap = el('div.ah', {},
     el('div.between', { style: { marginBottom: '12px' } },
       el('div', {},
         el('h2.ah-title', {}, 'Health'),
         el('div.micro', {}, `Apple Watch · ${latestKey}`)),
-      el('button.btn.sm.ghost', { onclick: () => openWhoopRelay(ctx) }, 'Sync')));
+      el('div.flex', { style: { gap: '6px' } },
+        el('button.btn.sm.ghost', { onclick: () => openAppleHealth(ctx) }, 'Set up'),
+        syncBtn)));
 
   /*
    * The rings lead, the way recovery leads the Whoop view.
