@@ -3355,168 +3355,224 @@ button.src-tag { cursor: pointer; }
    leave the slider the width it needs to be draggable. */
 .macro-range + div .num-in { width: 62px; text-align: right; }
 
+
+
 /* ═══════════════════════════════════════════════════════════════════════
-   Soft — a second skin, not a second app.
+   Paper — a third skin over the light theme.
 
-   The complaint that produced this was not about the numbers. It was that
-   the first screen arrives all at once: hairlines dividing everything,
-   panels butted against panels, and a condensed grotesque that makes a
-   calorie count look like an instrument reading. People described it as
-   overwhelming, and they were describing the surface rather than the depth.
+   Every screen, chart, table and number the app already draws is drawn
+   here too, unchanged. This is not a simplified mode and it hides nothing;
+   the objection it answers was never "too much information", it was that
+   the information arrived looking like a control panel.
 
-   So this skin changes four things and nothing else:
+   Four decisions carry it:
 
-     · corners go from 8px to 18px, so a card reads as an object
-     · every hairline is replaced by a shadow — depth does the sorting,
-       which is most of why the reference feels uncluttered
-     · the ground goes warm, and cards go pure white on top of it
-     · the type rounds off, using the phone's own ui-rounded so it looks
-       native rather than imported
+     · warm ground, cards floating on it as pale objects
+     · a real outline on anything you can press, with a hard shadow under
+       it that collapses when you push — the reason a button reads as a
+       button rather than as a coloured rectangle
+     · Fredoka over Nunito instead of Plex, self-hosted so the app still
+       works with no network
+     · mono retired here, with tabular figures kept so every column, chart
+       axis and table still lines up
 
-   It rides ON TOP of the light theme rather than replacing it: data-theme
-   stays "light" so every light-scoped rule in this file still applies, and
-   data-skin adds the shape on top. Nothing here touches a colour that
-   carries meaning — the ring palette, the macro hues and the category
-   colours are the light theme's, untouched, because what a reading means
-   must not depend on which skin somebody picked.
+   Both faces are variable and latin-only: 69 KB for the pair, which is
+   less than the three Plex families it replaces on this skin.
 
-   Mono survives exactly where it earns its place: numbers you study rather
-   than glance at. A calorie count read forty times a day is glanced at.
+   It rides on data-theme="light" and adds data-skin on top, so every
+   light-scoped rule in this file still applies. Nothing that carries
+   meaning is restated — ring colours, macro hues and category colours stay
+   the light theme's, because a reading must not change what it means
+   because somebody preferred warmer paper.
    ═══════════════════════════════════════════════════════════════════════ */
 
-:root[data-skin="soft"] {
-  --sans: ui-rounded, 'SF Pro Rounded', -apple-system, 'Segoe UI Variable',
-          'Nunito', system-ui, sans-serif;
-  --cond: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif;
+@font-face { font-family: 'Fredoka'; src: url('../fonts/fredoka-var.woff2') format('woff2');
+             font-weight: 300 700; font-display: swap; }
+@font-face { font-family: 'Nunito'; src: url('../fonts/nunito-var.woff2') format('woff2');
+             font-weight: 300 800; font-display: swap; }
 
-  /* Warm paper, white objects. The cool near-white of the light theme is
-     correct for a dashboard and slightly clinical for a kitchen. */
-  --bg:        #F6F2EC;
-  --bg-2:      #FFFFFF;
-  --surface:   #FFFFFF;
-  --surface-2: #FBF8F4;
-  --raised:    #FFFFFF;
-  --panel:     #FFFFFF;
-  --panel-2:   #F6F2EC;
+:root[data-skin="paper"] {
+  --sans: 'Nunito', ui-rounded, -apple-system, system-ui, sans-serif;
+  --cond: 'Fredoka', 'Nunito', ui-rounded, system-ui, sans-serif;
+  --mono: 'Nunito', ui-rounded, system-ui, sans-serif;
 
-  --text:      #1A1720;
-  --text-2:    #4A4652;
-  --muted:     #6E6A78;
-  --dim:       #9A96A4;
+  --bg:        #F0E5D2;
+  --bg-2:      #FFFDF8;
+  --surface:   #FFFDF8;
+  --surface-2: #F7EEDD;
+  --raised:    #FFFDF8;
+  --panel:     #FFFDF8;
+  --panel-2:   #F0E5D2;
 
-  /* Kept only for the few places a line genuinely separates rather than
-     decorates — inside a list, where a shadow per row would be absurd. */
-  --line:      rgba(70, 55, 45, .10);
-  --line-2:    rgba(70, 55, 45, .20);
+  --text:      #332A21;
+  --text-2:    #5C5044;
+  --muted:     #7D6E5C;
+  --dim:       #A2917B;
 
-  --r-sm: 12px;
-  --r:    18px;
-  --r-lg: 24px;
+  /* The outline, and the hard edge under anything pressable. */
+  --edge:      #2A211A;
+  --line:      rgba(42, 33, 26, .15);
+  --line-2:    rgba(42, 33, 26, .30);
 
-  --lift:    0 1px 0 rgba(60,45,35,.04), 0 10px 22px -10px rgba(60,45,35,.26);
-  --lift-lg: 0 2px 0 rgba(60,45,35,.04), 0 22px 44px -18px rgba(60,45,35,.32);
+  --r-sm: 14px;
+  --r:    20px;
+  --r-lg: 26px;
 
-  --glass:       rgba(255, 255, 255, .94);
-  --glass-solid: #FFFFFF;
-  --glass-line:  rgba(70, 55, 45, .10);
-  --glass-hi:    rgba(255, 255, 255, 1);
-  --glass-bg:    rgba(255, 255, 255, .96);
-  --glass-brd:   rgba(70, 55, 45, .12);
+  --lift:    0 3px 0 rgba(42,33,26,.07);
+  --lift-lg: 0 5px 0 rgba(42,33,26,.09), 0 24px 44px -22px rgba(42,33,26,.4);
+
+  --accent:     #D9452F;
+  --accent-2:   #9E2C1B;
+  --accent-ink: #FFFFFF;
+
+  --glass:       #FFFDF8;
+  --glass-solid: #FFFDF8;
+  --glass-line:  #2A211A;
+  --glass-hi:    transparent;
+  --glass-active:#F0E5D2;
+  --glass-bg:    #FFFDF8;
+  --glass-brd:   rgba(42,33,26,.15);
 
   --sheen: none;
   --grain: 0;
 }
 
-/* Shadow instead of border. This single rule is most of the skin. */
-:root[data-skin="soft"] .tile,
-:root[data-skin="soft"] .ah-card,
-:root[data-skin="soft"] .note {
-  border: 0;
+/* Figures line up without mono to guarantee it. */
+:root[data-skin="paper"] body { font-variant-numeric: tabular-nums; }
+
+/* ── surfaces ────────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .tile,
+:root[data-skin="paper"] .ah-card,
+:root[data-skin="paper"] .note,
+:root[data-skin="paper"] .home-sec {
+  border: 1.5px solid var(--line);
+  border-radius: var(--r);
   box-shadow: var(--lift);
-  padding: 16px;
+  padding: 17px;
 }
 
-/* Headings lose the condensed squeeze and gain weight instead — rounded
-   faces read as flimsy at 600 where a grotesque reads as firm. */
-:root[data-skin="soft"] h1,
-:root[data-skin="soft"] h2,
-:root[data-skin="soft"] h3,
-:root[data-skin="soft"] .brand {
-  font-weight: 800;
-  letter-spacing: -0.025em;
+/* ── type ────────────────────────────────────────────────────────────── */
+:root[data-skin="paper"] h1,
+:root[data-skin="paper"] h2,
+:root[data-skin="paper"] h3,
+:root[data-skin="paper"] .ah-title,
+:root[data-skin="paper"] .brand {
+  font-family: var(--cond);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+:root[data-skin="paper"] .brand { letter-spacing: .05em; }
+
+/* Every eyebrow: short, spaced, quiet. */
+:root[data-skin="paper"] .micro,
+:root[data-skin="paper"] .ah-cat,
+:root[data-skin="paper"] .mini-head {
+  font-family: var(--cond);
+  font-weight: 500;
+  font-size: 10.5px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--dim);
 }
 
-/* Buttons become chunky and lose their outline. */
-:root[data-skin="soft"] .btn {
-  border: 0;
-  border-radius: 14px;
-  font-weight: 700;
-  box-shadow: var(--lift);
+/* Readings: display face, moderate weight. Bold everywhere reads as shouting. */
+:root[data-skin="paper"] .ah-value,
+:root[data-skin="paper"] .row .kcal,
+:root[data-skin="paper"] .big-num {
+  font-family: var(--cond);
+  font-weight: 600;
+  letter-spacing: -0.03em;
 }
-:root[data-skin="soft"] .btn.primary {
-  box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--accent) 55%, transparent);
-}
-:root[data-skin="soft"] .btn.sm { border-radius: 11px; }
 
-/* The tab pill goes solid white. Glass over a warm ground turns grey, and
-   grey is the one thing this skin is trying to get rid of. */
-:root[data-skin="soft"] .tabs {
-  background: #FFFFFF;
-  border: 0;
+/* ── pressables ──────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .btn {
+  font-family: var(--cond);
+  font-weight: 500;
+  border: 2px solid var(--edge);
+  border-radius: 15px;
+  box-shadow: 0 3px 0 var(--edge);
+  transition: transform .12s, box-shadow .12s;
+}
+:root[data-skin="paper"] .btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--edge);
+  background: var(--surface-2);
+}
+:root[data-skin="paper"] .btn.primary { border-color: var(--accent-2); box-shadow: 0 3px 0 var(--accent-2); }
+:root[data-skin="paper"] .btn.primary:active { box-shadow: 0 0 0 var(--accent-2); background: var(--accent); }
+:root[data-skin="paper"] .btn.sm { border-radius: 12px; box-shadow: 0 2px 0 var(--edge); }
+:root[data-skin="paper"] .btn.sm:active { transform: translateY(2px); }
+
+:root[data-skin="paper"] .chip,
+:root[data-skin="paper"] .seg,
+:root[data-skin="paper"] .field,
+:root[data-skin="paper"] .theme-opt {
+  border: 2px solid var(--edge);
+  border-radius: 15px;
+}
+:root[data-skin="paper"] .seg { background: var(--surface-2); padding: 3px; }
+:root[data-skin="paper"] .seg button { border-radius: 11px; font-family: var(--cond); font-weight: 500; }
+:root[data-skin="paper"] .seg button[aria-pressed="true"] { box-shadow: 0 2px 0 var(--edge); border: 1.5px solid var(--edge); }
+:root[data-skin="paper"] .chip { box-shadow: 0 2px 0 var(--edge); border-radius: 999px; }
+
+/* ── rows ────────────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .row { border-bottom: 1.5px solid var(--line); padding: 13px 4px; }
+:root[data-skin="paper"] .row:last-child { border-bottom: 0; }
+:root[data-skin="paper"] .row:active { background: var(--surface-2); border-radius: 12px; }
+
+/* ── the tab pill ────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .tabs {
+  background: var(--surface);
+  border: 2px solid var(--edge);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  box-shadow: 0 10px 30px -10px rgba(60,45,35,.34);
+  box-shadow: 0 4px 0 var(--edge);
 }
-:root[data-skin="soft"] .tabs button {
-  font-family: var(--sans);
-  font-size: 9.5px; font-weight: 800; letter-spacing: .06em;
+:root[data-skin="paper"] .tabs button {
+  font-family: var(--cond);
+  font-size: 9.5px; font-weight: 500; letter-spacing: .09em;
 }
+:root[data-skin="paper"] .tabs button[aria-current=page] { background: var(--surface-2); }
 
-/*
- * The plus, in the middle of the tabs.
- *
- * It sits in the row rather than floating over the content, which is what
- * the reference does and is the better of the two: a floating button
- * covers whatever is underneath it, and on a log the thing underneath is
- * always the most recent entry — the one you are most likely to want.
- *
- * It goes to Home, because Home already is the food finder: search, the
- * grid, most eaten, recent, scanned. Nothing new was built for it. Home
- * therefore drops out of the row on this skin, so there is exactly one
- * way in rather than two.
- */
-:root[data-skin="soft"] .tab-plus {
-  flex: 0 0 auto;
-  width: 54px; height: 54px; margin: 0 4px;
-  border-radius: 50%;
+/* ── the floating plus ───────────────────────────────────────────────── */
+.food-fab { display: none; }
+:root[data-skin="paper"] .food-fab {
   display: flex; align-items: center; justify-content: center;
+  position: fixed; z-index: 51;
+  right: max(20px, calc(env(safe-area-inset-right, 0px) + 20px));
+  bottom: calc(var(--tab-h) + 14px);
+  width: 58px; height: 58px; border-radius: 50%;
   background: var(--accent); color: var(--accent-ink);
-  box-shadow: 0 8px 20px -4px color-mix(in srgb, var(--accent) 55%, transparent),
-              0 3px 0 var(--accent-2);
-  transition: transform .28s cubic-bezier(.34,1.56,.64,1);
+  border: 2px solid var(--edge);
+  box-shadow: 0 4px 0 var(--edge);
+  transition: transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s, opacity .3s;
 }
-:root[data-skin="soft"] .tab-plus:active { transform: scale(.9); }
-:root[data-skin="soft"] .tab-plus svg { width: 26px; height: 26px; stroke-width: 2.2; }
-
-/* Rows: no hairline, a little air, and the tap target rounds off. */
-:root[data-skin="soft"] .row {
-  border-bottom: 1px solid var(--line);
-  border-radius: 12px;
-  padding-left: 10px; padding-right: 10px;
+:root[data-skin="paper"] .food-fab:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--edge);
 }
-:root[data-skin="soft"] .row:last-child { border-bottom: 0; }
+:root[data-skin="paper"] .food-fab svg { stroke-width: 2.6; }
+/* Steps aside with the tab pill while the page is moving. */
+:root[data-skin="paper"] .tabs.scrolling ~ .food-fab,
+:root[data-skin="paper"] .food-fab.scrolling { opacity: .6; }
 
-/* Segmented controls and chips follow the same softening. */
-:root[data-skin="soft"] .seg { border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: 14px; }
-:root[data-skin="soft"] .seg button { border-radius: 11px; font-weight: 700; }
+/* ── odds and ends ───────────────────────────────────────────────────── */
+:root[data-skin="paper"] .home-search { border-radius: 16px; }
+:root[data-skin="paper"] .topbar { background: transparent; }
+:root[data-skin="paper"] .grid-empty { border-radius: var(--r); border-width: 1.5px; }
+:root[data-skin="paper"] .sheet,
+:root[data-skin="paper"] .sheet-body { border-radius: 26px 26px 0 0; }
 
-/* Fields lose the box and gain a tinted well. */
-:root[data-skin="soft"] .field {
-  border: 0; border-radius: 14px; background: var(--surface-2);
+/* Swatch: paper, card, red. */
+.theme-swatch.paper {
+  background: linear-gradient(140deg, #F0E5D2 0 44%, #FFFDF8 44% 80%, #D9452F 80%);
+  border-radius: 10px;
 }
 
-/* Swatch for the picker. */
-.theme-swatch.soft {
-  background: linear-gradient(140deg, #F6F2EC 0 55%, #FFFFFF 55%);
-  border-radius: 11px;
+/* The what's-new card. Accented enough to be noticed once, quiet enough
+   that it is not competing with the weigh-in ask underneath it. */
+.tile.news { border-left: 3px solid var(--accent); }
+:root[data-skin="paper"] .tile.news {
+  border: 2px solid var(--edge);
+  box-shadow: 0 4px 0 var(--edge);
 }

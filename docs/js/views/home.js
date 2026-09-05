@@ -53,6 +53,7 @@ export function renderHome(root, ctx) {
      a literal "null" ended up sitting under the readout whenever Whoop
      had nothing to say. */
   append(root,
+    whatsNew(ctx),
     rolloverCard(key, ctx),
     weighAsk(key, ctx),
     workoutAsk(key, ctx),
@@ -65,6 +66,57 @@ export function renderHome(root, ctx) {
     picker(s, ctx, key),
     logSection(key, ctx),
   );
+}
+
+/*
+ * What changed, once.
+ *
+ * An update that alters how the whole app looks needs to say so, or the
+ * next person to open it thinks something broke. But a banner that keeps
+ * coming back is worse than no banner: it teaches people to dismiss the
+ * top of the screen without reading it, which is exactly where the genuine
+ * warnings live — the weigh-in ask, the rollover, the coach.
+ *
+ * So it is keyed by id rather than by version. Closing it writes the id
+ * and it never returns, and a future note gets a new id rather than
+ * resurrecting this one. Nothing here is a nag: no counter, no "remind me
+ * later", one close button that means closed.
+ */
+const NEWS_ID = 'paper-skin';
+const NEWS = {
+  title: 'A new look, if you want it',
+  body: 'Paper is a warmer, rounder version of the whole app — every screen, '
+      + 'chart and number exactly as they were, drawn differently. It also '
+      + 'adds a floating plus that opens the food search from any screen.',
+  cta: 'Try it',
+};
+
+function whatsNew(ctx) {
+  if (get().settings?.seenNews === NEWS_ID) return null;
+
+  const dismiss = () => {
+    commit(st => {
+      st.settings = st.settings || {};
+      st.settings.seenNews = NEWS_ID;
+    }, 'settings');
+    ctx.refresh();
+  };
+
+  return el('div.tile.news', {},
+    el('div.between', {},
+      el('span.micro', {}, "What\u2019s new"),
+      el('button.x-btn', { 'aria-label': 'Dismiss', onclick: dismiss }, icon('x', 15))),
+    el('h3', { style: { marginTop: '8px' } }, NEWS.title),
+    el('div.fine', { style: { marginTop: '6px' } }, NEWS.body),
+    el('div.btn-row', { style: { marginTop: '12px' } },
+      el('button.btn.sm.primary', {
+        onclick: () => {
+          commit(st => { st.settings.theme = 'paper'; }, 'settings');
+          dismiss();
+          toast('Paper is on. Settings \u2192 Look to change back.');
+        },
+      }, NEWS.cta),
+      el('button.btn.sm', { onclick: dismiss }, 'Not now')));
 }
 
 /*

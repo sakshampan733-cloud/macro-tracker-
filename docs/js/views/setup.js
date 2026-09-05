@@ -908,7 +908,7 @@ export function renderSettings(root, ctx) {
           ...[
             ['dark',  'Dark'],
             ['light', 'Light'],
-            ['soft',  'Soft'],
+            ['paper', 'Paper'],
             ['auto',  'System'],
           ].map(([value, label]) => el('button.theme-opt', {
             type: 'button',
@@ -924,10 +924,9 @@ export function renderSettings(root, ctx) {
           'Dark is true black — on an OLED screen those pixels are genuinely off. '
           + 'Light is a cool near-white with white cards, not the cream it used to be.'),
         el('div.fine', { style: { marginTop: '8px' } },
-          'Soft is the light palette with rounded corners, shadows instead of '
-          + 'hairlines and a warm ground — the same numbers, a quieter surface. '
-          + 'It also moves Home into a plus button in the middle of the tab bar, '
-          + 'since Home is where you go to find a food.'))),
+          'Paper is warm ground, outlined cards and a rounded face — every screen '
+          + 'and every chart exactly as they are, drawn differently. It adds a '
+          + 'floating plus that opens the food search from anywhere.'))),
 
     group(ctx, 'read', 'Reading',
       'How much the app explains, and how much to trust it.',

@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.05-resting';
+export const VERSION = '2026.09.05-paper';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
@@ -144,39 +144,44 @@ scroller.addEventListener('scroll', () => {
 
 function drawNav() {
   clear(nav);
+  for (const t of TABS) {
+    nav.append(el('button', {
+      'aria-current': ctx.route === t.id ? 'page' : null,
+      onclick: () => ctx.go(t.id, t.id === 'today' ? { date: openDay() } : {}),
+    }, icon(t.icon, 21), el('span', {}, t.label)));
+  }
 
   /*
-   * On the soft skin the row is two tabs, the plus, two tabs.
+   * The floating plus, on the Paper skin only.
    *
-   * Home leaves the row and becomes the plus, because Home already IS the
-   * food finder and two doors into one screen is one door too many. Settings
-   * takes the vacated slot — it was only ever reachable from a small gear in
-   * the header, which is a poor home for the screen that holds your goal.
+   * It exists because of one complaint: finding a food means scrolling. The
+   * fix is not another route — Home already holds the search — it is landing
+   * on a focused field from wherever you happen to be standing, so the
+   * distance from "I ate something" to typing its name is one tap anywhere
+   * in the app.
    *
-   * TABS itself is untouched, so the swipe order still spans all four and
-   * every other skin renders exactly as before.
+   * It sits beside the tab row rather than inside it. In the row it would
+   * have cost a tab, and the four tabs are the ones already learned.
    */
-  const soft = document.documentElement.getAttribute('data-skin') === 'soft';
-  const tab = t => el('button', {
-    'aria-current': ctx.route === t.id ? 'page' : null,
-    onclick: () => ctx.go(t.id, t.id === 'today' ? { date: openDay() } : {}),
-  }, icon(t.icon, 21), el('span', {}, t.label));
+  const paper = document.documentElement.getAttribute('data-skin') === 'paper';
+  const old = document.getElementById('food-fab');
+  if (old) old.remove();
+  if (!paper || !get().profile) return;
 
-  if (!soft) {
-    for (const t of TABS) nav.append(tab(t));
-    return;
-  }
-
-  const rest = TABS.filter(t => t.id !== 'home');
-  const settings = { id: 'settings', label: 'You', icon: 'gear' };
-  const row = [...rest.slice(0, 2), null, ...rest.slice(2), settings];
-
-  for (const t of row) {
-    nav.append(t ? tab(t) : el('button.tab-plus', {
-      'aria-label': 'Add food',
-      onclick: () => ctx.go('home'),
-    }, icon('plus', 26)));
-  }
+  nav.parentNode.insertBefore(el('button.food-fab', {
+    id: 'food-fab',
+    'aria-label': 'Search foods',
+    onclick: () => {
+      ctx.go('home');
+      /* Two frames: the field does not exist until the route has drawn. */
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const box = document.querySelector('.home-search input');
+        if (!box) return;
+        box.scrollIntoView({ block: 'center', behavior: 'instant' });
+        box.focus();
+      }));
+    },
+  }, icon('plus', 27)), nav);
 }
 
 function drawHeader() {
@@ -206,7 +211,7 @@ function drawHeader() {
  * dark corrections.
  */
 /*
- * 'soft' is a skin, not a fourth palette.
+ * 'paper' is a skin, not a fourth palette.
  *
  * It resolves to the light theme and then adds data-skin on top, so every
  * light-scoped rule in the stylesheet still matches and only shape — radius,
@@ -216,14 +221,14 @@ function drawHeader() {
  */
 function applyTheme(pref) {
   const root = document.documentElement;
-  const soft = pref === 'soft';
-  const resolved = soft ? 'light'
+  const paper = pref === 'paper';
+  const resolved = paper ? 'light'
     : (!pref || pref === 'auto')
     ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches === false ? 'light' : 'dark')
     : pref;
 
   root.setAttribute('data-theme', resolved);
-  if (soft) root.setAttribute('data-skin', 'soft');
+  if (paper) root.setAttribute('data-skin', 'paper');
   else root.removeAttribute('data-skin');
   /*
    * The resolved scheme, never "light dark".
@@ -239,7 +244,7 @@ function applyTheme(pref) {
 
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content',
-    resolved === 'dark' ? '#000000' : soft ? '#F6F2EC' : '#F2F2F7');
+    resolved === 'dark' ? '#000000' : paper ? '#F0E5D2' : '#F2F2F7');
 
   applyOrb(get().settings?.orb || 'none', resolved);
 
