@@ -858,7 +858,7 @@ const WHOOP_ORDER = ['recovery', 'strain', 'hrv', 'rhr', 'kcal', 'spo2', 'resp',
 /*
  * One card. Shared by both views so they cannot drift apart.
  */
-function metricCard(s, ctx, scoped, sum, key, latestKey) {
+function metricCard(s, ctx, scoped, sum, key, latestKey, note = null) {
   const spec = METRIC_CARDS[key];
   const info = sum.metrics[key];
   if (!spec || !info?.latest) return null;
@@ -895,6 +895,7 @@ function metricCard(s, ctx, scoped, sum, key, latestKey) {
     el('div.ah-value', {},
       value.toLocaleString(undefined, { minimumFractionDigits: info.dp, maximumFractionDigits: info.dp }),
       info.unit ? el('span.ah-unit', {}, info.unit) : null),
+    note ? el('div.micro', { style: { marginTop: '2px', opacity: '.75' } }, note) : null,
     el('div.ah-spark', { style: { color: colour } },
       pts.length >= 2
         ? miniSpark(pts.map(p => p.v), { colour, w: 96, h: 20 })
@@ -966,8 +967,25 @@ function appleVitals(s, ctx, scoped, sum) {
           'Your Shortcut is not sending the ring data yet. Add Active Energy, '
           + 'Exercise Minutes and Stand Hours to it and the rings fill in.')));
 
+  /*
+   * Total burned, with its two halves named underneath.
+   *
+   * 1,800 kcal on a day of 230 active ones is a true number that reads as a
+   * boast. The total is the right figure to keep — it is what the calorie
+   * target is built from, and active alone would understate a rest day badly
+   * — but shown bare, next to a Move ring counting only the active part, it
+   * invites the reader to credit themselves with an afternoon they did not
+   * have. Resting energy is the body idling, not effort, and saying so costs
+   * one line.
+   */
+  const burnNote = (today.activeKcal != null && today.basalKcal != null)
+    ? `${Math.round(today.activeKcal).toLocaleString()} active · `
+      + `${Math.round(today.basalKcal).toLocaleString()} resting`
+    : null;
+
   const cards = APPLE_ORDER
-    .map(k => metricCard(s, ctx, scoped, sum, k, latestKey))
+    .map(k => metricCard(s, ctx, scoped, sum, k, latestKey,
+                         k === 'kcal' ? burnNote : null))
     .filter(Boolean);
 
   wrap.append(cards.length
