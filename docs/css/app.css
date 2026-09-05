@@ -3446,8 +3446,7 @@ button.src-tag { cursor: pointer; }
 /* ── surfaces ────────────────────────────────────────────────────────── */
 :root[data-skin="paper"] .tile,
 :root[data-skin="paper"] .ah-card,
-:root[data-skin="paper"] .note,
-:root[data-skin="paper"] .home-sec {
+:root[data-skin="paper"] .note {
   border: 1.5px solid var(--line);
   border-radius: var(--r);
   box-shadow: var(--lift);
@@ -3576,7 +3575,9 @@ button.src-tag { cursor: pointer; }
 
 /* ── odds and ends ───────────────────────────────────────────────────── */
 :root[data-skin="paper"] .home-search { border-radius: 16px; }
-:root[data-skin="paper"] .topbar { background: transparent; }
+/* Opaque, not transparent. Content scrolls under this bar, and a see-through
+   one let the Body screen's BMI figure sit on top of the wordmark. */
+:root[data-skin="paper"] .topbar { background: var(--bg); }
 :root[data-skin="paper"] .grid-empty { border-radius: var(--r); border-width: 1.5px; }
 :root[data-skin="paper"] .sheet,
 :root[data-skin="paper"] .sheet-body { border-radius: 26px 26px 0 0; }
@@ -3731,8 +3732,7 @@ button.src-tag { cursor: pointer; }
 
 /* ── the small stuff that still read as the old app ──────────────────── */
 :root[data-skin="paper"] .home-actions button,
-:root[data-skin="paper"] .x-btn,
-:root[data-skin="paper"] .sec-head {
+:root[data-skin="paper"] .x-btn {
   border: 2px solid var(--edge);
   border-radius: 15px;
   box-shadow: 0 3px 0 var(--edge);
@@ -3773,3 +3773,138 @@ button.src-tag { cursor: pointer; }
   border: 1.5px solid var(--edge);
   border-radius: 6px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Paper, part three — the screens the first two passes missed.
+
+   Two faults, both from treating the skin as a palette swap. The first was
+   scope: rules were written against the containers Home happens to use, so
+   Detail arrived recoloured but undrawn — its rails, macro rows, meal heads
+   and water grid were never named. The second was structural: .home-sec and
+   .sec-head are a section wrapper and its in-flow header, and giving each
+   the card treatment nested a bordered box inside a bordered box and
+   floated the header over the grid beneath it. That is the overlap under
+   Most eaten.
+
+   The fix is to name things by what they are. Containers stay containers.
+   Anything you can press, or that carries a measurement, gets the outline
+   and the edge — everywhere it appears, not only where Home puts it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Home: the food grid ─────────────────────────────────────────────── */
+:root[data-skin="paper"] .food-cell {
+  border: 2px solid var(--edge);
+  border-radius: 16px;
+  box-shadow: 0 3px 0 var(--edge);
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: transform .12s, box-shadow .12s;
+}
+:root[data-skin="paper"] .food-cell:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--edge);
+  background: var(--surface-2);
+}
+:root[data-skin="paper"] .food-cell:hover {
+  border-color: var(--edge);
+  background: var(--surface);
+}
+:root[data-skin="paper"] .food-cell .fc-name { font-weight: 600; }
+:root[data-skin="paper"] .food-cell .fc-kcal {
+  font-family: var(--cond); font-weight: 500;
+}
+:root[data-skin="paper"] .food-cell.is-meal { border-color: var(--accent-2); }
+
+:root[data-skin="paper"] .food-grid { gap: 10px; }
+
+/* The section header stays a header: no box, no shadow, nothing to overlap
+   the grid it introduces. */
+:root[data-skin="paper"] .home-sec { margin-top: 10px; }
+:root[data-skin="paper"] .sec-head { padding: 14px 2px 11px; }
+:root[data-skin="paper"] .sec-count {
+  border: 1.5px solid var(--edge);
+  font-family: var(--cond); font-weight: 500;
+  padding: 2px 9px;
+}
+:root[data-skin="paper"] .grid-empty {
+  border: 2px dashed var(--line-2);
+  border-radius: var(--r);
+}
+
+/* ── Detail: the screen the skin never reached ───────────────────────── */
+:root[data-skin="paper"] .now-card {
+  border: 2px solid var(--edge);
+  border-radius: 22px;
+  box-shadow: 0 4px 0 var(--edge);
+}
+:root[data-skin="paper"] .now-head,
+:root[data-skin="paper"] .macro-name,
+:root[data-skin="paper"] .meal-head .name,
+:root[data-skin="paper"] .tile-head,
+:root[data-skin="paper"] .section-label .micro {
+  font-family: var(--cond);
+  font-weight: 500;
+}
+:root[data-skin="paper"] .macro-val,
+:root[data-skin="paper"] .row .kcal,
+:root[data-skin="paper"] .row .portion,
+:root[data-skin="paper"] .meal-head .amt,
+:root[data-skin="paper"] .num,
+:root[data-skin="paper"] .readout-side .v {
+  font-family: var(--cond);
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+:root[data-skin="paper"] .macro-row { padding: 12px 0; }
+:root[data-skin="paper"] .macro-row + .macro-row { border-top: 1.5px solid var(--line); }
+
+:root[data-skin="paper"] .meal-head {
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+  padding: 10px 13px;
+}
+
+:root[data-skin="paper"] .caff-card {
+  border: 2px solid var(--edge);
+  border-radius: 22px;
+  box-shadow: 0 4px 0 var(--edge);
+}
+
+/* The water grid on Detail: each cell an object, filled or empty. */
+:root[data-skin="paper"] .water-grid > * {
+  border: 1.5px solid var(--edge);
+  border-radius: 7px;
+}
+
+/* Notes and callouts keep their meaning colour and gain the outline. */
+:root[data-skin="paper"] .note,
+:root[data-skin="paper"] .note.info,
+:root[data-skin="paper"] .note.warn,
+:root[data-skin="paper"] .note.good {
+  border: 2px solid var(--edge);
+  border-radius: 18px;
+  box-shadow: 0 3px 0 var(--edge);
+}
+
+:root[data-skin="paper"] .divider { border-color: var(--line); border-width: 1.5px; }
+
+/* ── everywhere: rows that open something are pressable ──────────────── */
+:root[data-skin="paper"] .tile.tappable {
+  border: 2px solid var(--edge);
+  box-shadow: 0 4px 0 var(--edge);
+  transition: transform .12s, box-shadow .12s;
+}
+:root[data-skin="paper"] .tile.tappable:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--edge);
+}
+
+/* A card holding a list should not also pad it. */
+:root[data-skin="paper"] .tile.flush { padding: 0; }
+
+/* ── the top bar ─────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .brand { font-family: var(--cond); font-weight: 600; }
+:root[data-skin="paper"] .mini-row { border-top: 1.5px solid var(--line); }
+:root[data-skin="paper"] .mini-x { border: 1.5px solid var(--edge); }
