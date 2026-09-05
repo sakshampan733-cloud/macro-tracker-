@@ -3354,3 +3354,169 @@ button.src-tag { cursor: pointer; }
 /* The typed field sits beside the slider, so it stays narrow enough to
    leave the slider the width it needs to be draggable. */
 .macro-range + div .num-in { width: 62px; text-align: right; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Soft — a second skin, not a second app.
+
+   The complaint that produced this was not about the numbers. It was that
+   the first screen arrives all at once: hairlines dividing everything,
+   panels butted against panels, and a condensed grotesque that makes a
+   calorie count look like an instrument reading. People described it as
+   overwhelming, and they were describing the surface rather than the depth.
+
+   So this skin changes four things and nothing else:
+
+     · corners go from 8px to 18px, so a card reads as an object
+     · every hairline is replaced by a shadow — depth does the sorting,
+       which is most of why the reference feels uncluttered
+     · the ground goes warm, and cards go pure white on top of it
+     · the type rounds off, using the phone's own ui-rounded so it looks
+       native rather than imported
+
+   It rides ON TOP of the light theme rather than replacing it: data-theme
+   stays "light" so every light-scoped rule in this file still applies, and
+   data-skin adds the shape on top. Nothing here touches a colour that
+   carries meaning — the ring palette, the macro hues and the category
+   colours are the light theme's, untouched, because what a reading means
+   must not depend on which skin somebody picked.
+
+   Mono survives exactly where it earns its place: numbers you study rather
+   than glance at. A calorie count read forty times a day is glanced at.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root[data-skin="soft"] {
+  --sans: ui-rounded, 'SF Pro Rounded', -apple-system, 'Segoe UI Variable',
+          'Nunito', system-ui, sans-serif;
+  --cond: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif;
+
+  /* Warm paper, white objects. The cool near-white of the light theme is
+     correct for a dashboard and slightly clinical for a kitchen. */
+  --bg:        #F6F2EC;
+  --bg-2:      #FFFFFF;
+  --surface:   #FFFFFF;
+  --surface-2: #FBF8F4;
+  --raised:    #FFFFFF;
+  --panel:     #FFFFFF;
+  --panel-2:   #F6F2EC;
+
+  --text:      #1A1720;
+  --text-2:    #4A4652;
+  --muted:     #6E6A78;
+  --dim:       #9A96A4;
+
+  /* Kept only for the few places a line genuinely separates rather than
+     decorates — inside a list, where a shadow per row would be absurd. */
+  --line:      rgba(70, 55, 45, .10);
+  --line-2:    rgba(70, 55, 45, .20);
+
+  --r-sm: 12px;
+  --r:    18px;
+  --r-lg: 24px;
+
+  --lift:    0 1px 0 rgba(60,45,35,.04), 0 10px 22px -10px rgba(60,45,35,.26);
+  --lift-lg: 0 2px 0 rgba(60,45,35,.04), 0 22px 44px -18px rgba(60,45,35,.32);
+
+  --glass:       rgba(255, 255, 255, .94);
+  --glass-solid: #FFFFFF;
+  --glass-line:  rgba(70, 55, 45, .10);
+  --glass-hi:    rgba(255, 255, 255, 1);
+  --glass-bg:    rgba(255, 255, 255, .96);
+  --glass-brd:   rgba(70, 55, 45, .12);
+
+  --sheen: none;
+  --grain: 0;
+}
+
+/* Shadow instead of border. This single rule is most of the skin. */
+:root[data-skin="soft"] .tile,
+:root[data-skin="soft"] .ah-card,
+:root[data-skin="soft"] .note {
+  border: 0;
+  box-shadow: var(--lift);
+  padding: 16px;
+}
+
+/* Headings lose the condensed squeeze and gain weight instead — rounded
+   faces read as flimsy at 600 where a grotesque reads as firm. */
+:root[data-skin="soft"] h1,
+:root[data-skin="soft"] h2,
+:root[data-skin="soft"] h3,
+:root[data-skin="soft"] .brand {
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+/* Buttons become chunky and lose their outline. */
+:root[data-skin="soft"] .btn {
+  border: 0;
+  border-radius: 14px;
+  font-weight: 700;
+  box-shadow: var(--lift);
+}
+:root[data-skin="soft"] .btn.primary {
+  box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+:root[data-skin="soft"] .btn.sm { border-radius: 11px; }
+
+/* The tab pill goes solid white. Glass over a warm ground turns grey, and
+   grey is the one thing this skin is trying to get rid of. */
+:root[data-skin="soft"] .tabs {
+  background: #FFFFFF;
+  border: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 10px 30px -10px rgba(60,45,35,.34);
+}
+:root[data-skin="soft"] .tabs button {
+  font-family: var(--sans);
+  font-size: 9.5px; font-weight: 800; letter-spacing: .06em;
+}
+
+/*
+ * The plus, in the middle of the tabs.
+ *
+ * It sits in the row rather than floating over the content, which is what
+ * the reference does and is the better of the two: a floating button
+ * covers whatever is underneath it, and on a log the thing underneath is
+ * always the most recent entry — the one you are most likely to want.
+ *
+ * It goes to Home, because Home already is the food finder: search, the
+ * grid, most eaten, recent, scanned. Nothing new was built for it. Home
+ * therefore drops out of the row on this skin, so there is exactly one
+ * way in rather than two.
+ */
+:root[data-skin="soft"] .tab-plus {
+  flex: 0 0 auto;
+  width: 54px; height: 54px; margin: 0 4px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: var(--accent-ink);
+  box-shadow: 0 8px 20px -4px color-mix(in srgb, var(--accent) 55%, transparent),
+              0 3px 0 var(--accent-2);
+  transition: transform .28s cubic-bezier(.34,1.56,.64,1);
+}
+:root[data-skin="soft"] .tab-plus:active { transform: scale(.9); }
+:root[data-skin="soft"] .tab-plus svg { width: 26px; height: 26px; stroke-width: 2.2; }
+
+/* Rows: no hairline, a little air, and the tap target rounds off. */
+:root[data-skin="soft"] .row {
+  border-bottom: 1px solid var(--line);
+  border-radius: 12px;
+  padding-left: 10px; padding-right: 10px;
+}
+:root[data-skin="soft"] .row:last-child { border-bottom: 0; }
+
+/* Segmented controls and chips follow the same softening. */
+:root[data-skin="soft"] .seg { border: 0; box-shadow: inset 0 0 0 1px var(--line); border-radius: 14px; }
+:root[data-skin="soft"] .seg button { border-radius: 11px; font-weight: 700; }
+
+/* Fields lose the box and gain a tinted well. */
+:root[data-skin="soft"] .field {
+  border: 0; border-radius: 14px; background: var(--surface-2);
+}
+
+/* Swatch for the picker. */
+.theme-swatch.soft {
+  background: linear-gradient(140deg, #F6F2EC 0 55%, #FFFFFF 55%);
+  border-radius: 11px;
+}

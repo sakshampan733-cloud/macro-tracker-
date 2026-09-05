@@ -144,11 +144,38 @@ scroller.addEventListener('scroll', () => {
 
 function drawNav() {
   clear(nav);
-  for (const t of TABS) {
-    nav.append(el('button', {
-      'aria-current': ctx.route === t.id ? 'page' : null,
-      onclick: () => ctx.go(t.id, t.id === 'today' ? { date: openDay() } : {}),
-    }, icon(t.icon, 21), el('span', {}, t.label)));
+
+  /*
+   * On the soft skin the row is two tabs, the plus, two tabs.
+   *
+   * Home leaves the row and becomes the plus, because Home already IS the
+   * food finder and two doors into one screen is one door too many. Settings
+   * takes the vacated slot — it was only ever reachable from a small gear in
+   * the header, which is a poor home for the screen that holds your goal.
+   *
+   * TABS itself is untouched, so the swipe order still spans all four and
+   * every other skin renders exactly as before.
+   */
+  const soft = document.documentElement.getAttribute('data-skin') === 'soft';
+  const tab = t => el('button', {
+    'aria-current': ctx.route === t.id ? 'page' : null,
+    onclick: () => ctx.go(t.id, t.id === 'today' ? { date: openDay() } : {}),
+  }, icon(t.icon, 21), el('span', {}, t.label));
+
+  if (!soft) {
+    for (const t of TABS) nav.append(tab(t));
+    return;
+  }
+
+  const rest = TABS.filter(t => t.id !== 'home');
+  const settings = { id: 'settings', label: 'You', icon: 'gear' };
+  const row = [...rest.slice(0, 2), null, ...rest.slice(2), settings];
+
+  for (const t of row) {
+    nav.append(t ? tab(t) : el('button.tab-plus', {
+      'aria-label': 'Add food',
+      onclick: () => ctx.go('home'),
+    }, icon('plus', 26)));
   }
 }
 
@@ -178,13 +205,26 @@ function drawHeader() {
  * match while the attribute is absent; the result was light tokens wearing
  * dark corrections.
  */
+/*
+ * 'soft' is a skin, not a fourth palette.
+ *
+ * It resolves to the light theme and then adds data-skin on top, so every
+ * light-scoped rule in the stylesheet still matches and only shape — radius,
+ * shadow, type, ground — is overridden. Written as a third palette it would
+ * have had to restate every colour in the file, and the two would have drifted
+ * the first time one of them was corrected.
+ */
 function applyTheme(pref) {
   const root = document.documentElement;
-  const resolved = (!pref || pref === 'auto')
+  const soft = pref === 'soft';
+  const resolved = soft ? 'light'
+    : (!pref || pref === 'auto')
     ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches === false ? 'light' : 'dark')
     : pref;
 
   root.setAttribute('data-theme', resolved);
+  if (soft) root.setAttribute('data-skin', 'soft');
+  else root.removeAttribute('data-skin');
   /*
    * The resolved scheme, never "light dark".
    *
@@ -198,7 +238,8 @@ function applyTheme(pref) {
   root.style.colorScheme = resolved;
 
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#000000' : '#F2F2F7');
+  if (meta) meta.setAttribute('content',
+    resolved === 'dark' ? '#000000' : soft ? '#F6F2EC' : '#F2F2F7');
 
   applyOrb(get().settings?.orb || 'none', resolved);
 
