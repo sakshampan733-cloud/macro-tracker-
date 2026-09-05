@@ -312,6 +312,7 @@ export async function syncApple({ relay, key } = {}) {
          picture of the day and there is no Whoop equivalent to merge
          them with. */
       keep('activeKcal', r.activeKcal);
+      keep('basalKcal', r.basalKcal);
       keep('exerciseMin', r.exerciseMin);
       keep('standHours', r.standHours);
       keep('moveGoal', r.moveGoal);

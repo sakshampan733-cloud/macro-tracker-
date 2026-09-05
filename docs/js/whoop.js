@@ -186,6 +186,10 @@ export const METRICS = {
      the calorie target is actually built from, while the ring counts only
      the active part. Naming it "Total burned" says so without a footnote. */
   kcal:      { label: 'Total burned',    unit: 'kcal',good: 'none', dp: 0 },
+  /* Shown instead of the total on the Apple view, where the Move ring is
+     already saying what the active half was. Two cards adding up to a third
+     is arithmetic homework; the ring plus this is the whole day. */
+  basalKcal: { label: 'Resting burned',  unit: 'kcal',good: 'none', dp: 0 },
   resp:      { label: 'Respiratory rate',unit: 'rpm', good: 'none', dp: 1 },
   spo2:      { label: 'Blood oxygen',    unit: '%',   good: 'high', dp: 1 },
   temp:      { label: 'Skin temp',       unit: '°C',  good: 'none', dp: 1 },

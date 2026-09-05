@@ -842,6 +842,7 @@ const METRIC_CARDS = {
   /*        category,             colour token,   glyph,   zero-based chart */
   steps:    ['Activity',          '--h-move',     'steps',  true],
   kcal:     ['Activity',          '--h-energy',   'flame',  true],
+  basalKcal:['Activity',          '--h-energy',   'flame',  true],
   strain:   ['Exertion',          '--h-strain',   'bolt',   true],
   recovery: ['Recovery',          '--h-recovery', 'coach',  true],
   rhr:      ['Heart',             '--h-heart',    'heart',  false],
@@ -858,7 +859,7 @@ const WHOOP_ORDER = ['recovery', 'strain', 'hrv', 'rhr', 'kcal', 'spo2', 'resp',
 /*
  * One card. Shared by both views so they cannot drift apart.
  */
-function metricCard(s, ctx, scoped, sum, key, latestKey, note = null) {
+function metricCard(s, ctx, scoped, sum, key, latestKey) {
   const spec = METRIC_CARDS[key];
   const info = sum.metrics[key];
   if (!spec || !info?.latest) return null;
@@ -895,7 +896,6 @@ function metricCard(s, ctx, scoped, sum, key, latestKey, note = null) {
     el('div.ah-value', {},
       value.toLocaleString(undefined, { minimumFractionDigits: info.dp, maximumFractionDigits: info.dp }),
       info.unit ? el('span.ah-unit', {}, info.unit) : null),
-    note ? el('div.micro', { style: { marginTop: '2px', opacity: '.75' } }, note) : null,
     el('div.ah-spark', { style: { color: colour } },
       pts.length >= 2
         ? miniSpark(pts.map(p => p.v), { colour, w: 96, h: 20 })
@@ -968,24 +968,21 @@ function appleVitals(s, ctx, scoped, sum) {
           + 'Exercise Minutes and Stand Hours to it and the rings fill in.')));
 
   /*
-   * Total burned, with its two halves named underneath.
+   * Resting rather than total, on this view only.
    *
-   * 1,800 kcal on a day of 230 active ones is a true number that reads as a
-   * boast. The total is the right figure to keep — it is what the calorie
-   * target is built from, and active alone would understate a rest day badly
-   * — but shown bare, next to a Move ring counting only the active part, it
-   * invites the reader to credit themselves with an afternoon they did not
-   * have. Resting energy is the body idling, not effort, and saying so costs
-   * one line.
+   * 1,800 kcal beside a Move ring reading 230 read as a boast about an
+   * afternoon that did not happen — and naming the two halves underneath it
+   * still left the reader adding up two numbers to find the one that was
+   * new. The ring is already the active half, stated plainly and in colour.
+   * What it does not say is the other half, so that is what the card says.
+   *
+   * The total is not lost: it is still stored as kcal and is still what the
+   * calorie target and the day factor are computed from. This is a display
+   * choice on the one screen where the ring makes the total redundant.
    */
-  const burnNote = (today.activeKcal != null && today.basalKcal != null)
-    ? `${Math.round(today.activeKcal).toLocaleString()} active · `
-      + `${Math.round(today.basalKcal).toLocaleString()} resting`
-    : null;
-
+  const energyKey = today.basalKcal != null ? 'basalKcal' : 'kcal';
   const cards = APPLE_ORDER
-    .map(k => metricCard(s, ctx, scoped, sum, k, latestKey,
-                         k === 'kcal' ? burnNote : null))
+    .map(k => metricCard(s, ctx, scoped, sum, k === 'kcal' ? energyKey : k, latestKey))
     .filter(Boolean);
 
   wrap.append(cards.length
