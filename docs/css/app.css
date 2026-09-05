@@ -3505,16 +3505,48 @@ button.src-tag { cursor: pointer; }
 :root[data-skin="paper"] .btn.sm { border-radius: 12px; box-shadow: 0 2px 0 var(--edge); }
 :root[data-skin="paper"] .btn.sm:active { transform: translateY(2px); }
 
+/*
+ * .field is a label plus a control, not a control.
+ *
+ * Bordering it drew a box around the pair, so every caption on the Settings
+ * form — HEIGHT (CM), BORN, TRAINING — ended up sitting on top of that box's
+ * own edge, with the real input drawing a second box inside the first. The
+ * outline belongs on the thing you can type into.
+ */
+:root[data-skin="paper"] input:not([type=range]):not([type=checkbox]),
+:root[data-skin="paper"] select,
+:root[data-skin="paper"] textarea,
+:root[data-skin="paper"] .home-search {
+  border: 2px solid var(--edge);
+  border-radius: 14px;
+  background: var(--surface);
+}
+:root[data-skin="paper"] .field > label {
+  font-family: var(--cond);
+  font-weight: 500;
+  color: var(--muted);
+}
+
 :root[data-skin="paper"] .chip,
 :root[data-skin="paper"] .seg,
-:root[data-skin="paper"] .field,
 :root[data-skin="paper"] .theme-opt {
   border: 2px solid var(--edge);
   border-radius: 15px;
 }
-:root[data-skin="paper"] .seg { background: var(--surface-2); padding: 3px; }
-:root[data-skin="paper"] .seg button { border-radius: 11px; font-family: var(--cond); font-weight: 500; }
-:root[data-skin="paper"] .seg button[aria-pressed="true"] { box-shadow: 0 2px 0 var(--edge); border: 1.5px solid var(--edge); }
+:root[data-skin="paper"] .seg { background: var(--surface-2); padding: 4px; }
+:root[data-skin="paper"] .seg button {
+  border: 0; border-radius: 11px;
+  font-family: var(--cond); font-weight: 500;
+  /* Fredoka runs wider than Plex Condensed, and "FEET & INCHES" in a
+     half-width field was breaking across three lines. */
+  font-size: 10.5px; letter-spacing: .03em; padding: 8px 4px;
+}
+/* The selected segment is filled, not boxed. A border inside a border is
+   two rectangles arguing about which one you pressed. */
+:root[data-skin="paper"] .seg button[aria-pressed="true"] {
+  background: var(--surface);
+  box-shadow: 0 2px 0 rgba(42,33,26,.18);
+}
 :root[data-skin="paper"] .chip { box-shadow: 0 2px 0 var(--edge); border-radius: 999px; }
 
 /* ── rows ────────────────────────────────────────────────────────────── */
