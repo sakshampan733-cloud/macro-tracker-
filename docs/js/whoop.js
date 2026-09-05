@@ -179,7 +179,13 @@ export const METRICS = {
   sleepH:    { label: 'Sleep',           unit: 'h',   good: 'high', dp: 1 },
   sleepPerf: { label: 'Sleep performance', unit: '%', good: 'high', dp: 0 },
   strain:    { label: 'Day strain',      unit: '',    good: 'none', dp: 1 },
-  kcal:      { label: 'Energy burned',   unit: 'kcal',good: 'none', dp: 0 },
+  /* "Energy burned" sat directly beside an Apple Move ring reading 146 and
+     read as a contradiction: one number claiming 1,372, another claiming
+     146, for what looked like the same thing. They are not the same thing —
+     this is resting plus active, the whole day's expenditure, which is what
+     the calorie target is actually built from, while the ring counts only
+     the active part. Naming it "Total burned" says so without a footnote. */
+  kcal:      { label: 'Total burned',    unit: 'kcal',good: 'none', dp: 0 },
   resp:      { label: 'Respiratory rate',unit: 'rpm', good: 'none', dp: 1 },
   spo2:      { label: 'Blood oxygen',    unit: '%',   good: 'high', dp: 1 },
   temp:      { label: 'Skin temp',       unit: '°C',  good: 'none', dp: 1 },
