@@ -907,12 +907,16 @@ export function renderSettings(root, ctx) {
         el('div.theme-row', {},
           ...[
             ['dark',  'Dark'],
-            ['light', 'Light'],
-            ['paper', 'Paper'],
+            ['paper', 'Light'],
             ['auto',  'System'],
           ].map(([value, label]) => el('button.theme-opt', {
             type: 'button',
-            'aria-pressed': String((s.settings.theme || 'dark') === value),
+            /* A profile saved before Paper replaced the light palette still
+               reads 'light'; it is this option now, so it must look selected
+               rather than leaving the row with nothing pressed. */
+            'aria-pressed': String(
+              ((s.settings.theme || 'dark') === 'light' ? 'paper' : (s.settings.theme || 'dark'))
+              === value),
             onclick: () => {
               commit(st => { st.settings.theme = value; }, 'settings');
               ctx.refresh();
@@ -922,11 +926,8 @@ export function renderSettings(root, ctx) {
             el('span.micro', {}, label)))),
         el('div.fine', { style: { marginTop: '10px' } },
           'Dark is true black — on an OLED screen those pixels are genuinely off. '
-          + 'Light is a cool near-white with white cards, not the cream it used to be.'),
-        el('div.fine', { style: { marginTop: '8px' } },
-          'Paper is warm ground, outlined cards and a rounded face — every screen '
-          + 'and every chart exactly as they are, drawn differently. It adds a '
-          + 'floating plus that opens the food search from anywhere.'))),
+          + 'Light is warm ground, outlined cards and a rounded face, with every '
+          + 'screen and every chart exactly as they are in Dark.'))),
 
     group(ctx, 'read', 'Reading',
       'How much the app explains, and how much to trust it.',

@@ -85,9 +85,9 @@ export function renderHome(root, ctx) {
 const NEWS_ID = 'paper-skin';
 const NEWS = {
   title: 'A new look, if you want it',
-  body: 'Paper is a warmer, rounder version of the whole app — every screen, '
-      + 'chart and number exactly as they were, drawn differently. It also '
-      + 'adds a floating plus that opens the food search from any screen.',
+  body: 'Light is a warmer, rounder version of the whole app — every screen, '
+      + 'chart and number exactly as they were, drawn differently. There is '
+      + 'also a floating plus that opens the food search from any screen.',
   cta: 'Try it',
 };
 
@@ -113,7 +113,7 @@ function whatsNew(ctx) {
         onclick: () => {
           commit(st => { st.settings.theme = 'paper'; }, 'settings');
           dismiss();
-          toast('Paper is on. Settings \u2192 Look to change back.');
+          toast('Light is on. Settings \u2192 Appearance to change back.');
         },
       }, NEWS.cta),
       el('button.btn.sm', { onclick: dismiss }, 'Not now')));

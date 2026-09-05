@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.05-fields';
+export const VERSION = '2026.09.05-onelight';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
@@ -231,11 +231,13 @@ function drawHeader() {
  */
 function applyTheme(pref) {
   const root = document.documentElement;
-  const paper = pref === 'paper';
-  const resolved = paper ? 'light'
-    : (!pref || pref === 'auto')
-    ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches === false ? 'light' : 'dark')
-    : pref;
+  /* 'light' is Paper now; the plain light palette is no longer offered, and
+     System resolves to Paper rather than to a theme you cannot pick. */
+  const wantsLight = pref === 'paper' || pref === 'light'
+    || ((!pref || pref === 'auto')
+        && window.matchMedia?.('(prefers-color-scheme: dark)').matches === false);
+  const paper = wantsLight;
+  const resolved = wantsLight ? 'light' : 'dark';
 
   root.setAttribute('data-theme', resolved);
   if (paper) root.setAttribute('data-skin', 'paper');

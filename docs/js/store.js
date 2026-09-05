@@ -118,7 +118,15 @@ function load() {
 
     if (!raw) return EMPTY();
     const parsed = JSON.parse(raw);
-    return { ...EMPTY(), ...parsed, settings: { ...EMPTY().settings, ...(parsed.settings || {}) } };
+    const merged = { ...EMPTY(), ...parsed,
+                     settings: { ...EMPTY().settings, ...(parsed.settings || {}) } };
+    /*
+     * The old light theme is gone and Paper is the light theme now. Anybody
+     * sitting on 'light' gets moved rather than silently falling back to
+     * dark, which is the opposite of what they asked for.
+     */
+    if (merged.settings.theme === 'light') merged.settings.theme = 'paper';
+    return merged;
   } catch (e) {
     console.warn('Stored data unreadable, starting fresh', e);
     return EMPTY();

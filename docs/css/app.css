@@ -3189,6 +3189,8 @@ button.src-tag { cursor: pointer; }
   position: relative; overflow: hidden;
 }
 .theme-swatch.dark  { background: linear-gradient(140deg, #000, #1C1C1E); }
+/* The plain light swatch is unused now that Paper is the light theme, but
+   the rule stays harmless and costs nothing if that option ever returns. */
 .theme-swatch.light { background: linear-gradient(140deg, #fff, #E9E9EE); }
 .inten-label.is-easy { color: var(--ring-stand); }
 .inten-label.is-mid  { color: var(--good-ink); }
