@@ -3354,3 +3354,225 @@ button.src-tag { cursor: pointer; }
 /* The typed field sits beside the slider, so it stays narrow enough to
    leave the slider the width it needs to be draggable. */
 .macro-range + div .num-in { width: 62px; text-align: right; }
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Paper — a third skin over the light theme.
+
+   Every screen, chart, table and number the app already draws is drawn
+   here too, unchanged. This is not a simplified mode and it hides nothing;
+   the objection it answers was never "too much information", it was that
+   the information arrived looking like a control panel.
+
+   Four decisions carry it:
+
+     · warm ground, cards floating on it as pale objects
+     · a real outline on anything you can press, with a hard shadow under
+       it that collapses when you push — the reason a button reads as a
+       button rather than as a coloured rectangle
+     · Fredoka over Nunito instead of Plex, self-hosted so the app still
+       works with no network
+     · mono retired here, with tabular figures kept so every column, chart
+       axis and table still lines up
+
+   Both faces are variable and latin-only: 69 KB for the pair, which is
+   less than the three Plex families it replaces on this skin.
+
+   It rides on data-theme="light" and adds data-skin on top, so every
+   light-scoped rule in this file still applies. Nothing that carries
+   meaning is restated — ring colours, macro hues and category colours stay
+   the light theme's, because a reading must not change what it means
+   because somebody preferred warmer paper.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@font-face { font-family: 'Fredoka'; src: url('../fonts/fredoka-var.woff2') format('woff2');
+             font-weight: 300 700; font-display: swap; }
+@font-face { font-family: 'Nunito'; src: url('../fonts/nunito-var.woff2') format('woff2');
+             font-weight: 300 800; font-display: swap; }
+
+:root[data-skin="paper"] {
+  --sans: 'Nunito', ui-rounded, -apple-system, system-ui, sans-serif;
+  --cond: 'Fredoka', 'Nunito', ui-rounded, system-ui, sans-serif;
+  --mono: 'Nunito', ui-rounded, system-ui, sans-serif;
+
+  --bg:        #F0E5D2;
+  --bg-2:      #FFFDF8;
+  --surface:   #FFFDF8;
+  --surface-2: #F7EEDD;
+  --raised:    #FFFDF8;
+  --panel:     #FFFDF8;
+  --panel-2:   #F0E5D2;
+
+  --text:      #332A21;
+  --text-2:    #5C5044;
+  --muted:     #7D6E5C;
+  --dim:       #A2917B;
+
+  /* The outline, and the hard edge under anything pressable. */
+  --edge:      #2A211A;
+  --line:      rgba(42, 33, 26, .15);
+  --line-2:    rgba(42, 33, 26, .30);
+
+  --r-sm: 14px;
+  --r:    20px;
+  --r-lg: 26px;
+
+  --lift:    0 3px 0 rgba(42,33,26,.07);
+  --lift-lg: 0 5px 0 rgba(42,33,26,.09), 0 24px 44px -22px rgba(42,33,26,.4);
+
+  --accent:     #D9452F;
+  --accent-2:   #9E2C1B;
+  --accent-ink: #FFFFFF;
+
+  --glass:       #FFFDF8;
+  --glass-solid: #FFFDF8;
+  --glass-line:  #2A211A;
+  --glass-hi:    transparent;
+  --glass-active:#F0E5D2;
+  --glass-bg:    #FFFDF8;
+  --glass-brd:   rgba(42,33,26,.15);
+
+  --sheen: none;
+  --grain: 0;
+}
+
+/* Figures line up without mono to guarantee it. */
+:root[data-skin="paper"] body { font-variant-numeric: tabular-nums; }
+
+/* ── surfaces ────────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .tile,
+:root[data-skin="paper"] .ah-card,
+:root[data-skin="paper"] .note,
+:root[data-skin="paper"] .home-sec {
+  border: 1.5px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--lift);
+  padding: 17px;
+}
+
+/* ── type ────────────────────────────────────────────────────────────── */
+:root[data-skin="paper"] h1,
+:root[data-skin="paper"] h2,
+:root[data-skin="paper"] h3,
+:root[data-skin="paper"] .ah-title,
+:root[data-skin="paper"] .brand {
+  font-family: var(--cond);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+:root[data-skin="paper"] .brand { letter-spacing: .05em; }
+
+/* Every eyebrow: short, spaced, quiet. */
+:root[data-skin="paper"] .micro,
+:root[data-skin="paper"] .ah-cat,
+:root[data-skin="paper"] .mini-head {
+  font-family: var(--cond);
+  font-weight: 500;
+  font-size: 10.5px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* Readings: display face, moderate weight. Bold everywhere reads as shouting. */
+:root[data-skin="paper"] .ah-value,
+:root[data-skin="paper"] .row .kcal,
+:root[data-skin="paper"] .big-num {
+  font-family: var(--cond);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+/* ── pressables ──────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .btn {
+  font-family: var(--cond);
+  font-weight: 500;
+  border: 2px solid var(--edge);
+  border-radius: 15px;
+  box-shadow: 0 3px 0 var(--edge);
+  transition: transform .12s, box-shadow .12s;
+}
+:root[data-skin="paper"] .btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--edge);
+  background: var(--surface-2);
+}
+:root[data-skin="paper"] .btn.primary { border-color: var(--accent-2); box-shadow: 0 3px 0 var(--accent-2); }
+:root[data-skin="paper"] .btn.primary:active { box-shadow: 0 0 0 var(--accent-2); background: var(--accent); }
+:root[data-skin="paper"] .btn.sm { border-radius: 12px; box-shadow: 0 2px 0 var(--edge); }
+:root[data-skin="paper"] .btn.sm:active { transform: translateY(2px); }
+
+:root[data-skin="paper"] .chip,
+:root[data-skin="paper"] .seg,
+:root[data-skin="paper"] .field,
+:root[data-skin="paper"] .theme-opt {
+  border: 2px solid var(--edge);
+  border-radius: 15px;
+}
+:root[data-skin="paper"] .seg { background: var(--surface-2); padding: 3px; }
+:root[data-skin="paper"] .seg button { border-radius: 11px; font-family: var(--cond); font-weight: 500; }
+:root[data-skin="paper"] .seg button[aria-pressed="true"] { box-shadow: 0 2px 0 var(--edge); border: 1.5px solid var(--edge); }
+:root[data-skin="paper"] .chip { box-shadow: 0 2px 0 var(--edge); border-radius: 999px; }
+
+/* ── rows ────────────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .row { border-bottom: 1.5px solid var(--line); padding: 13px 4px; }
+:root[data-skin="paper"] .row:last-child { border-bottom: 0; }
+:root[data-skin="paper"] .row:active { background: var(--surface-2); border-radius: 12px; }
+
+/* ── the tab pill ────────────────────────────────────────────────────── */
+:root[data-skin="paper"] .tabs {
+  background: var(--surface);
+  border: 2px solid var(--edge);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 4px 0 var(--edge);
+}
+:root[data-skin="paper"] .tabs button {
+  font-family: var(--cond);
+  font-size: 9.5px; font-weight: 500; letter-spacing: .09em;
+}
+:root[data-skin="paper"] .tabs button[aria-current=page] { background: var(--surface-2); }
+
+/* ── the floating plus ───────────────────────────────────────────────── */
+.food-fab { display: none; }
+:root[data-skin="paper"] .food-fab {
+  display: flex; align-items: center; justify-content: center;
+  position: fixed; z-index: 51;
+  right: max(20px, calc(env(safe-area-inset-right, 0px) + 20px));
+  bottom: calc(var(--tab-h) + 14px);
+  width: 58px; height: 58px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink);
+  border: 2px solid var(--edge);
+  box-shadow: 0 4px 0 var(--edge);
+  transition: transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s, opacity .3s;
+}
+:root[data-skin="paper"] .food-fab:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--edge);
+}
+:root[data-skin="paper"] .food-fab svg { stroke-width: 2.6; }
+/* Steps aside with the tab pill while the page is moving. */
+:root[data-skin="paper"] .tabs.scrolling ~ .food-fab,
+:root[data-skin="paper"] .food-fab.scrolling { opacity: .6; }
+
+/* ── odds and ends ───────────────────────────────────────────────────── */
+:root[data-skin="paper"] .home-search { border-radius: 16px; }
+:root[data-skin="paper"] .topbar { background: transparent; }
+:root[data-skin="paper"] .grid-empty { border-radius: var(--r); border-width: 1.5px; }
+:root[data-skin="paper"] .sheet,
+:root[data-skin="paper"] .sheet-body { border-radius: 26px 26px 0 0; }
+
+/* Swatch: paper, card, red. */
+.theme-swatch.paper {
+  background: linear-gradient(140deg, #F0E5D2 0 44%, #FFFDF8 44% 80%, #D9452F 80%);
+  border-radius: 10px;
+}
+
+/* The what's-new card. Accented enough to be noticed once, quiet enough
+   that it is not competing with the weigh-in ask underneath it. */
+.tile.news { border-left: 3px solid var(--accent); }
+:root[data-skin="paper"] .tile.news {
+  border: 2px solid var(--edge);
+  box-shadow: 0 4px 0 var(--edge);
+}

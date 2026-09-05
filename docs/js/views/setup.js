@@ -908,6 +908,7 @@ export function renderSettings(root, ctx) {
           ...[
             ['dark',  'Dark'],
             ['light', 'Light'],
+            ['paper', 'Paper'],
             ['auto',  'System'],
           ].map(([value, label]) => el('button.theme-opt', {
             type: 'button',
@@ -921,7 +922,11 @@ export function renderSettings(root, ctx) {
             el('span.micro', {}, label)))),
         el('div.fine', { style: { marginTop: '10px' } },
           'Dark is true black — on an OLED screen those pixels are genuinely off. '
-          + 'Light is a cool near-white with white cards, not the cream it used to be.'))),
+          + 'Light is a cool near-white with white cards, not the cream it used to be.'),
+        el('div.fine', { style: { marginTop: '8px' } },
+          'Paper is warm ground, outlined cards and a rounded face — every screen '
+          + 'and every chart exactly as they are, drawn differently. It adds a '
+          + 'floating plus that opens the food search from anywhere.'))),
 
     group(ctx, 'read', 'Reading',
       'How much the app explains, and how much to trust it.',

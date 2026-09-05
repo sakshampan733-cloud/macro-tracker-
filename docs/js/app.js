@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.05-resting';
+export const VERSION = '2026.09.05-paper';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
@@ -150,6 +150,38 @@ function drawNav() {
       onclick: () => ctx.go(t.id, t.id === 'today' ? { date: openDay() } : {}),
     }, icon(t.icon, 21), el('span', {}, t.label)));
   }
+
+  /*
+   * The floating plus, on the Paper skin only.
+   *
+   * It exists because of one complaint: finding a food means scrolling. The
+   * fix is not another route — Home already holds the search — it is landing
+   * on a focused field from wherever you happen to be standing, so the
+   * distance from "I ate something" to typing its name is one tap anywhere
+   * in the app.
+   *
+   * It sits beside the tab row rather than inside it. In the row it would
+   * have cost a tab, and the four tabs are the ones already learned.
+   */
+  const paper = document.documentElement.getAttribute('data-skin') === 'paper';
+  const old = document.getElementById('food-fab');
+  if (old) old.remove();
+  if (!paper || !get().profile) return;
+
+  nav.parentNode.insertBefore(el('button.food-fab', {
+    id: 'food-fab',
+    'aria-label': 'Search foods',
+    onclick: () => {
+      ctx.go('home');
+      /* Two frames: the field does not exist until the route has drawn. */
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const box = document.querySelector('.home-search input');
+        if (!box) return;
+        box.scrollIntoView({ block: 'center', behavior: 'instant' });
+        box.focus();
+      }));
+    },
+  }, icon('plus', 27)), nav);
 }
 
 function drawHeader() {
@@ -178,13 +210,26 @@ function drawHeader() {
  * match while the attribute is absent; the result was light tokens wearing
  * dark corrections.
  */
+/*
+ * 'paper' is a skin, not a fourth palette.
+ *
+ * It resolves to the light theme and then adds data-skin on top, so every
+ * light-scoped rule in the stylesheet still matches and only shape — radius,
+ * shadow, type, ground — is overridden. Written as a third palette it would
+ * have had to restate every colour in the file, and the two would have drifted
+ * the first time one of them was corrected.
+ */
 function applyTheme(pref) {
   const root = document.documentElement;
-  const resolved = (!pref || pref === 'auto')
+  const paper = pref === 'paper';
+  const resolved = paper ? 'light'
+    : (!pref || pref === 'auto')
     ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches === false ? 'light' : 'dark')
     : pref;
 
   root.setAttribute('data-theme', resolved);
+  if (paper) root.setAttribute('data-skin', 'paper');
+  else root.removeAttribute('data-skin');
   /*
    * The resolved scheme, never "light dark".
    *
@@ -198,7 +243,8 @@ function applyTheme(pref) {
   root.style.colorScheme = resolved;
 
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#000000' : '#F2F2F7');
+  if (meta) meta.setAttribute('content',
+    resolved === 'dark' ? '#000000' : paper ? '#F0E5D2' : '#F2F2F7');
 
   applyOrb(get().settings?.orb || 'none', resolved);
 
