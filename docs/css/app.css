@@ -3304,8 +3304,11 @@ button.src-tag { cursor: pointer; }
 .readout-main, .readout-side .v { white-space: nowrap; }
 .readout { gap: 12px; }
 .readout > * { min-width: 0; }
+/* Scoped to the sleep readout it was written for. Bare, it also caught the
+   day's calorie number — the largest figure on the home screen — and shrank
+   it to 26px on every phone, which is every phone. */
 @media (max-width: 420px) {
-  .readout-main { font-size: 26px !important; }
+  .readout .readout-main { font-size: 26px !important; }
 }
 
 /* Steps: one bar a day against the target, so a bad run reads as a run. */
@@ -3535,9 +3538,24 @@ button.src-tag { cursor: pointer; }
 :root[data-skin="paper"] .tabs button[aria-current=page] { background: var(--surface-2); }
 
 /* ── the floating plus ───────────────────────────────────────────────── */
-.food-fab { display: none; }
-:root[data-skin="paper"] .food-fab {
+/* Defined outside the skin: the scrolling it fixes is not a property of
+   how the app is painted. Paper only changes what it looks like. */
+.food-fab {
   display: flex; align-items: center; justify-content: center;
+  position: fixed; z-index: 51;
+  right: max(20px, calc(env(safe-area-inset-right, 0px) + 20px));
+  bottom: calc(var(--tab-h) + 14px);
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink);
+  border: 1px solid var(--accent-2);
+  box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--accent) 65%, transparent);
+  transition: transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s, opacity .3s;
+}
+.food-fab:active { transform: scale(.9); }
+.food-fab svg { stroke-width: 2.2; }
+.tabs.scrolling ~ .food-fab { opacity: .55; }
+
+:root[data-skin="paper"] .food-fab {
   position: fixed; z-index: 51;
   right: max(20px, calc(env(safe-area-inset-right, 0px) + 20px));
   bottom: calc(var(--tab-h) + 14px);
@@ -3575,4 +3593,183 @@ button.src-tag { cursor: pointer; }
 :root[data-skin="paper"] .tile.news {
   border: 2px solid var(--edge);
   box-shadow: 0 4px 0 var(--edge);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Paper, part two — the shapes, not just the colours.
+
+   The first pass changed the palette and the corners and left the layout
+   alone, which is exactly what it looked like: the old app in a warmer
+   coat. What actually made the study read as a different app was that its
+   objects had shapes — a ticket, stamps, outlined bars — rather than being
+   uniform rounded rectangles.
+
+   None of this removes anything. Every element restyled below already
+   exists and already holds the same numbers; they are given an outline, a
+   hard shadow and a silhouette. The rule throughout: an outline plus a
+   solid offset shadow reads as an object you could pick up, and that is
+   the whole difference between a card and a sticker.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── the day's readout, as a ticket ──────────────────────────────────── */
+:root[data-skin="paper"] .readout-block {
+  position: relative;
+  border: 2px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 0 5px 0 var(--edge);
+  padding: 20px 20px 14px;
+  overflow: hidden;
+}
+:root[data-skin="paper"] .readout-block:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--edge);
+}
+:root[data-skin="paper"] .readout-block:hover { border-color: var(--edge); }
+
+/* The punched notches. Positioned on the perforation, which sits just
+   above the cups. */
+:root[data-skin="paper"] .readout-block::before,
+:root[data-skin="paper"] .readout-block::after {
+  content: ''; position: absolute; z-index: 1;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--edge);
+  top: 104px;
+}
+:root[data-skin="paper"] .readout-block::before { left: -13px; }
+:root[data-skin="paper"] .readout-block::after  { right: -13px; }
+
+/* The tear line, edge to edge. */
+:root[data-skin="paper"] .cups {
+  border-top: 2px dashed var(--line-2);
+  margin: 26px -20px 0;
+  padding: 20px 20px 0;
+  gap: 10px;
+}
+
+:root[data-skin="paper"] .readout-top .readout-main {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 58px;
+  letter-spacing: -.045em;
+}
+:root[data-skin="paper"] .readout-top .readout-side .v {
+  font-family: var(--cond); font-weight: 600; font-size: 19px;
+}
+
+/* ── the cups, as stamps ─────────────────────────────────────────────── */
+:root[data-skin="paper"] .cup-bar {
+  border: 2px solid var(--edge);
+  border-radius: 14px;
+  box-shadow: 0 3px 0 var(--edge);
+  background: var(--surface-2);
+  height: 62px;
+}
+:root[data-skin="paper"] .cup-bar i { border-radius: 0 0 10px 10px; }
+:root[data-skin="paper"] .cup-n {
+  font-family: var(--cond); font-weight: 600; font-size: 16px; margin-top: 12px;
+}
+:root[data-skin="paper"] .cup-l {
+  font-family: var(--cond); font-weight: 500; font-size: 10px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+:root[data-skin="paper"] .readout-more {
+  font-family: var(--cond); font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; font-size: 10.5px;
+  border-top: 2px dashed var(--line-2);
+}
+
+/* ── charts, outlined ────────────────────────────────────────────────── */
+/* Bars get the same treatment as everything else: a border and a hard
+   edge. A chart drawn like the buttons around it stops looking like a
+   readout pasted into a page. */
+:root[data-skin="paper"] .bar-fill {
+  border: 1.5px solid var(--edge);
+  border-radius: 6px 6px 3px 3px;
+  box-shadow: 0 2px 0 rgba(42,33,26,.10);
+}
+:root[data-skin="paper"] .bar-row { gap: 4px; }
+
+:root[data-skin="paper"] .stage-bar {
+  border: 2px solid var(--edge);
+  border-radius: 9px;
+  height: 16px;
+  box-shadow: 0 2px 0 rgba(42,33,26,.10);
+}
+:root[data-skin="paper"] .stage-key i {
+  border: 1.5px solid var(--edge); border-radius: 3px; width: 10px; height: 10px;
+}
+
+/* Line charts: thicker, rounder, and never hairlines. */
+:root[data-skin="paper"] svg path,
+:root[data-skin="paper"] svg polyline,
+:root[data-skin="paper"] svg line {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+:root[data-skin="paper"] .spark path,
+:root[data-skin="paper"] .ah-spark path,
+:root[data-skin="paper"] .chart path {
+  stroke-width: 2.6;
+}
+:root[data-skin="paper"] .chart .grid line,
+:root[data-skin="paper"] .chart .axis line { opacity: .45; }
+
+/* Rings: thicker strokes so they read as drawn rather than printed. */
+:root[data-skin="paper"] .rings circle,
+:root[data-skin="paper"] .activity-rings circle { stroke-linecap: round; }
+
+/* Meters, tracks and progress bars wherever they appear. */
+:root[data-skin="paper"] .meter,
+:root[data-skin="paper"] .track,
+:root[data-skin="paper"] .gauge,
+:root[data-skin="paper"] .water-cell,
+:root[data-skin="paper"] .macro-track {
+  border: 1.5px solid var(--edge);
+  border-radius: 8px;
+}
+
+/* ── the small stuff that still read as the old app ──────────────────── */
+:root[data-skin="paper"] .home-actions button,
+:root[data-skin="paper"] .x-btn,
+:root[data-skin="paper"] .sec-head {
+  border: 2px solid var(--edge);
+  border-radius: 15px;
+  box-shadow: 0 3px 0 var(--edge);
+}
+:root[data-skin="paper"] .home-actions button:active,
+:root[data-skin="paper"] .x-btn:active {
+  transform: translateY(3px); box-shadow: 0 0 0 var(--edge);
+}
+:root[data-skin="paper"] .x-btn { border-radius: 50%; }
+:root[data-skin="paper"] .home-actions button span,
+:root[data-skin="paper"] .sec-head .micro {
+  font-family: var(--cond); font-weight: 500;
+}
+:root[data-skin="paper"] .home-head h2,
+:root[data-skin="paper"] .home-head .h1 {
+  font-family: var(--cond); font-weight: 600;
+}
+
+/* The macro rails on Detail, the water cells and the caffeine bar — the
+   remaining places a measurement was drawn as a hairline rather than as an
+   object. Same rule as everything else: outline it, and give it an edge. */
+:root[data-skin="paper"] .rail-track,
+:root[data-skin="paper"] .caff-bar {
+  border: 1.5px solid var(--edge);
+  border-radius: 8px;
+  height: 13px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+:root[data-skin="paper"] .rail-fill,
+:root[data-skin="paper"] .caff-fill { border-radius: 0; }
+:root[data-skin="paper"] .rail-target { background: var(--edge); width: 2.5px; }
+:root[data-skin="paper"] .rail-caption,
+:root[data-skin="paper"] .rail-band {
+  font-family: var(--cond); font-weight: 500;
+}
+:root[data-skin="paper"] .water-tile .flex > * {
+  border: 1.5px solid var(--edge);
+  border-radius: 6px;
 }

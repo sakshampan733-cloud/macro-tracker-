@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.05-paper';
+export const VERSION = '2026.09.05-ticket';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
@@ -162,11 +162,13 @@ function drawNav() {
    *
    * It sits beside the tab row rather than inside it. In the row it would
    * have cost a tab, and the four tabs are the ones already learned.
+   *
+   * On every skin, not just Paper. The scrolling problem it fixes is not a
+   * property of how the app is painted.
    */
-  const paper = document.documentElement.getAttribute('data-skin') === 'paper';
   const old = document.getElementById('food-fab');
   if (old) old.remove();
-  if (!paper || !get().profile) return;
+  if (!get().profile) return;
 
   nav.parentNode.insertBefore(el('button.food-fab', {
     id: 'food-fab',
