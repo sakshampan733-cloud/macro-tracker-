@@ -224,12 +224,39 @@ const NEVER_ZERO = new Set(['basalKcal', 'activeKcal', 'standHours',
                             'rhr', 'hrv', 'spo2', 'resp', 'temp',
                             'weightKg', 'vo2max', 'sleepH']);
 
+/*
+ * What a human reading can actually be.
+ *
+ * Not defensive programming for its own sake — this catches the one mistake
+ * that is genuinely easy to make and impossible to spot afterwards: picking
+ * a Health type whose name reads right but whose samples mean something
+ * else. "Apple Stand Time" and "Apple Stand Hours" sound interchangeable.
+ * They are not. Stand Time measures minutes-stood-per-hour, so summing a day
+ * of it and asking Shortcuts for hours returns 960 minutes as 16 — which is
+ * a plausible-looking number, lands in the ring as 16/12, and is wrong.
+ *
+ * A value outside these bounds is not a person, it is a units or type error,
+ * and storing it would put a lie in the history that every later trend reads
+ * as real. Dropped instead, so the tile stays blank and the gap is visible.
+ *
+ * temp is deliberately absent: Apple reports wrist temperature absolutely in
+ * some places and as a deviation from baseline in others, so there is no one
+ * range that is not wrong for half the senders.
+ */
+const RANGES = {
+  standHours: [0, 24], sleepH: [0, 24], remH: [0, 24], swsH: [0, 24], deepH: [0, 24],
+  spo2: [50, 100], resp: [4, 60], rhr: [25, 150], hrv: [1, 300],
+  vo2max: [10, 90], weightKg: [20, 400], exerciseMin: [0, 1440],
+};
+
 function clean(row) {
   const out = {};
   for (const f of FIELDS) {
     const v = num(row[f]);
     if (v == null || v < 0) continue;
     if (v === 0 && NEVER_ZERO.has(f)) continue;
+    const r = RANGES[f];
+    if (r && (v < r[0] || v > r[1])) continue;
     out[f] = v;
   }
   return out;
