@@ -497,7 +497,15 @@ function weightVerdict(pv, wu, toDisp) {
   const drift = Math.abs(gap);
   /* Half a kilo is inside what a scale and a 7,700-per-kilo approximation
      can disagree about on their own. */
-  if (drift < 0.5) return 'The two lines agree, so the calories you are logging are broadly the real ones.';
+  if (drift < 0.5) {
+    /* Agreement means two different things depending on where maintenance
+       came from, and only one of them is about your logging. */
+    return pv.circular
+      ? 'The two lines agree — though they were always going to, because your '
+        + 'maintenance figure is worked out from this same log. To test whether the '
+        + 'log itself is accurate, switch maintenance to the formula below.'
+      : 'The two lines agree, so the calories you are logging are broadly the real ones.';
+  }
   const by = `${toDisp(drift).toFixed(1)} ${wu}`;
   return gap > 0
     ? `You are ${by} heavier than your log predicts — either food is going unlogged, `
@@ -548,12 +556,17 @@ function senseTile(s, ctx) {
     if (onPlan && consistent) {
       head = 'It holds together.';
       body = `Training ${st.perWeek} times a week, and your weight is doing what your food `
-           + 'log says it should. All three records agreeing is the only state in which any '
-           + 'of them can be trusted.';
+           + 'log says it should. '
+           + (pv.circular
+              ? 'Bear in mind your maintenance figure comes from this log, so the two '
+                + 'lines agreeing says they are consistent rather than that they are right.'
+              : 'All three records agreeing is the only state in which any of them can be '
+                + 'trusted.');
     } else if (onPlan) {
-      head = 'The food side is honest; the training is thin.';
-      body = 'Your weight is tracking your log closely, so the eating is being recorded '
-           + `properly. But ${st.perWeek} sessions a week is not much stimulus — in a `
+      head = pv.circular ? 'The food side is consistent; the training is thin.'
+                         : 'The food side is honest; the training is thin.';
+      body = 'Your weight is tracking your log closely. '
+           + `But ${st.perWeek} sessions a week is not much stimulus — in a `
            + (cutting ? 'deficit that is how weight comes off muscle as well as fat.'
                       : 'surplus that is how a gain ends up being mostly fat.');
     } else if (gap > 0) {

@@ -1240,6 +1240,22 @@ export function planVsActual(store, windowDays = 60) {
     need: { loggedDays: 7, weighIns: 3 },
     have: { loggedDays: logged, weighIns: withBoth.length },
     points, gapKg, skipped, maintenance: maint.kcal, maintenanceSource: maint.source,
+    /*
+     * Can this comparison detect a dishonest log at all?
+     *
+     * Only when the maintenance figure came from somewhere other than the
+     * log. The adaptive figure is back-calculated FROM the log, so eating
+     * 2,600 while writing down 2,000 and holding your weight makes it
+     * conclude maintenance is 2,000 — after which both lines agree exactly
+     * and the gap is zero by construction.
+     *
+     * That absorption is the right behaviour for setting targets, since the
+     * deficit ends up relative to how you log. It is the wrong basis for
+     * telling somebody their logging is accurate, and the screen needs to
+     * know the difference rather than reporting a guaranteed agreement as
+     * evidence.
+     */
+    circular: maint.source === 'adaptive',
     startDate, days: points.length,
   };
 }

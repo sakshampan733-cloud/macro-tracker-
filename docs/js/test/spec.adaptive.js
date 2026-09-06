@@ -262,6 +262,22 @@ describe('Plan against actual points the right way', () => {
     eq(r.need.loggedDays, 7);
   });
 
+  it('flags when the comparison cannot mean what it looks like', () => {
+    /* The screen phrases agreement differently depending on this, so it is
+       worth failing loudly if it ever stops being reported. */
+    const biased = simulate({ trueTDEE: 2600, intake: 2600, days: 45 });
+    for (const d of Object.values(biased.days)) {
+      if (d.entries?.length) d.entries = dayOf(2000).entries;
+    }
+    biased.profile = profileFor();
+    ok(planVsActual(biased).circular,
+       'a maintenance figure taken from the log cannot audit that log');
+
+    const independent = { ...biased, settings: { tdeeSource: 'predicted' } };
+    notOk(planVsActual(independent).circular,
+          'a formula figure is independent, so the comparison is real');
+  });
+
   it('says which maintenance figure the line was drawn from', () => {
     const store = simulate({ trueTDEE: 2600, intake: 2000, days: 45 });
     store.profile = profileFor();
