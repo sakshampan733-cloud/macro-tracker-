@@ -389,6 +389,80 @@ export function whoopTDEE(store, windowDays = 14, rowsOverride = null) {
  * because it is measured on the actual person rather than predicted for a
  * population or modelled by a wrist strap.
  */
+/*
+ * How far the band's burn is from the truth, for this person.
+ *
+ * Wrist devices overstate energy burned, and not by a little: validation
+ * studies routinely find 20–40% over on active calories, because the model
+ * is inferring work from heart rate and movement and has no idea how
+ * efficient you are. Whoop and Apple both do it, by different amounts, and
+ * the amount is personal — it depends on your resting rate, your fitness and
+ * how the thing sits on your wrist.
+ *
+ * So the app does not carry a correction factor. It measures yours.
+ *
+ * There is already a figure that cannot be inflated: the adaptive estimate,
+ * which is arithmetic on what you ate and what the scale did. Energy that
+ * did not exist does not move a scale. Comparing the two gives this
+ * person's device bias directly, and it is worth reporting even when it
+ * changes nothing — "your watch reads 19% high" is the answer to why the
+ * two numbers on the maintenance card disagree.
+ *
+ * Deliberately refuses outside a sane band. A ratio beyond these limits is
+ * far more likely to be a fortnight of half-logged days than a watch that
+ * is wrong by half, and a bad correction is worse than none.
+ */
+export function bandBias(store) {
+  const adaptive = adaptiveTDEE(store);
+  const band = whoopTDEE(store, 28);
+  if (!adaptive.ready || !band.ready || !(band.kcal > 0)) {
+    return { ready: false, need: 'both a measured maintenance and a fortnight of band days' };
+  }
+  if (band.days < 10) return { ready: false, need: '10 days of band data' };
+
+  const ratio = adaptive.kcal / band.kcal;
+  if (!(ratio > 0.6 && ratio < 1.25)) {
+    return { ready: false, ratio: +ratio.toFixed(3), outOfRange: true };
+  }
+
+  /* Positive means the band claims more than your body spent. */
+  const overPct = Math.round((1 / ratio - 1) * 100);
+  return {
+    ready: true,
+    ratio: +ratio.toFixed(3),
+    overPct,
+    /* Under about 8% is inside what the two estimates disagree about
+       anyway, and calling that a bias would be reading noise. */
+    material: Math.abs(overPct) >= 8,
+    adaptive: adaptive.kcal,
+    band: band.kcal,
+    days: band.days,
+  };
+}
+
+/*
+ * The band figure, corrected by this person's own measured bias.
+ *
+ * Only when a bias has actually been measured and is big enough to matter.
+ * With nothing to compare against, the raw number is reported unchanged and
+ * the caption says so — an uncorrected figure honestly labelled is better
+ * than a corrected one built on a guess.
+ */
+function correctBand(whoop, store) {
+  const bias = bandBias(store);
+  if (!bias.ready || !bias.material) {
+    return { ...whoop, why: `Mean of your last ${whoop.days} band days.` };
+  }
+  return {
+    ...whoop,
+    kcal: Math.round(whoop.kcal * bias.ratio),
+    raw: whoop.kcal,
+    bias,
+    why: `Mean of your last ${whoop.days} band days, cut by ${bias.overPct}% — `
+       + 'that is how far your band reads above what your own intake and weight say.',
+  };
+}
+
 export function bestTDEE(store, profile) {
   const adaptive = adaptiveTDEE(store);
   const whoop = whoopTDEE(store);
@@ -396,14 +470,14 @@ export function bestTDEE(store, profile) {
   const pref = store.settings?.tdeeSource || 'auto';
 
   if (pref === 'predicted') return { ...predicted, why: 'You chose the formula estimate.' };
-  if (pref === 'whoop' && whoop.ready) return { ...whoop, why: `Mean of your last ${whoop.days} Whoop days.` };
+  if (pref === 'whoop' && whoop.ready) return correctBand(whoop, store);
   if (pref === 'adaptive' && adaptive.ready) return { ...adaptive, why: 'Back-calculated from your own log.' };
 
   if (adaptive.ready) {
     return { ...adaptive, why: `From ${adaptive.samples.intakeDays} logged days and ${adaptive.samples.weighIns} weigh-ins.`, alternatives: { whoop, predicted } };
   }
   if (whoop.ready) {
-    return { ...whoop, why: `Mean of your last ${whoop.days} Whoop days.`, alternatives: { adaptive, predicted } };
+    return { ...correctBand(whoop, store), alternatives: { adaptive, predicted } };
   }
   return {
     ...predicted,

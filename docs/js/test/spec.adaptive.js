@@ -29,7 +29,7 @@
  */
 
 import { describe, it, eq, near, ok, notOk, isNull, within } from './harness.js';
-import { adaptiveTDEE, planVsActual, trendWeight, bestTDEE } from '../nutrition.js';
+import { adaptiveTDEE, planVsActual, trendWeight, bestTDEE, bandBias } from '../nutrition.js';
 
 const KCAL_PER_KG = 7700;
 
@@ -335,5 +335,75 @@ describe('Which maintenance figure gets used', () => {
     const r = bestTDEE(store, profile);
     eq(r.source, 'adaptive', 'measured beats predicted');
     near(r.kcal, 2600, 200);
+  });
+});
+
+
+describe('A band that reads high', () => {
+  const profile = {
+    sex: 'male', weightKg: 80, heightCm: 180,
+    birthYear: new Date().getFullYear() - 30,
+    activity: 'moderate', bodyFatPct: 0, goal: 'cut',
+  };
+
+  /* A watch claiming `over`% more burn than the person actually spends. */
+  const withBand = (trueTDEE, intake, overPct, days = 28) => {
+    const store = simulate({ trueTDEE, intake, days });
+    store.profile = profile;
+    store.settings = {};
+    store.whoop = { rows: {} };
+    for (const date of Object.keys(store.days)) {
+      store.whoop.rows[date] = { kcal: Math.round(trueTDEE * (1 + overPct / 100)), by: { kcal: 'apple' } };
+    }
+    return store;
+  };
+
+  it('measures how far the band is out, using the one figure it cannot inflate', () => {
+    /* Energy that was never spent does not move a scale, so the adaptive
+       number is the reference and the watch is the thing being measured. */
+    const b = bandBias(withBand(2500, 2100, 30));
+    ok(b.ready);
+    near(b.overPct, 30, 8, 'recovers roughly the overstatement it was given');
+    ok(b.material);
+  });
+
+  it('says nothing when the band is close enough to be trusted', () => {
+    const b = bandBias(withBand(2500, 2100, 3));
+    ok(b.ready);
+    notOk(b.material, 'a few per cent is noise, not a bias worth naming');
+  });
+
+  it('refuses when there is nothing to check it against', () => {
+    const store = simulate({ trueTDEE: 2500, intake: 2100, days: 7 });
+    store.profile = profile; store.whoop = { rows: {} }; store.settings = {};
+    notOk(bandBias(store).ready, 'no adaptive figure means no reference');
+  });
+
+  it('refuses a ratio too wild to be a device error', () => {
+    /* Far more likely to be a fortnight of half-logged days, and a bad
+       correction is worse than none. */
+    const b = bandBias(withBand(2500, 2100, 300));
+    notOk(b.ready);
+    ok(b.outOfRange);
+  });
+
+  it('cuts the band figure when the band is the one in use', () => {
+    const store = withBand(2500, 2100, 30);
+    store.settings = { tdeeSource: 'whoop' };
+    const r = bestTDEE(store, profile);
+    eq(r.source, 'whoop');
+    ok(r.kcal < r.raw, 'the reported figure is below the raw band reading');
+    near(r.kcal, 2500, 300, 'and lands near what the body actually spent');
+  });
+
+  it('leaves the raw figure alone when no bias has been measured', () => {
+    const store = simulate({ trueTDEE: 2500, intake: 2100, days: 7 });
+    store.profile = profile; store.settings = { tdeeSource: 'whoop' };
+    store.whoop = { rows: {} };
+    for (const date of Object.keys(store.days)) {
+      store.whoop.rows[date] = { kcal: 3200, by: { kcal: 'apple' } };
+    }
+    const r = bestTDEE(store, profile);
+    near(r.kcal, 3200, 1, 'uncorrected, and the caption says so rather than pretending');
   });
 });

@@ -14,7 +14,7 @@ import {
   importWhoopCSV, importWhoopFile, summary, METRICS, seriesFor, placeInRange, baseline,
   nutritionVsRecovery, stats,
 } from '../whoop.js';
-import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict, planVsActual, bmiFor } from '../nutrition.js';
+import { trendWeight, adaptiveTDEE, bestTDEE, whoopTDEE, predictedTDEE, checkIn, checkInVerdict, planVsActual, bmiFor, bandBias } from '../nutrition.js';
 import { trainStats } from '../store.js';
 import { stepReport, stepTarget, stepsWorth, suggestedTarget } from '../steps.js';
 import { stepCarry, STEP_SPREAD } from '../carry.js';
@@ -704,9 +704,21 @@ function tdeeTile(s) {
         ? `Whoop measured all ${whoop.days} days, so Whoop is the one in use`
         : `Measured by your ${bandLabel} over ${whoop.days} days`;
 
+  /*
+   * What the band overstates by, once there is something to check it
+   * against. Worth saying even when it changes nothing: it is the answer to
+   * why these two rows disagree, and people otherwise assume the watch is
+   * the more scientific of the two.
+   */
+  const bias = bandBias(s);
+
   const rows = [
     { key: 'adaptive', label: 'Adaptive', note: 'From your own intake and weight trend', res: adaptive },
-    { key: 'whoop', label: bandLabel, note: bandNote, res: whoop },
+    { key: 'whoop', label: bandLabel,
+      note: bias.ready && bias.material
+        ? `${bandNote} · reads ${bias.overPct > 0 ? bias.overPct + '% high' : Math.abs(bias.overPct) + '% low'} against your own numbers`
+        : bandNote,
+      res: whoop },
     { key: 'predicted', label: 'Formula', note: predicted.method, res: predicted },
   ];
 
