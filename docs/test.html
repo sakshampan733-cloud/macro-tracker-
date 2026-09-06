@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basal — model tests</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 28px 20px 60px;
+    background: #0B0B0D; color: #E8E8EC;
+    font: 14px/1.6 ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 19px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { color: #8A8A93; font-size: 13px; margin-bottom: 22px; }
+  .sub a { color: #8A8A93; }
+  #summary {
+    position: sticky; top: 0; z-index: 2;
+    background: #0B0B0D; padding: 12px 0 14px; margin-bottom: 10px;
+    border-bottom: 1px solid #232327; font-size: 15px;
+  }
+  .good { color: #4ADE80; }
+  .bad  { color: #FF6B6B; }
+  .dim  { color: #7A7A82; }
+  h2 {
+    font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+    color: #8A8A93; margin: 24px 0 8px; font-weight: 600;
+  }
+  .t { padding: 3px 0 3px 22px; position: relative; }
+  .t::before { position: absolute; left: 0; }
+  .t.p::before { content: '✓'; color: #4ADE80; }
+  .t.f::before { content: '✗'; color: #FF6B6B; }
+  .t.f { color: #FFB4B4; }
+  pre {
+    margin: 5px 0 9px 22px; padding: 9px 12px; white-space: pre-wrap;
+    background: #17171B; border-left: 2px solid #FF6B6B;
+    border-radius: 0 6px 6px 0; color: #FFC9C9; font-size: 12.5px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Basal — model tests</h1>
+  <div class="sub">
+    The energy model, the log, the scanner and carry-forward, checked against
+    the equations they claim to implement. No build step: this page imports
+    the same modules the app does.
+    <a href="index.html">← back to the app</a>
+  </div>
+
+  <div id="summary" class="dim">Running…</div>
+  <div id="out"></div>
+</div>
+
+<script type="module">
+import { run } from './js/test/harness.js';
+import './js/test/spec.nutrition.js';
+import './js/test/spec.store.js';
+import './js/test/spec.scan.js';
+import './js/test/spec.carry.js';
+
+const out = document.getElementById('out');
+const summary = document.getElementById('summary');
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+};
+
+const report = {
+  suite: name => out.append(el('h2', null, name)),
+  pass: name => out.append(el('div', 't p', name)),
+  fail: (name, message) => {
+    out.append(el('div', 't f', name));
+    out.append(el('pre', null, message));
+  },
+  done: (pass, fail) => {
+    summary.className = fail ? 'bad' : 'good';
+    summary.textContent = fail
+      ? `${fail} failing, ${pass} passing`
+      : `All ${pass} passing`;
+    /* So a headless run can read the result without scraping the page. */
+    window.__basalTests = { pass, fail };
+    document.title = fail ? `✗ ${fail} failing — Basal tests`
+                          : `✓ ${pass} passing — Basal tests`;
+  },
+};
+
+run(report).catch(e => {
+  summary.className = 'bad';
+  summary.textContent = 'The suite itself failed to run';
+  out.append(el('pre', null, e.stack || String(e)));
+});
+</script>
+</body>
+</html>

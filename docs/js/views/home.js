@@ -27,7 +27,7 @@ import {
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
   scannedFoods, builtFoods, addWater, undoWater, peekDay, dismissNote, noteDismissed,
-  commit, noteActiveDay,
+  commit, noteActiveDay, exportJSON,
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
@@ -54,6 +54,7 @@ export function renderHome(root, ctx) {
      had nothing to say. */
   append(root,
     whatsNew(ctx),
+    backupAsk(ctx),
     rolloverCard(key, ctx),
     weighAsk(key, ctx),
     workoutAsk(key, ctx),
@@ -117,6 +118,73 @@ function whatsNew(ctx) {
         },
       }, NEWS.cta),
       el('button.btn.sm', { onclick: dismiss }, 'Not now')));
+}
+
+/*
+ * Asking for a backup, on a schedule rather than a hunch.
+ *
+ * Everything this app knows lives in one browser's storage. That is a
+ * genuinely good trade — no account, no server, nothing of yours anywhere
+ * else — and it has exactly one failure mode: Safari's "Clear History and
+ * Website Data" wipes it, and so does a new phone. There is no warning and
+ * no recovery, and the person it will happen to is the one who never opened
+ * Settings.
+ *
+ * So the app asks. Not on day one, when there is nothing worth saving and a
+ * prompt just reads as noise; not every day, which teaches people to dismiss
+ * the top of the screen. After a fortnight of real logging, and then again a
+ * fortnight after each export.
+ *
+ * The bar for "real" is deliberately high — two weeks of days with food in
+ * them. Somebody who opened the app twice in March does not need to be
+ * chased about a backup.
+ */
+const BACKUP_AFTER_DAYS = 14;
+const BACKUP_MIN_DAYS_LOGGED = 14;
+
+function backupAsk(ctx) {
+  const s = get();
+  const logged = Object.values(s.days || {}).filter(d => d.entries?.length).length;
+  if (logged < BACKUP_MIN_DAYS_LOGGED) return null;
+
+  const last = s.settings?.lastExportAt || 0;
+  const days = Math.floor((Date.now() - last) / 86400000);
+  if (last && days < BACKUP_AFTER_DAYS) return null;
+  if (!last && logged < BACKUP_MIN_DAYS_LOGGED) return null;
+
+  /* Snoozing is a fortnight, not forever. A permanent dismissal on the one
+     prompt that prevents data loss would be the wrong thing to offer. */
+  const snoozed = s.settings?.backupSnoozedAt || 0;
+  if (Date.now() - snoozed < BACKUP_AFTER_DAYS * 86400000) return null;
+
+  const doExport = () => {
+    const blob = new Blob([exportJSON()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url,
+      download: `basal-${new Date().toISOString().slice(0, 10)}.json` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    commit(st => { st.settings.lastExportAt = Date.now(); }, 'settings');
+    toast('Saved. Keep it somewhere that is not this phone.');
+    ctx.refresh();
+  };
+
+  return el('div.tile.news', {},
+    el('span.micro', {}, 'Back up'),
+    el('h3', { style: { marginTop: '8px' } },
+      last ? `${days} days since your last backup`
+           : `${logged} days logged, no backup yet`),
+    el('div.fine', { style: { marginTop: '6px' } },
+      'Your log lives only in this browser. Clearing website data or changing '
+      + 'phone would take it with no way back.'),
+    el('div.btn-row', { style: { marginTop: '12px' } },
+      el('button.btn.sm.primary', { onclick: doExport }, 'Save a copy'),
+      el('button.btn.sm', {
+        onclick: () => {
+          commit(st => { st.settings.backupSnoozedAt = Date.now(); }, 'settings');
+          ctx.refresh();
+        },
+      }, 'Later')));
 }
 
 /*

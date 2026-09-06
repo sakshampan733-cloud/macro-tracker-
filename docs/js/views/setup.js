@@ -1096,6 +1096,10 @@ export function renderSettings(root, ctx) {
     const a = el('a', { href: url, download: `basal-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    /* Stamped so the app can stop asking, and start again when it has been
+       long enough. Without this the reminder either never appears or never
+       goes away, and both make people ignore it. */
+    commit(st => { st.settings.lastExportAt = Date.now(); }, 'settings');
   }
 
   function doImport() {
