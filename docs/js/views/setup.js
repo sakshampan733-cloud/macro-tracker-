@@ -18,7 +18,7 @@ import { openGoalEditor, feasibilityHead, goalTile } from './goal.js';
 import { generateDemo } from '../demo.js';
 import { openSleepGoal, sleepSchedule, sleepHours, clockText } from './sleep.js';
 import { openGuide } from './guide.js';
-import { isNativeStore, listBackups, readBackup } from '../nativestore.js';
+import { isNativeStore, listBackups, readBackup, exportToFiles } from '../nativestore.js';
 import { openAppleHealth } from './apple.js';
 import { openHealthSetup } from './body.js';
 import { healthSource } from '../applehealth.js';
@@ -1205,7 +1205,21 @@ export function renderSettings(root, ctx) {
   );
 
   function doExport() {
-    const blob = new Blob([exportJSON()], { type: 'application/json' });
+    const json = exportJSON();
+
+    /* In the app a download anchor does nothing — no downloads folder, no
+       error, just a tap that appears to work. Write the file where the
+       person can reach it instead. */
+    if (isNativeStore()) {
+      exportToFiles(json).then(r => {
+        toast(r.ok ? `Saved. Files \u2192 Basal \u2192 backups \u2192 ${r.name}`
+                   : 'Could not write the file.', r.ok ? '' : 'err');
+      });
+      commit(st => { st.settings.lastExportAt = Date.now(); }, 'settings');
+      return;
+    }
+
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = el('a', { href: url, download: `basal-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a); a.click(); a.remove();

@@ -202,3 +202,30 @@ export async function readBackup(name) {
   });
   return typeof res.data === 'string' ? res.data : null;
 }
+
+/*
+ * An export somebody can actually find.
+ *
+ * On the web, exporting is an anchor with a download attribute and the
+ * browser does the rest. Inside the app that mechanism is not reliable —
+ * a WKWebView has no downloads folder to put it in, and the tap does
+ * nothing at all, with no error. The same silent failure the import had.
+ *
+ * So on native, exporting writes a dated file next to the automatic
+ * backups, where it shows up under Basal in the Files app and can be
+ * AirDropped, mailed, or handed to the website's import.
+ */
+export async function exportToFiles(json) {
+  const f = plugin();
+  if (!f) return { ok: false };
+  const name = `basal-export-${new Date().toISOString().slice(0, 10)}.json`;
+  try {
+    await f.writeFile({
+      path: `${BACKUP_DIR}/${name}`, directory: Directory.Documents,
+      encoding: 'utf8', data: json, recursive: true,
+    });
+    return { ok: true, name };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
