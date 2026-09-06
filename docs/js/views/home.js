@@ -93,7 +93,11 @@ const NEWS = {
 };
 
 function whatsNew(ctx) {
-  if (get().settings?.seenNews === NEWS_ID) return null;
+  const s = get();
+  if (s.settings?.seenNews === NEWS_ID) return null;
+  /* Nothing to announce to somebody already looking at it. New installs
+     start on Paper, so the card would be offering them what they have. */
+  if ((s.settings?.theme || 'paper') === 'paper') return null;
 
   const dismiss = () => {
     commit(st => {

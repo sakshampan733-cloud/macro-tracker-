@@ -6,8 +6,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#F0E5D2",
+  "theme_color": "#F0E5D2",
   "categories": [
     "health",
     "fitness",

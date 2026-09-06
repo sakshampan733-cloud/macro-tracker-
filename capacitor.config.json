@@ -4,7 +4,7 @@
   "webDir": "docs",
   "ios": {
     "contentInset": "never",
-    "backgroundColor": "#000000"
+    "backgroundColor": "#F0E5D2"
   },
   "server": {
     "iosScheme": "capacitor"

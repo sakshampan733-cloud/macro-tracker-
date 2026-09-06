@@ -82,7 +82,12 @@ const EMPTY = () => ({
     checkInDays: 14,        // fortnight by default — see the Body screen for why
     energyView: 'remaining',
     explain: true,          // show the teaching text, or just the numbers
-    theme: 'dark',          // 'dark' | 'light' | 'auto'
+    /* Paper, for anyone opening this for the first time.
+       Dark was the default when dark was the only considered option; the
+       people who called the app overwhelming were all on it, and none of
+       them would have found a theme picker to fix that. Anyone who has
+       already chosen keeps their choice — a stored setting always wins. */
+    theme: 'paper',         // 'dark' | 'paper' | 'auto'
     isDemo: false,          // generated data is loaded, not real logging
     relayUrl: '',           // Cloudflare worker that fronts Whoop
     limitsOpen: false,
@@ -1076,9 +1081,22 @@ export function exportJSON() {
 export function importJSON(text) {
   const parsed = JSON.parse(text);
   if (!parsed || typeof parsed !== 'object' || !('days' in parsed)) {
-    throw new Error('That file is not an Basal backup.');
+    throw new Error('That file is not a Basal backup.');
   }
-  state = { ...EMPTY(), ...parsed };
+  /*
+   * Settings are merged, not replaced.
+   *
+   * A spread put the file's settings object in whole, so anything added to
+   * the app since the backup was written arrived undefined rather than at
+   * its default — and a backup restored onto a newer build is the normal
+   * case, not the edge one. This is the same merge load() does, for the
+   * same reason, and the retired light theme is migrated here too so a
+   * restore does not land somebody back on a palette that no longer exists.
+   */
+  const settings = { ...EMPTY().settings, ...(parsed.settings || {}) };
+  if (settings.theme === 'light') settings.theme = 'paper';
+
+  state = { ...EMPTY(), ...parsed, settings };
   persist();
   emit('import', state);
 }

@@ -5,11 +5,13 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.06-shell';
+export const VERSION = '2026.09.06-healthkit';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
 import { applyOrb } from './theme.js';
+import { syncFoods } from './data/foodsync.js';
+import { autoSyncHealthKit, canReadHealth } from './healthkit.js';
 import { solveDensities } from './dishes.js';
 import { bestTDEE, macroTargets, goalRate } from './nutrition.js';
 import { renderToday } from './views/today.js';
@@ -265,7 +267,7 @@ function applyTheme(pref) {
 /* The system flipping while the app is open, on 'auto'. */
 window.matchMedia?.('(prefers-color-scheme: dark)')
   .addEventListener?.('change', () => {
-    if ((get().settings?.theme || 'dark') === 'auto') applyTheme('auto');
+    if ((get().settings?.theme || 'paper') === 'auto') applyTheme('auto');
   });
 
 /*
@@ -292,7 +294,7 @@ function refreshDensities() {
 
 function draw() {
   const s = get();
-  applyTheme(s.settings?.theme || 'dark');
+  applyTheme(s.settings?.theme || 'paper');
   setExplanations(s.settings?.explain !== false);
   refreshDensities();
   clear(main);
@@ -324,6 +326,8 @@ function draw() {
       el('button.btn.sm', { onclick: () => ctx.go('today') }, 'Back to today')));
   }
   drawNav();
+  /* Self-gating: fires once, the first draw after onboarding is saved. */
+  maybeShowGuide();
 }
 
 /* Storage errors are the one background failure worth interrupting for. */
@@ -435,7 +439,17 @@ if (get().profile) {
    * were never refreshed again.
    */
   if (repairSleepUnits()) draw();
-  autoSyncApple().then(changed => { if (changed) draw(); }).catch(() => {});
+  /* In the app, read Health directly; on the web, pull the relay as before.
+     Never both — they would race to write the same rows. */
+  if (canReadHealth()) {
+    autoSyncHealthKit().then(changed => { if (changed) draw(); }).catch(() => {});
+  } else {
+    autoSyncApple().then(changed => { if (changed) draw(); }).catch(() => {});
+  }
+
+  /* The food list, checked once a day and applied at the next launch.
+     Deliberately not awaited and never redraws — see foodsync.js. */
+  syncFoods().catch(() => {});
 }
 
 const initial = location.hash.slice(1);

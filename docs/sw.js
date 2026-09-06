@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.09.06-shell';
+const CACHE = 'basal-2026.09.06-healthkit';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -41,6 +41,23 @@ const SHELL = [
   'fonts/ibm-plex-sans-condensed-700.woff2',
   'fonts/ibm-plex-mono-400.woff2', 'fonts/ibm-plex-mono-500.woff2', 'fonts/ibm-plex-mono-600.woff2',
   'icons/icon-192.png', 'icons/icon-512.png',
+
+  /*
+   * Added after an audit found fifteen shipped modules missing from this
+   * list, Home among them. Network-first caching meant they arrived on the
+   * first online visit and nobody noticed — but a fresh install that goes
+   * offline before it has drawn Home would have failed to boot, and that is
+   * exactly the install least able to recover.
+   *
+   * The two variable fonts matter more now that Paper is the default: a
+   * first run without them falls back to the system face, which is not the
+   * app anybody was shown.
+   */
+  'js/views/home.js', 'js/views/train.js', 'js/views/meallog.js', 'js/views/targets.js',
+  'js/carry.js', 'js/steps.js', 'js/units.js', 'js/intensity.js', 'js/coachwhoop.js',
+  'js/data/foodsync.js', 'js/healthkit.js', 'js/data/classify.js', 'js/data/exercises.js', 'js/data/workouts.js',
+  'fonts/fredoka-var.woff2', 'fonts/nunito-var.woff2',
+  'data/foods.json',
 ];
 
 self.addEventListener('install', e => {

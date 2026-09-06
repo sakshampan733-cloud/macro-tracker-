@@ -420,6 +420,11 @@ export function renderOnboarding(root, ctx, { editing = false } = {}) {
              s.goal, which is what the goal card, the feasibility check and
              the boot-time pace refresh all read. */
           const { targetKg, byDate, ...prof } = p;
+          /* maybeShowGuide() gates on this and nothing ever set it, so the
+             eight-page guide — including the page where you pick a theme —
+             has never appeared for a single person. Set on save, which is
+             the moment onboarding is genuinely finished. */
+          prof.done = true;
           s.profile = existing ? { ...existing, ...prof } : prof;
           if (targetKg && byDate) {
             s.goal = {
@@ -915,7 +920,7 @@ export function renderSettings(root, ctx) {
                reads 'light'; it is this option now, so it must look selected
                rather than leaving the row with nothing pressed. */
             'aria-pressed': String(
-              ((s.settings.theme || 'dark') === 'light' ? 'paper' : (s.settings.theme || 'dark'))
+              ((s.settings.theme || 'paper') === 'light' ? 'paper' : (s.settings.theme || 'paper'))
               === value),
             onclick: () => {
               commit(st => { st.settings.theme = value; }, 'settings');
@@ -1103,16 +1108,40 @@ export function renderSettings(root, ctx) {
   }
 
   function doImport() {
-    const f = el('input', { type: 'file', accept: '.json,application/json' });
+    /*
+     * The input has to be in the document.
+     *
+     * In Safari a detached <input type="file"> can still be clicked open.
+     * Inside the native shell's WKWebView it cannot — the tap does nothing
+     * at all, with no error, which is the worst way for a restore to fail:
+     * the person taps Import, sees nothing happen, and concludes their
+     * backup is unreadable. Appended, clicked, removed.
+     *
+     * The accept list is broad on purpose. iOS Files greys out anything it
+     * cannot match, and a .json exported to iCloud has arrived typed as
+     * text/plain and as nothing at all often enough that a strict filter
+     * hides the very file being looked for.
+     */
+    const f = el('input', {
+      type: 'file',
+      accept: '.json,application/json,text/plain',
+      style: { position: 'fixed', left: '-9999px', width: '1px', height: '1px' },
+    });
     f.addEventListener('change', async () => {
       const file = f.files[0];
+      f.remove();
       if (!file) return;
       try {
         importJSON(await file.text());
         toast('Restored.');
-        location.reload();
-      } catch (e) { toast(e.message, 'err'); }
+        setTimeout(() => location.reload(), 400);
+      } catch (e) {
+        toast(e.message || 'Could not read that file.', 'err');
+      }
     });
+    /* If the sheet is dismissed without picking, change never fires. */
+    window.addEventListener('focus', () => setTimeout(() => f.remove(), 1500), { once: true });
+    document.body.append(f);
     f.click();
   }
 }

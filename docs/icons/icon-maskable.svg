@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Maskable variant: same art, pulled into the 80% safe zone so a
+       circular or squircle crop never cuts the punched notches. -->
+<rect width="512" height="512" fill="#D9452F"/>
+<g transform="translate(256 256) scale(0.76) translate(-256 -256)">
+  <rect x="86" y="120" width="340" height="272" rx="46" fill="#FFFDF8" stroke="#2A211A" stroke-width="17"/>
+  <circle cx="86" cy="292" r="30" fill="#D9452F" stroke="#2A211A" stroke-width="17"/>
+  <circle cx="426" cy="292" r="30" fill="#D9452F" stroke="#2A211A" stroke-width="17"/>
+  <line x1="132" y1="292" x2="380" y2="292" stroke="#2A211A" stroke-width="11"
+        stroke-dasharray="22 20" stroke-linecap="round"/>
+  <g stroke="#2A211A" stroke-width="14">
+    <rect x="140" y="168" width="68" height="76" rx="20" fill="#2E6F9E"/>
+    <rect x="222" y="168" width="68" height="76" rx="20" fill="#E0A32E"/>
+    <rect x="304" y="168" width="68" height="76" rx="20" fill="#9A4E86"/>
+  </g>
+  <line x1="150" y1="340" x2="290" y2="340" stroke="#2A211A" stroke-width="15" stroke-linecap="round"/>
+</g>
+</svg>

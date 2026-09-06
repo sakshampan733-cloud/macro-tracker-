@@ -1887,7 +1887,7 @@ export function openHealthSetup(ctx) {
      'Recovery, strain, HRV, resting heart rate, sleep stages, blood oxygen, skin temperature '
      + 'and respiratory rate. No step count — Whoop measures steps but its API does not hand them over.'],
     ['apple', 'Apple Watch only',
-     'Steps, heart rate, sleep and energy, pushed from the Health app by a Shortcut. '
+     'Steps, heart rate, sleep and energy, read straight from the Health app. '
      + 'No recovery or strain score — those are Whoop\u2019s own calculations.'],
     ['both', 'Both',
      'Whoop supplies everything it measures. Apple fills only the gap: steps. '

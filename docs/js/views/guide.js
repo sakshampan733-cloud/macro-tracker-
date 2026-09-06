@@ -110,18 +110,29 @@ function appearancePicker() {
      theme — which is worth asking once, since it is the one preference
      people notice immediately and rarely go looking for. */
   const row = el('div.theme-row');
+  /* Paper is the light theme now, so this offers what Settings offers —
+     and paints the skin as well as the palette, or picking Light here
+     would show a page the app can no longer produce. */
+  const paint = v => {
+    const light = v === 'paper'
+      || (v === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches === false);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', light ? 'light' : 'dark');
+    if (light && v !== 'dark') root.setAttribute('data-skin', 'paper');
+    else root.removeAttribute('data-skin');
+    root.style.colorScheme = light ? 'light' : 'dark';
+  };
   const set = v => {
     commit(s => { s.settings.theme = v; }, 'settings');
-    document.documentElement.setAttribute('data-theme',
-      v === 'auto'
-        ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches === false ? 'light' : 'dark')
-        : v);
+    paint(v);
     [...row.children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === v)));
   };
-  for (const [value, label] of [['dark', 'Dark'], ['light', 'Light'], ['auto', 'System']]) {
+  const currentRaw = get().settings.theme || 'paper';
+  const current = currentRaw === 'light' ? 'paper' : currentRaw;
+  for (const [value, label] of [['dark', 'Dark'], ['paper', 'Light'], ['auto', 'System']]) {
     row.append(el('button.theme-opt', {
       type: 'button', dataset: { theme: value },
-      'aria-pressed': String((get().settings.theme || 'dark') === value),
+      'aria-pressed': String(current === value),
       onclick: () => set(value),
     }, el('div', { class: 'theme-swatch ' + value }), el('span.micro', {}, label)));
   }
@@ -202,10 +213,25 @@ export function openGuide({ onDone = () => {} } = {}) {
 }
 
 /* Shown once, after onboarding, before the first log. */
+/*
+ * Called on every draw, not once at boot.
+ *
+ * At boot there is no profile yet — the person is still filling the form —
+ * so the single startup call always answered "not now" and nothing ever
+ * asked again. Checking on each draw catches the moment onboarding is
+ * saved, which is when the guide is actually wanted.
+ *
+ * The flag is what makes that safe: draw runs constantly, and without it
+ * every redraw would queue another copy of the sheet.
+ */
+let scheduled = false;
+
 export function maybeShowGuide() {
+  if (scheduled) return false;
   const s = get();
   if (!s.profile?.done) return false;     // still onboarding
   if (s.settings?.guideSeen) return false;
+  scheduled = true;
   setTimeout(() => openGuide(), 450);     // let the first screen paint first
   return true;
 }

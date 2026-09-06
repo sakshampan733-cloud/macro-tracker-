@@ -16,6 +16,20 @@
  *        C = composite dish, recipe-dependent    D = street/restaurant, high variance
  */
 
+/*
+ * The version of this list.
+ *
+ * Bump it whenever a food is added, corrected or removed. The app compares
+ * it against the copy it has cached and only takes a strictly higher one,
+ * so a stale response can never overwrite a newer list, and a phone that
+ * has been offline for a month catches up in one step rather than
+ * replaying every change.
+ *
+ * Date-shaped for the same reason the app version is: two numbers are
+ * easier to reason about when one of them tells you when it was written.
+ */
+export const FOODS_VERSION = 2026090602;
+
 export const GROUPS = [
   'Protein', 'Grains', 'Legumes', 'Dairy & Egg', 'Vegetables',
   'Fruit', 'Fats & Nuts', 'Prepared', 'Eating out', 'Snacks & Sweets',
@@ -1202,7 +1216,16 @@ export const FOODS = [
   F('aloo-kachori','Aloo kachori, homemade','Prepared','veg','as-served','D',
     355,6.0,42.0,18.5,2.6,1.4,4.6,420,[['1 kachori (55 g)',55],['2 kachori (110 g)',110]],
     'kachodi, aloo kachodi, khasta kachori, alu kachori, potato kachori'),
-  F('mix-veg','Mixed vegetable curry','Prepared','veg','as-served','C',
+
+
+  /* Ram laddu — Delhi street food: moong dal batter, deep fried, served
+     under grated mooli with green chutney. Graded D because the oil is
+     whatever the cart is using and how long they sat in it varies.
+     Atwater check: 9(4) + 26(4) + 14(9) + 4.5(2) = 275 against 270 stated,
+     which is inside the rounding of a street-food estimate. */
+  F('ram-laddu','Ram laddu','Eating out','veg','as-served','D',
+    270,9.0,26.0,14.0,4.5,1.5,3.4,380,[['1 plate (~120 g)',120],['6 pieces (~150 g)',150]],
+    'ram ladoo, moong dal pakora, mangodi, dilli chaat, laddu with mooli'),  F('mix-veg','Mixed vegetable curry','Prepared','veg','as-served','C',
     100,2.8,10.5,5.8,3.0,3.5,2.4,390,[['1 katori (150 g)',150]]),
   F('sarson-saag','Sarson ka saag','Prepared','veg','as-served','C',
     90,3.5,7.0,6.0,3.5,1.5,2.6,350,[['1 katori (150 g)',150]]),
@@ -1485,6 +1508,53 @@ export function dietAllows(food, diet) {
 }
 
 export const BY_ID = Object.fromEntries(FOODS.map(f => [f.id, f]));
+
+/*
+ * A newer list, if one has been fetched.
+ *
+ * The rows above are the floor: they ship with the app, so a first launch
+ * with no network still has 600 foods, and a phone in a basement is not
+ * suddenly unable to log lunch. Anything newer arrives as data — see
+ * foodsync.js — and is applied here, at module load, before a single
+ * consumer has read FOODS.
+ *
+ * That timing is the whole reason this is done synchronously off
+ * localStorage rather than awaited. Two dozen modules import FOODS and
+ * BY_ID; if the list changed after they had started reading it, some
+ * screens would show the new foods and others the old ones, within the
+ * same session. Applied first, everything sees one list.
+ *
+ * Mutated in place rather than reassigned, because these are exported
+ * bindings other modules already hold references to.
+ */
+function applyCachedFoods() {
+  try {
+    const raw = localStorage.getItem('basal.foods');
+    if (!raw) return;
+    const cached = JSON.parse(raw);
+    if (!(cached?.version > FOODS_VERSION)) return;
+    if (!Array.isArray(cached.foods) || cached.foods.length < 100) return;
+
+    /* A malformed row is dropped rather than allowed to poison the list —
+       a food with no id or no energy figure would log as free. */
+    const rows = cached.foods.filter(f => f && f.id && f.n && f.per100?.kcal != null);
+    if (rows.length < 100) return;
+
+    FOODS.length = 0;
+    FOODS.push(...rows);
+    for (const k of Object.keys(BY_ID)) delete BY_ID[k];
+    for (const f of rows) BY_ID[f.id] = f;
+
+    if (Array.isArray(cached.groups) && cached.groups.length) {
+      GROUPS.length = 0;
+      GROUPS.push(...cached.groups);
+    }
+  } catch {
+    /* A corrupt cache is not worth a blank app. The built-in list stands. */
+  }
+}
+
+applyCachedFoods();
 
 /*
  * Atwater reconciliation.

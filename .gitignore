@@ -40,3 +40,21 @@ data/*
 # Scratch
 *.log
 _test_*.csv
+
+# ─────────────────────────────────────────────────────────────────────
+# The native shell.
+# The Xcode project is committed; everything below is generated.
+# ─────────────────────────────────────────────────────────────────────
+
+# Installed tooling. Rebuilt from package.json with `npm install`.
+node_modules/
+
+# The web app, copied in by `npx cap sync`. It is docs/ verbatim, so
+# committing it would be the whole app stored twice and drifting.
+ios/App/App/public/
+
+# Xcode build output and per-user window state.
+ios/App/build/
+ios/App/DerivedData/
+**/xcuserdata/
+**/*.xcuserdatad

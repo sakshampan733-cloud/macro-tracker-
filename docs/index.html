@@ -5,15 +5,47 @@
 <title>Basal</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
 <meta name="description" content="A measuring instrument for what you eat.">
-<meta name="theme-color" content="#000000">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#F0E5D2">
+<meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Basal">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/app.css">
+<script>
+/*
+ * The theme, before anything is drawn.
+ *
+ * app.js sets this too, but it is a module: it does not run until the
+ * stylesheet and the parser are done, and until it does the page wears
+ * whatever :root says. On a cold start that showed as a black flash before
+ * the warm ground arrived — worst on the native shell, where the launch
+ * image hands straight over to a painted page.
+ *
+ * Small enough to be inline and deliberately defensive: a corrupt store, a
+ * browser with storage blocked, or no saved settings at all must all end
+ * up with a themed page rather than no page.
+ */
+(function () {
+  try {
+    var raw = localStorage.getItem('basal.v1');
+    var pref = raw ? (JSON.parse(raw).settings || {}).theme : null;
+    if (pref === 'light') pref = 'paper';          // the retired option
+    if (!pref) pref = 'paper';                     // a fresh install
+    var light = pref === 'paper' ||
+      (pref === 'auto' && window.matchMedia &&
+       window.matchMedia('(prefers-color-scheme: dark)').matches === false);
+    var root = document.documentElement;
+    root.setAttribute('data-theme', light ? 'light' : 'dark');
+    if (pref === 'paper' || (light && pref === 'auto')) root.setAttribute('data-skin', 'paper');
+    root.style.colorScheme = light ? 'light' : 'dark';
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', light ? '#F0E5D2' : '#000000');
+  } catch (e) { /* the module will sort it out a moment later */ }
+})();
+</script>
 </head>
 <body>
   <div id="scroller">

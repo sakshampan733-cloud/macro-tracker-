@@ -180,54 +180,16 @@ export function existingSource(store) {
 }
 
 /*
- * Pull whatever the phone has pushed and fold it into the day rows.
+ * Absorbing a batch of Apple rows.
  *
- * Whoop's own fields are left untouched where both exist: Whoop measures
- * more, and the app's day factor and coaching were built against it.
+ * Extracted so HealthKit and the relay share one merge instead of two that
+ * drift. The rules in here — active plus basal for total energy, per-field
+ * provenance, gaps-only when a Whoop is also worn, never overwriting a
+ * hand-typed weight — were learned one bug at a time and are the reason the
+ * native reader could be written as a thin fetch rather than a second
+ * implementation of everything.
  */
-export async function syncApple({ relay, key } = {}) {
-  const store = get();
-  const base = relayBase(relay);
-  const k = key || healthKey();
-  if (!base) {
-    return { ok: false, error: 'No relay address set, or the one saved is not a '
-      + 'usable web address. Set it under Whoop live sync.' };
-  }
-  if (!k) return { ok: false, error: 'No health key yet — generate one first.' };
-
-  /* Both bands is a supported setup, not a conflict — but it means Apple
-     fills only what Whoop cannot measure. Without a declared setup, fall
-     back to the old rule and refuse rather than guess. */
-  const mode = healthSource();
-  const prior = existingSource(store);
-  const gapsOnly = mode === 'both' || (mode == null && prior === 'whoop');
-
-  if (mode == null && prior === 'whoop') {
-    return { ok: false, mixed: true,
-      error: 'This app already holds Whoop data. Tell it you wear both bands '
-           + 'and Apple will fill only the gaps — steps, which Whoop\u2019s API '
-           + 'does not return. Left to merge freely it would overwrite your '
-           + 'HRV history with a different measure of it: Whoop reports RMSSD, '
-           + 'Apple reports SDNN.' };
-  }
-
-  let payload;
-  try {
-    const r = await fetch(`${base}/apple/pull`, { headers: { 'x-basal-key': k } });
-    if (!r.ok) return { ok: false, error: `The relay answered ${r.status}.` };
-    payload = await r.json();
-  } catch (e) {
-    return { ok: false,
-      error: `Could not reach ${base}/apple/pull — ${e.message}. `
-           + 'Check the relay address under Whoop live sync.' };
-  }
-
-  const rows = payload.rows || [];
-  if (!rows.length) {
-    return { ok: true, days: 0,
-      note: 'The relay has nothing yet. Run the Shortcut once on your phone.' };
-  }
-
+export function absorbAppleRows(rows, { gapsOnly = false } = {}) {
   let added = 0;
   commit(s => {
     s.whoop = s.whoop || { rows: {}, importedAt: null };
@@ -334,6 +296,60 @@ export async function syncApple({ relay, key } = {}) {
     s.whoop.importedAt = Date.now();
     s.settings.healthSyncedAt = Date.now();
   }, 'whoop');
+
+  return added;
+}
+
+/*
+ * Pull whatever the phone has pushed and fold it into the day rows.
+ *
+ * Whoop's own fields are left untouched where both exist: Whoop measures
+ * more, and the app's day factor and coaching were built against it.
+ */
+export async function syncApple({ relay, key } = {}) {
+  const store = get();
+  const base = relayBase(relay);
+  const k = key || healthKey();
+  if (!base) {
+    return { ok: false, error: 'No relay address set, or the one saved is not a '
+      + 'usable web address. Set it under Whoop live sync.' };
+  }
+  if (!k) return { ok: false, error: 'No health key yet — generate one first.' };
+
+  /* Both bands is a supported setup, not a conflict — but it means Apple
+     fills only what Whoop cannot measure. Without a declared setup, fall
+     back to the old rule and refuse rather than guess. */
+  const mode = healthSource();
+  const prior = existingSource(store);
+  const gapsOnly = mode === 'both' || (mode == null && prior === 'whoop');
+
+  if (mode == null && prior === 'whoop') {
+    return { ok: false, mixed: true,
+      error: 'This app already holds Whoop data. Tell it you wear both bands '
+           + 'and Apple will fill only the gaps — steps, which Whoop\u2019s API '
+           + 'does not return. Left to merge freely it would overwrite your '
+           + 'HRV history with a different measure of it: Whoop reports RMSSD, '
+           + 'Apple reports SDNN.' };
+  }
+
+  let payload;
+  try {
+    const r = await fetch(`${base}/apple/pull`, { headers: { 'x-basal-key': k } });
+    if (!r.ok) return { ok: false, error: `The relay answered ${r.status}.` };
+    payload = await r.json();
+  } catch (e) {
+    return { ok: false,
+      error: `Could not reach ${base}/apple/pull — ${e.message}. `
+           + 'Check the relay address under Whoop live sync.' };
+  }
+
+  const rows = payload.rows || [];
+  if (!rows.length) {
+    return { ok: true, days: 0,
+      note: 'The relay has nothing yet. Run the Shortcut once on your phone.' };
+  }
+
+  const added = absorbAppleRows(rows, { gapsOnly });
 
   return { ok: true, days: added, gapsOnly,
            from: rows[0].date, to: rows[rows.length - 1].date };

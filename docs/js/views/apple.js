@@ -13,6 +13,7 @@ import {
   healthKey, makeHealthKey, forgetHealthKey, pushUrl, syncApple, existingSource,
   healthSource, relayBase,
 } from '../applehealth.js';
+import { canReadHealth, askForHealth, syncHealthKit, healthAvailable } from '../healthkit.js';
 import { checkRelay } from '../whooprelay.js';
 
 const copy = async (text, what) => {
@@ -26,11 +27,95 @@ const codeRow = (label, value) => el('div.code-row', {},
     el('div.code-val', {}, value)),
   el('button.btn.sm', { onclick: () => copy(value, label) }, 'Copy'));
 
+/*
+ * The native Health screen: one button.
+ *
+ * Everything the relay version needed to explain — the key, the JSON body,
+ * which statistic each field wants, when the automation should fire — is
+ * gone, because iOS answers all of it. What is left is asking permission
+ * and saying what came back.
+ */
+function nativeHealth(ctx, render) {
+  const s = get();
+  const asked = !!s.settings?.healthAsked;
+  const last = s.settings?.healthPulledAt;
+  const kids = [];
+
+  kids.push(
+    el('div.section-label', {}, el('span.micro', {}, 'Apple Health')),
+    el('div.tile', {},
+      el('div.fine', {},
+        asked
+          ? 'Basal reads your steps, energy, heart rate, HRV, sleep, blood '
+            + 'oxygen and weight straight from Health. Nothing leaves your phone.'
+          : 'Allow Basal to read Health and your rings, sleep and heart data '
+            + 'fill in on their own. No Shortcut, no relay, no key.'),
+      el('button.btn.primary.block', { style: { marginTop: '12px' },
+        onclick: async e => {
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          btn.textContent = asked ? 'Reading…' : 'Asking…';
+          if (!asked) {
+            const a = await askForHealth();
+            if (!a.ok) { toast(a.error, 'err'); btn.disabled = false; render(); return; }
+          }
+          const r = await syncHealthKit({ days: 7 });
+          btn.disabled = false;
+          if (!r.ok) { toast(r.error, 'err'); render(); return; }
+          if (!r.days) { toast(r.note || 'Nothing in Health yet.'); render(); return; }
+          toast(`${r.days} day${r.days === 1 ? '' : 's'} in.`);
+          ctx.refresh();
+          render();
+        } }, asked ? 'Read Health now' : 'Connect Apple Health'),
+      last ? el('div.fine', { style: { marginTop: '10px' } },
+        'Last read ' + new Date(last).toLocaleString()) : null),
+  );
+
+  if (asked) {
+    kids.push(
+      el('div.tile', {},
+        el('div.fine', {},
+          'Seeing nothing? iOS never tells an app what you allowed, so the app '
+          + 'cannot warn you. Check Settings \u2192 Health \u2192 Data Access & '
+          + 'Devices \u2192 Basal, and turn on whatever is off.')),
+    );
+  }
+
+  kids.push(
+    el('div.section-label', {}, el('span.micro', {}, 'What Apple can and cannot give')),
+    el('div.tile', {},
+      el('div.fine', { style: { lineHeight: '1.65' } },
+        'Steps, energy, exercise minutes, stand hours, resting heart rate, HRV, '
+        + 'blood oxygen, respiratory rate, wrist temperature, sleep stages and '
+        + 'weight all come across, and the daily target moves with your energy burn.'),
+      el('div.fine', { style: { marginTop: '10px', lineHeight: '1.65' } },
+        'Recovery and strain do not exist in Apple Health \u2014 they are Whoop\u2019s '
+        + 'own scores. The coaching that keys on them stays quiet rather than '
+        + 'inventing a number.')),
+  );
+
+  return kids;
+}
+
 export function openAppleHealth(ctx) {
   const body = el('div');
 
   const render = () => {
     const s = get();
+
+    /*
+     * In the app, none of the rest of this screen applies.
+     *
+     * The relay, the key and the Shortcut existed because a web page cannot
+     * read HealthKit. Running natively it can, so showing twelve steps of
+     * setup for a problem that no longer exists would be worse than useless
+     * — somebody would follow them.
+     */
+    if (canReadHealth()) {
+      body.replaceChildren();
+      append(body, ...nativeHealth(ctx, render));
+      return;
+    }
     const relay = (s.settings.relayUrl || '').replace(/\/+$/, '');
     const key = healthKey();
     const url = pushUrl(relay);
