@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.06-durable';
+export const VERSION = '2026.09.06-widget';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
@@ -13,6 +13,7 @@ import { applyOrb } from './theme.js';
 import { syncFoods } from './data/foodsync.js';
 import { autoSyncHealthKit, canReadHealth } from './healthkit.js';
 import { isNativeStore, writeDailyBackup, flush as flushStore } from './nativestore.js';
+import { publishWidget } from './widget.js';
 import { solveDensities } from './dishes.js';
 import { bestTDEE, macroTargets, goalRate } from './nutrition.js';
 import { renderToday } from './views/today.js';
@@ -340,6 +341,8 @@ function draw() {
   drawNav();
   /* Self-gating: fires once, the first draw after onboarding is saved. */
   maybeShowGuide();
+  /* Cheap, deduped, and silent when there is no widget. */
+  publishWidget();
 }
 
 /* Storage errors are the one background failure worth interrupting for. */

@@ -12,6 +12,7 @@
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		8A01D99D160E42CC8FE73909 /* BasalHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B47FDDD950C4FDF814CC0DF /* BasalHealth.swift */; };
 		8285F57E83C64BF48BD31C20 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2578C1C5B80D407B9A785B94 /* MainViewController.swift */; };
+		D31ABA3BE1A24E3E94345FEE /* WidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7C69DCEA7B4C7EA5DB3FA5 /* WidgetBridge.swift */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
@@ -27,6 +28,7 @@
 		4B47FDDD950C4FDF814CC0DF /* BasalHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasalHealth.swift; sourceTree = "<group>"; };
 		D25C70AFDDB140539A298E43 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		2578C1C5B80D407B9A785B94 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		4F7C69DCEA7B4C7EA5DB3FA5 /* WidgetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBridge.swift; sourceTree = "<group>"; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -72,6 +74,7 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				4F7C69DCEA7B4C7EA5DB3FA5 /* WidgetBridge.swift */,
 				2578C1C5B80D407B9A785B94 /* MainViewController.swift */,
 				D25C70AFDDB140539A298E43 /* App.entitlements */,
 				4B47FDDD950C4FDF814CC0DF /* BasalHealth.swift */,
@@ -167,6 +170,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				D31ABA3BE1A24E3E94345FEE /* WidgetBridge.swift in Sources */,
 				8285F57E83C64BF48BD31C20 /* MainViewController.swift in Sources */,
 				8A01D99D160E42CC8FE73909 /* BasalHealth.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
