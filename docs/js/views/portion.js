@@ -24,7 +24,9 @@ import { haptic } from '../feedback.js';
 import {
   METHODS, shiftDay, GRADE_MULT, macrosFor, addEntry, updateEntry, MEALS,
   mealForNow, dayKey, toggleFavourite, isFavourite, saveFood, get, commit,
+  totals, entryMacros,
 } from '../store.js';
+import { dayTargets } from './today.js';
 import { atwater, BY_ID } from '../data/foods.js';
 import { qualityFor, LEUCINE_THRESHOLD_G } from '../data/quality.js';
 
@@ -162,6 +164,7 @@ export function openPortion(food, {
 
   /* ── live readout ── */
   const readout = el('div');
+  const budget = el('div');
   const amountBox = el('div');
   const methodChip = el('div');
   const depth = el('div');
@@ -171,6 +174,71 @@ export function openPortion(food, {
     state.method = units[state.unit].raw ? 'weighed'
       : (grade === 'B' ? 'label' : 'portion');
   };
+
+  /*
+   * What this portion does to the rest of the day, before it is logged.
+   *
+   * The app already knew this and only said it afterwards: you logged the
+   * kachori, went back to the readout and found the day had gone red. The
+   * arithmetic is identical either way, so the honest place for it is here,
+   * while the number in the quantity box is still being changed.
+   *
+   * Two rules keep it from becoming a scold. It always speaks — what is
+   * left, not only what is exceeded — because a strip that appears only
+   * when you have done something wrong teaches people to fear the screen.
+   * And it names the macro, since "over" on fat and "over" on protein are
+   * not the same news and only one of them usually matters.
+   */
+  function drawBudget(m) {
+    const s = get();
+    const target = dayTargets(s, dateKey);
+    if (!target?.kcal) { budget.replaceChildren(); return; }
+
+    const eatenNow = totals(dateKey);
+    /* Editing an entry replaces it rather than adding to it, so its current
+       contribution has to come back out or it is counted twice and every
+       edit looks like it blows the day. */
+    const already = entry ? entryMacros(entry) : null;
+
+    const seen = k => (eatenNow[k] || 0) - (already ? (already[k] || 0) : 0);
+    const rows = [
+      { k: 'kcal', label: 'kcal', unit: '' },
+      { k: 'p', label: 'protein', unit: ' g' },
+      { k: 'c', label: 'carbs', unit: ' g' },
+      { k: 'f', label: 'fat', unit: ' g' },
+    ];
+
+    const overs = [];
+    for (const r of rows) {
+      const t = target[r.k];
+      if (!(t > 0)) continue;
+      const after = seen(r.k) + (m[r.k] || 0);
+      if (after > t) overs.push({ ...r, by: Math.round(after - t) });
+    }
+
+    const leftKcal = Math.round(target.kcal - seen('kcal') - (m.kcal || 0));
+
+    if (!overs.length) {
+      budget.replaceChildren(el('div.fine.is-good', { style: { marginTop: '10px', textAlign: 'center' } },
+        `Leaves ${leftKcal.toLocaleString()} kcal for the rest of the day.`));
+      return;
+    }
+
+    /* Calories lead when they are among the overs; otherwise the macro that
+       is over is the whole story and leading with calories would bury it. */
+    const kcalOver = overs.find(o => o.k === 'kcal');
+    const rest = overs.filter(o => o.k !== 'kcal');
+    const head = kcalOver
+      ? `Takes you ${kcalOver.by.toLocaleString()} kcal over`
+      : `Fits on calories \u2014 ${leftKcal.toLocaleString()} left`;
+    const tail = rest.length
+      ? ' · ' + rest.map(o => `${o.label} +${o.by}${o.unit}`).join(', ') + ' over'
+      : '';
+
+    budget.replaceChildren(el('div.fine.is-warn', {
+      style: { marginTop: '10px', textAlign: 'center' },
+    }, head + tail));
+  }
 
   const render = () => {
     const gr = gramsNow();
@@ -191,6 +259,8 @@ export function openPortion(food, {
         macroPill('Carbs', m.c, 'var(--m-c)'),
         macroPill('Fat', m.f, 'var(--m-f)')),
     );
+
+    drawBudget(m);
 
     methodChip.replaceChildren(
       el('button', {
@@ -446,7 +516,7 @@ export function openPortion(food, {
   const s = sheet({
     title: food.n || food.name,
     body: el('div', {},
-      el('div.tile.tile-hero', { style: { marginBottom: '12px' } }, readout),
+      el('div.tile.tile-hero', { style: { marginBottom: '12px' } }, readout, budget),
       mealRow,
       el('div', { style: { height: '12px' } }),
       amountCard,
