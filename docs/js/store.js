@@ -11,6 +11,8 @@ import { MICROS, NUTRIENTS } from './data/nutrients.js';
 import { supplementMicros } from './data/supplements.js';
 import { PRESETS as PRESET_TYPES } from './data/workouts.js';
 
+import { save as nativeSave } from './nativestore.js';
+
 const KEY = 'basal.v1';
 const LEGACY_KEYS = ['assay.v1'];   // the app was called Assay before this
 const listeners = new Set();
@@ -144,7 +146,14 @@ function writeNow() {
   clearTimeout(saveTimer);
   saveTimer = null;
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    /* Stamped so hydrate() can tell a file and a localStorage copy apart
+       when both exist and decide which one is actually newer. */
+    state.savedAt = Date.now();
+    const json = JSON.stringify(state);
+    localStorage.setItem(KEY, json);
+    /* In the app, the file is the record and this is its cache. Debounced
+       inside, and deliberately not awaited: a save must not block a draw. */
+    nativeSave(json);
     return true;
   } catch (e) {
     // Quota is the only realistic failure here. Say so plainly.

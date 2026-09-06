@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.09.06-healthkit';
+const CACHE = 'basal-2026.09.06-durable';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -55,7 +55,7 @@ const SHELL = [
    */
   'js/views/home.js', 'js/views/train.js', 'js/views/meallog.js', 'js/views/targets.js',
   'js/carry.js', 'js/steps.js', 'js/units.js', 'js/intensity.js', 'js/coachwhoop.js',
-  'js/data/foodsync.js', 'js/healthkit.js', 'js/data/classify.js', 'js/data/exercises.js', 'js/data/workouts.js',
+  'js/data/foodsync.js', 'js/healthkit.js', 'js/nativestore.js', 'js/data/classify.js', 'js/data/exercises.js', 'js/data/workouts.js',
   'fonts/fredoka-var.woff2', 'fonts/nunito-var.woff2',
   'data/foods.json',
 ];

@@ -57,6 +57,24 @@
       Basal needs JavaScript. Enable it and reload.
     </p>
   </noscript>
-  <script type="module" src="js/app.js"></script>
+  <script type="module">
+    /*
+     * In the app, the log lives in a file; read it in before anything else.
+     *
+     * app.js and its two dozen imports read localStorage synchronously at
+     * module load, so the file has to be poured in first — after that the
+     * app behaves exactly as it does on the web. On the web this costs one
+     * dynamic import and nothing else.
+     */
+    if (globalThis.Capacitor?.isNativePlatform?.()) {
+      try {
+        const ns = await import('./js/nativestore.js');
+        await ns.hydrate();
+      } catch (e) {
+        console.warn('Could not read the log file; using web storage', e);
+      }
+    }
+    await import('./js/app.js');
+  </script>
 </body>
 </html>

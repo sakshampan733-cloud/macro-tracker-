@@ -18,6 +18,7 @@ import { openGoalEditor, feasibilityHead, goalTile } from './goal.js';
 import { generateDemo } from '../demo.js';
 import { openSleepGoal, sleepSchedule, sleepHours, clockText } from './sleep.js';
 import { openGuide } from './guide.js';
+import { isNativeStore, listBackups, readBackup } from '../nativestore.js';
 import { openAppleHealth } from './apple.js';
 import { openHealthSetup } from './body.js';
 import { healthSource } from '../applehealth.js';
@@ -582,6 +583,74 @@ function group(ctx, key, title, subtitle, ...children) {
   return el('div.set-group' + (open ? '.is-open' : ''), {}, head, body);
 }
 
+/*
+ * The copies the app keeps for you.
+ *
+ * Only in the native app, because only there is there a real folder to keep
+ * them in. One a day, seven kept, listed newest first — and listed rather
+ * than merely written, because a backup nobody can see is a backup nobody
+ * trusts, and because these files are the person's own: they show up under
+ * Basal in the Files app, ready to be moved anywhere they like.
+ *
+ * The honest limit is stated on the card. These live inside the app, so
+ * deleting the app takes them with it. What covers that is the phone's own
+ * iCloud backup, which needs nothing set up, and exporting a copy somewhere
+ * else, which needs a decision.
+ */
+function backupsTile(ctx) {
+  if (!isNativeStore()) return null;
+
+  const tile = el('div.tile', {},
+    el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Automatic backups'),
+    el('div.fine', { style: { marginTop: '4px' } },
+      'A copy of your log every day, seven kept. They live in the Files app under '
+      + 'Basal — move one somewhere else and it survives even if this app is deleted.'),
+    el('div.fine', { style: { marginTop: '8px' } }, 'Reading\u2026'));
+
+  listBackups().then(rows => {
+    const kids = [
+      el('div', { style: { fontSize: '14px', fontWeight: '500' } }, 'Automatic backups'),
+      el('div.fine', { style: { marginTop: '4px' } },
+        'A copy of your log every day, seven kept. They live in the Files app under '
+        + 'Basal — move one somewhere else and it survives even if this app is deleted.'),
+    ];
+
+    if (!rows.length) {
+      kids.push(el('div.fine', { style: { marginTop: '10px' } },
+        'None yet. The first one is written the next time you open the app.'));
+    } else {
+      for (const r of rows) {
+        kids.push(el('div.row', {},
+          el('div.grow', {},
+            el('div.title', {}, dateLabel(r.date)),
+            el('div.sub', {}, r.size ? `${Math.round(r.size / 1024)} KB` : 'backup')),
+          el('button.btn.sm', {
+            onclick: async () => {
+              if (!(await confirmSheet({
+                title: `Restore ${dateLabel(r.date)}?`,
+                message: 'Everything logged since then is replaced by what this file holds. '
+                       + 'There is no undo.',
+                confirmLabel: 'Restore', danger: true,
+              }))) return;
+              try {
+                const text = await readBackup(r.name);
+                if (!text) { toast('Could not read that backup.', 'err'); return; }
+                importJSON(text);
+                toast('Restored.');
+                setTimeout(() => location.reload(), 400);
+              } catch (e) {
+                toast(e.message || 'That file could not be read.', 'err');
+              }
+            },
+          }, 'Restore')));
+      }
+    }
+    replaceKids(tile, ...kids);
+  }).catch(() => {});
+
+  return tile;
+}
+
 export function renderSettings(root, ctx) {
   const s = get();
   const p = s.profile;
@@ -967,6 +1036,7 @@ export function renderSettings(root, ctx) {
 
     group(ctx, 'data', 'Data',
       'Export, backup, demo data, and erasing.',
+      backupsTile(ctx),
       el('div.tile', {},
         el('div', { style: { fontSize: '14px', fontWeight: '500' } },
           get().settings.isDemo ? 'Demo data is loaded' : 'Try two years of data'),

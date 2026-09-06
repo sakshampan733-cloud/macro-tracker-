@@ -5,13 +5,14 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.06-healthkit';
+export const VERSION = '2026.09.06-durable';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
 import { applyOrb } from './theme.js';
 import { syncFoods } from './data/foodsync.js';
 import { autoSyncHealthKit, canReadHealth } from './healthkit.js';
+import { isNativeStore, writeDailyBackup, flush as flushStore } from './nativestore.js';
 import { solveDensities } from './dishes.js';
 import { bestTDEE, macroTargets, goalRate } from './nutrition.js';
 import { renderToday } from './views/today.js';
@@ -264,6 +265,17 @@ function applyTheme(pref) {
 
 }
 
+/*
+ * Anything still waiting to be written, written now.
+ *
+ * The save is debounced by a second or so, which is a window in which the
+ * app can be swiped away. Backgrounding is the last reliable moment to get
+ * it onto disk.
+ */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flushStore().catch(() => {});
+});
+
 /* The system flipping while the app is open, on 'auto'. */
 window.matchMedia?.('(prefers-color-scheme: dark)')
   .addEventListener?.('change', () => {
@@ -450,6 +462,27 @@ if (get().profile) {
   /* The food list, checked once a day and applied at the next launch.
      Deliberately not awaited and never redraws — see foodsync.js. */
   syncFoods().catch(() => {});
+
+  /*
+   * A dated copy of the log, once a day.
+   *
+   * The device backup covers a lost or replaced phone; this covers the two
+   * things it does not — deleting the app on purpose, and restoring from a
+   * backup older than this morning. It also puts a file the person can see
+   * and move into the Files app, which is the only copy that stays theirs
+   * if they ever stop using this.
+   */
+  if (isNativeStore()) {
+    const last = get().settings?.lastDailyBackup || 0;
+    if (Date.now() - last > 20 * 60 * 60 * 1000) {
+      const json = localStorage.getItem('basal.v1');
+      if (json) {
+        writeDailyBackup(json).then(r => {
+          if (r.ok) commit(st => { st.settings.lastDailyBackup = Date.now(); }, 'settings');
+        }).catch(() => {});
+      }
+    }
+  }
 }
 
 const initial = location.hash.slice(1);
