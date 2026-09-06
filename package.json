@@ -1,0 +1,10 @@
+{
+  "name": "basal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Native shell for Basal. The app itself lives in docs/ and needs no build step.",
+  "scripts": {
+    "ios": "cap sync ios && cap open ios",
+    "sync": "cap sync ios"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "appId": "com.sakshampanchal.basal",
+  "appName": "Basal",
+  "webDir": "docs",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#000000"
+  },
+  "server": {
+    "iosScheme": "capacitor"
+  }
+}

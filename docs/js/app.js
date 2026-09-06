@@ -5,7 +5,7 @@
  * phone and the laptop disagree about what the app can do, you can see
  * which one is stale instead of guessing.
  */
-export const VERSION = '2026.09.05-contract';
+export const VERSION = '2026.09.06-shell';
 
 import { el, clear, icon, toast, $, setExplanations } from './ui.js';
 import { get, commit, subscribe, dayKey, openDay, noteAppOpen, pushBackup, setDishDensities, flush } from './store.js';
@@ -380,7 +380,19 @@ subscribe(evt => {
  * for a new worker on every launch, and when one takes over, reload once so
  * the running page is not left half-old.
  */
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+/*
+ * Never inside the native shell.
+ *
+ * A packaged app already carries its assets; a worker caching them on top
+ * would let a build serve the previous build's screens, which is the exact
+ * failure the worker exists to prevent on the web. Capacitor usually serves
+ * from capacitor://, which the https check below would catch on its own —
+ * but it can be configured to use https://localhost, and then it would not.
+ * Said explicitly rather than relied on by accident.
+ */
+const NATIVE = !!(window.Capacitor?.isNativePlatform?.());
+
+if (!NATIVE && 'serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
     reg.update().catch(() => {});
     setInterval(() => reg.update().catch(() => {}), 15 * 60 * 1000);
