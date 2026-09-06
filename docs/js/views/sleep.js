@@ -49,13 +49,6 @@ export function clearSleepSchedule() {
   commit(s => { delete s.settings.sleepGoal; }, 'settings');
 }
 
-/* 24-hour clock text, in the same style as the rest of the app. */
-export function hhmm(h) {
-  const t = ((h % 24) + 24) % 24;
-  const hr = Math.floor(t);
-  const mn = Math.round((t - hr) * 60);
-  return `${String(mn === 60 ? hr + 1 : hr).padStart(2, '0')}:${String(mn === 60 ? 0 : mn).padStart(2, '0')}`;
-}
 
 /* Twelve-hour text, which is how most people say a bedtime out loud. */
 export function clockText(h) {

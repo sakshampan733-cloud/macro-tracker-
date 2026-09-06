@@ -26,55 +26,6 @@ const KINDS = [
   ['other', 'No coffee'],
 ];
 
-/* ── Pick a drink ───────────────────────────────────────────────────── */
-
-export function openStarbucks(ctx, { dateKey = null } = {}) {
-  const key = dateKey || ctx?.date || dayKey();
-  const results = el('div');
-  const search = el('input', {
-    type: 'search', placeholder: 'Latte, frappuccino, chai…', autocomplete: 'off',
-    oninput: e => draw(e.target.value),
-  });
-
-  function cell(d) {
-    const m = buildMacros(defaultBuild(d.id, 'grande'));
-    return el('button.food-cell', {
-      onclick: () => { sh.close(); openBuilder(d.id, key, ctx); },
-    },
-      el('span.fc-name', {}, d.name),
-      el('span.fc-kcal', {}, `${m.kcal} kcal · ${m.caffeine} mg`));
-  }
-
-  function draw(q) {
-    clear(results);
-    const needle = (q || '').trim().toLowerCase();
-
-    if (needle.length >= 2) {
-      const hits = DRINK_LIST.filter(d => d.name.toLowerCase().includes(needle));
-      results.append(hits.length
-        ? el('div.food-grid', {}, ...hits.map(cell))
-        : el('div.fine', {}, `Nothing on the menu matches “${q}”.`));
-      return;
-    }
-
-    results.append(el('div.fine', { style: { marginBottom: '12px' } },
-      'Grande, standard build. Everything is adjustable on the next screen.'));
-    for (const [kind, label] of KINDS) {
-      const group = DRINK_LIST.filter(d => d.kind === kind);
-      if (!group.length) continue;
-      results.append(
-        el('div.section-label', {}, el('span.micro', {}, label)),
-        el('div.food-grid', {}, ...group.map(cell)));
-    }
-  }
-
-  draw('');
-  const sh = sheet({
-    title: 'Starbucks',
-    body: el('div', {}, el('div.field', {}, search), results),
-  });
-  return sh;
-}
 
 /* ── Build it ───────────────────────────────────────────────────────── */
 

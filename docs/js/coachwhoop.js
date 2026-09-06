@@ -351,8 +351,3 @@ export function whoopAdvice(store, targets, key = dayKey(), now = new Date()) {
   return out.sort((a, b) => b.urgency - a.urgency);
 }
 
-/* The single most useful thing Whoop has to say right now, or nothing. */
-export function topWhoopAdvice(store, targets, key = dayKey(), now = new Date()) {
-  const all = whoopAdvice(store, targets, key, now);
-  return all.length ? all[0] : null;
-}

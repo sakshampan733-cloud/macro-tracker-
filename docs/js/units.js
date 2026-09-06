@@ -43,23 +43,7 @@ export function showWeight(kg, unit = 'kg', { dp = 1, withUnit = true } = {}) {
   return withUnit ? `${n} ${unit}` : n;
 }
 
-/* A typed weight, back to the kilograms everything is stored in. */
-export const readWeight = (value, unit = 'kg') => {
-  const n = parseFloat(value);
-  if (!Number.isFinite(n)) return null;
-  return unit === 'lb' ? lbToKg(n) : n;
-};
 
-/*
- * A difference in weight.
- *
- * Kept separate from showWeight because a delta of zero should read as
- * "0.0 kg" rather than "—", and because the sign matters.
- */
-export function showWeightDelta(kg, unit = 'kg', { dp = 1 } = {}) {
-  const v = unit === 'lb' ? kgToLb(kg) : kg;
-  return `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(dp)} ${unit}`;
-}
 
 /* ── Height ─────────────────────────────────────────────────────────── */
 
@@ -75,20 +59,3 @@ export function cmToFtIn(cm) {
 export const ftInToCm = (ft, inch) =>
   ((Number(ft) || 0) * 12 + (Number(inch) || 0)) * CM_PER_IN;
 
-export function showHeight(cm, unit = 'cm') {
-  if (cm == null || Number.isNaN(cm)) return '—';
-  if (unit === 'ftin') {
-    const { ft, in: inch } = cmToFtIn(cm);
-    return `${ft}′ ${inch}″`;
-  }
-  return `${Math.round(cm)} cm`;
-}
-
-/* ── A rate, which is a weight per week ─────────────────────────────── */
-
-export function showRate(kgPerWeek, unit = 'kg', { dp = 2 } = {}) {
-  if (!kgPerWeek) return 'hold steady';
-  const v = unit === 'lb' ? kgToLb(kgPerWeek) : kgPerWeek;
-  const dir = v > 0 ? 'gain' : 'lose';
-  return `${dir} ${Math.abs(v).toFixed(dp)} ${unit} a week`;
-}

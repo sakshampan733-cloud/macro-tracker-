@@ -48,7 +48,6 @@ export const GRADE_MULT = { A: 1.0, B: 1.2, C: 1.6, D: 2.2 };
 let dishDensities = {};
 
 export function setDishDensities(map) { dishDensities = map || {}; }
-export function getDishDensity(style) { return dishDensities[style] || null; }
 
 const EMPTY = () => ({
   v: 1,
@@ -703,8 +702,6 @@ export function isFavourite(id) {
   return !!(state.favourites || []).includes(id);
 }
 
-export function favouriteIds() { return [...(state.favourites || [])]; }
-
 /*
  * Hiding a suggestion.
  *
@@ -724,8 +721,6 @@ export function toggleHidden(ref) {
     else s.hidden.push(ref);
   }, 'hidden');
 }
-
-export function isHidden(ref) { return !!(state.hidden || []).includes(ref); }
 
 /* Favourites, resolved to something the grid can render. */
 export function favouriteFoods() {
@@ -870,10 +865,6 @@ export function dismissNote(key, id) {
 
 export function noteDismissed(key, id) {
   return (peekDay(key).dismissed || []).includes(id);
-}
-
-export function restoreNotes(key) {
-  commit(s => { day(key).dismissed = []; }, 'coach');
 }
 
 export function suppsTaken(key = dayKey()) {

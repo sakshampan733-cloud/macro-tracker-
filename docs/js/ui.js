@@ -47,7 +47,6 @@ export const clear = n => { while (n.firstChild) n.removeChild(n.firstChild); re
  */
 let explanationsOn = true;
 export function setExplanations(v) { explanationsOn = v !== false; }
-export function explanationsEnabled() { return explanationsOn; }
 
 export function explain(text, opts = {}) {
   if (!explanationsOn) return null;

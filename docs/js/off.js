@@ -45,8 +45,6 @@ export async function haveServer() {
   return serverKnown;
 }
 
-/* Let the UI say which mode it is in without probing again. */
-export function serverMode() { return serverKnown; }
 
 const num = v => {
   const n = parseFloat(v);

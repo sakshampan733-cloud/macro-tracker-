@@ -32,19 +32,6 @@ import { NUTRIENTS } from '../data/nutrients.js';
  * and its caffeine surfaces here, next to the pre-workout, because the
  * ceiling and the bedtime question apply to the sum.
  */
-/*
- * The day's caffeine, from every source at once.
- *
- * Shared so the ceiling row and the caffeine tile can never disagree —
- * two places computing the same total independently is how they drift.
- */
-export function dayCaffeineMg(s, key) {
-  const entries = peekDay(key).entries || [];
-  const fromFood = caffeineDay(entries).total;
-  const fromSupps = (suppsTaken(key) || []).reduce(
-    (a, id) => a + (SUPPLEMENTS[id]?.caffeine || s.supplementsCustom?.[id]?.caffeine || 0), 0);
-  return fromFood + fromSupps;
-}
 
 export function caffeineTile(s, key, now = new Date()) {
   return live(() => buildCaffeine(get(), key, now) || el('div'),

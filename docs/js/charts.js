@@ -167,83 +167,6 @@ export function countUp(node, target, dp = 0, unit = '', ms = 900) {
 
 const fmt = (v, dp) => dp ? v.toFixed(dp) : String(Math.round(v));
 
-/*
- * An area chart with a gradient fill.
- *
- * The line alone was too thin to read as anything; the fill underneath is
- * what turns a row of numbers into a shape you can take in at a glance.
- * Draws itself in left to right on first paint.
- */
-export function areaChart(points, {
-  w = 340, h = 120, colour = 'var(--accent)', pad = 8,
-  showDots = false, band = null, format = v => String(Math.round(v)),
-} = {}) {
-  const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, class: 'chart-rich' });
-  svg.setAttribute('preserveAspectRatio', 'none');
-  svg.style.height = h + 'px';
-  svg.style.width = '100%';
-  if (!points.length) return svg;
-
-  const vals = points.map(p => p.v);
-  let lo = Math.min(...vals), hi = Math.max(...vals);
-  if (band) { lo = Math.min(lo, band.lo); hi = Math.max(hi, band.hi); }
-  const span = (hi - lo) || 1;
-  const padY = span * 0.15;
-  lo -= padY; hi += padY;
-
-  const x = i => pad + (i / Math.max(1, points.length - 1)) * (w - pad * 2);
-  const y = v => h - pad - ((v - lo) / (hi - lo)) * (h - pad * 2);
-
-  const gid = nextId('grad');
-  const grad = svgEl('linearGradient', { id: gid, x1: '0', y1: '0', x2: '0', y2: '1' });
-  grad.append(
-    svgEl('stop', { offset: '0%', 'stop-color': colour, 'stop-opacity': '0.34' }),
-    svgEl('stop', { offset: '100%', 'stop-color': colour, 'stop-opacity': '0' }),
-  );
-  const defs = svgEl('defs');
-  defs.append(grad);
-  svg.append(defs);
-
-  // the typical range, drawn behind everything as context
-  if (band) {
-    svg.append(svgEl('rect', {
-      x: 0, y: y(band.hi), width: w, height: Math.max(1, y(band.lo) - y(band.hi)),
-      fill: colour, opacity: 0.07,
-    }));
-  }
-
-  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
-  svg.append(svgEl('path', {
-    d: `${line}L${x(points.length - 1).toFixed(1)},${h}L${x(0).toFixed(1)},${h}Z`,
-    fill: `url(#${gid})`,
-  }));
-
-  const stroke = svgEl('path', {
-    d: line, fill: 'none', stroke: colour,
-    'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
-  });
-  svg.append(stroke);
-
-  if (!reduced()) {
-    const len = points.length * 40;
-    stroke.style.strokeDasharray = len;
-    stroke.style.strokeDashoffset = len;
-    stroke.style.transition = 'stroke-dashoffset 1.2s ease-out';
-    const settle = () => { stroke.style.strokeDashoffset = '0'; };
-    requestAnimationFrame(settle);
-    setTimeout(settle, 500);
-  }
-
-  if (showDots) {
-    const last = points[points.length - 1];
-    const dot = svgEl('circle', {
-      cx: x(points.length - 1), cy: y(last.v), r: 3.5, fill: colour,
-    });
-    dot.setAttribute('class', 'chart-pulse');
-    svg.append(dot);
-  }
-  return svg;
-}
 
 /*
  * Sleep, as the stages it was actually made of.
@@ -285,32 +208,6 @@ export function liveDot(colour = 'var(--accent)') {
   return d;
 }
 
-/* Bars for a set of days, e.g. a fortnight of recovery scores. */
-export function barRow(points, { h = 56, colourFor = () => 'var(--accent)' } = {}) {
-  const wrap = document.createElement('div');
-  wrap.className = 'bar-row';
-  wrap.style.height = h + 'px';
-  const max = Math.max(...points.map(p => p.v), 1);
-  points.forEach((p, i) => {
-    const b = document.createElement('div');
-    b.className = 'bar-col';
-    const fill = document.createElement('div');
-    fill.className = 'bar-fill';
-    fill.style.background = colourFor(p.v);
-    const pct = (p.v / max) * 100;
-    fill.style.height = reduced() ? pct + '%' : '0%';
-    fill.style.transitionDelay = (i * 22) + 'ms';
-    if (p.label) b.title = p.label;
-    b.append(fill);
-    wrap.append(b);
-    if (!reduced()) {
-      const settle = () => { fill.style.height = pct + '%'; };
-      requestAnimationFrame(settle);
-      setTimeout(settle, 500);
-    }
-  });
-  return wrap;
-}
 
 /* ── Apple Health style ─────────────────────────────────────────────── */
 
@@ -430,36 +327,6 @@ export function healthBars(points, {
   return svg;
 }
 
-/*
- * A stacked day-part bar — sleep stages, or where the day's calories fell.
- * Same capsule language, read horizontally.
- */
-export function segmentBar(segments, { h = 30, radius = 8 } = {}) {
-  const total = segments.reduce((a, s) => a + (s.value || 0), 0);
-  const wrap = document.createElement('div');
-  wrap.className = 'stage-bar';
-  wrap.style.height = h + 'px';
-  wrap.style.borderRadius = radius + 'px';
-  if (!total) return wrap;
-
-  segments.forEach((s, i) => {
-    if (!(s.value > 0)) return;
-    const seg = document.createElement('div');
-    seg.className = 'stage-seg';
-    seg.style.background = s.colour;
-    seg.title = `${s.label}: ${s.display ?? s.value}`;
-    const pct = (s.value / total) * 100;
-    seg.style.width = reduced() ? pct + '%' : '0%';
-    seg.style.transitionDelay = (i * 80) + 'ms';
-    wrap.append(seg);
-    if (!reduced()) {
-      const settle = () => { seg.style.width = pct + '%'; };
-      requestAnimationFrame(settle);
-      setTimeout(settle, 500);
-    }
-  });
-  return wrap;
-}
 
 
 /*

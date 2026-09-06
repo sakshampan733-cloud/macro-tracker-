@@ -22,26 +22,6 @@
 import { get, dayKey, shiftDay, doseLog, sessionFor, wasNotified, markNotified, peekDay } from './store.js';
 import { rowsFor, healthSource, bandName } from './applehealth.js';
 
-/*
- * "Already sent" is a fact about the day, not about this page.
- *
- * It used to be a Set here, wiped by every reload, so the same reminder
- * fired again on every launch. It lives in the store now — see
- * wasNotified / markNotified — and once a day means once a day.
- */
-
-export function permissionState() {
-  if (typeof Notification === 'undefined') return 'unsupported';
-  return Notification.permission;
-}
-
-export async function askPermission() {
-  if (typeof Notification === 'undefined') return 'unsupported';
-  if (Notification.permission !== 'default') return Notification.permission;
-  try { return await Notification.requestPermission(); }
-  catch { return Notification.permission; }
-}
-
 async function show(title, body, tag) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
   try {

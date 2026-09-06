@@ -109,9 +109,3 @@ export async function syncFoods({ force = false } = {}) {
 
 /* Undo, for when a bad list somehow gets published and cached. Drops back
    to the rows that shipped with the app; takes effect on the next launch. */
-export function forgetCachedFoods() {
-  try {
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(STAMP_KEY);
-  } catch { /* nothing to do */ }
-}

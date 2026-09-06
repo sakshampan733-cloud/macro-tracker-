@@ -53,50 +53,9 @@ export const PRESETS = [
   { id: 'p-mobility',   name: 'Mobility',         groups: [], cardio: true },
 ];
 
-/*
- * How hard a session was, from the only number worth asking for.
- *
- * Sets taken close to failure is what drives adaptation, and it is one
- * number a person can supply in three seconds on the way out of the gym.
- * Asking for exercises, reps and loads gets a more complete picture from
- * the few who will do it every time, and nothing at all from everyone
- * else — so that stays optional and this is what the app reasons with.
- *
- * The thresholds are per-session and deliberately wide. Anything tighter
- * would be inventing precision: what counts as a hard set varies more
- * between two people than these bands do.
- */
-export function sessionLoad({ sets, minutes, strain }) {
-  const bySets = sets != null
-    ? (sets >= 20 ? 'hard' : sets >= 10 ? 'solid' : sets >= 4 ? 'light' : 'token')
-    : null;
-  /* Whoop's day strain and Apple's exercise minutes both describe the
-     whole day, not the session, so they can only ever corroborate — never
-     override something the person actually reported. */
-  const byBand = strain != null
-    ? (strain >= 15 ? 'hard' : strain >= 10 ? 'solid' : strain >= 6 ? 'light' : 'token')
-    : minutes != null
-      ? (minutes >= 75 ? 'hard' : minutes >= 40 ? 'solid' : minutes >= 15 ? 'light' : 'token')
-      : null;
-  return { bySets, byBand, agreed: bySets && byBand ? bySets === byBand : null };
-}
 
 const RANK = { token: 0, light: 1, solid: 2, hard: 3 };
 
-/*
- * When the diary and the strap disagree about the same session.
- *
- * "I wrote chest day and did four sets" is a real thing, and so is a
- * genuinely brutal hour that the log records as three sets because the
- * person was too tired to type. Neither is a lie worth accusing anyone of,
- * so this reports the disagreement and its direction and stops there.
- */
-export function loadMismatch(load) {
-  if (!load.bySets || !load.byBand || load.agreed) return null;
-  const gap = RANK[load.bySets] - RANK[load.byBand];
-  if (Math.abs(gap) < 2) return null;
-  return gap > 0 ? 'sets-high' : 'band-high';
-}
 
 /*
  * What the last fortnight actually covered.

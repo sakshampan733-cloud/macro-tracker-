@@ -355,17 +355,6 @@ export async function syncApple({ relay, key } = {}) {
            from: rows[0].date, to: rows[rows.length - 1].date };
 }
 
-/*
- * The Shortcut, written out.
- *
- * Kept here rather than in a document so it can quote the user's own
- * relay address and key — the two things every set of generic
- * instructions on the internet leaves as a blank you have to work out.
- */
-export function shortcutSteps(relay, key) {
-  const url = pushUrl(relay) || 'https://YOUR-RELAY/apple/push';
-  return { url, key: key || 'YOUR-KEY' };
-}
 
 /*
  * Pull on opening, without being asked.
