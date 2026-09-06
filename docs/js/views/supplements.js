@@ -15,7 +15,7 @@ import {
 import { SUPPLEMENTS, SUPPLEMENT_TAGS } from '../data/supplements.js';
 import { openLabelScan } from './labelscan.js';
 import {
-  caffeineDay, stillInYouAt, latestHourFor, remainingAt, DAILY_CEILING_MG, hourText,
+  caffeineDay, stillInYouAt, latestHourFor, remainingAt, DAILY_CEILING_MG, ceilingFor, curfew, hourText,
 } from '../data/caffeine.js';
 import { sleepSchedule } from './sleep.js';
 import { NUTRIENTS } from '../data/nutrients.js';
@@ -57,7 +57,28 @@ function buildCaffeine(s, key, now = new Date()) {
 
   const bedHour = bedHourFor(s, now);
   const atBed = bedHour == null ? null : stillInYouAt(items, bedHour, now);
-  const over = total > DAILY_CEILING_MG;
+  const ceiling = ceilingFor(s.profile);
+  const over = total > ceiling;
+
+  /*
+   * The curfew, and whether it has already gone.
+   *
+   * The card used to name a cut-off only on the days nothing was wrong,
+   * which is the one day nobody needs it. Drink an espresso at ten and it
+   * would say a large coffee was fine until nine — true, and read as
+   * approval. The time is stated every day now, and the moment something
+   * is drunk after it the card says so instead of reporting the same
+   * arithmetic in a calmer voice.
+   */
+  const cutoff = curfew(bedHour);
+  const lateDose = cutoff == null ? null : items.find(it => {
+    if (!it.at) return false;
+    const at = new Date(it.at);
+    const h = at.getHours() + at.getMinutes() / 60;
+    /* Anything after the curfew but before the small hours, so a 6am
+       coffee is not read as last night's. */
+    return h > cutoff && h < cutoff + 8;
+  });
 
   /*
    * One line, and it has to be about sleep rather than about a number.
@@ -77,10 +98,20 @@ function buildCaffeine(s, key, now = new Date()) {
     line = `About ${Math.round(atBed)} mg still in you at ${hourText(bedHour)} — enough to `
          + 'make falling asleep slower than usual.';
     tone = 'is-warn';
+  } else if (lateDose) {
+    line = `That was after ${hourText(cutoff)}, which is late enough to show up `
+         + 'tomorrow — usually as less deep sleep rather than trouble getting off.';
+    tone = 'is-warn';
   } else {
-    const cut = lastCallFor(150, bedHour);
-    line = `Clear by bedtime. A large coffee is fine up to about ${hourText(cut)}.`;
+    line = `Clear by bedtime. Last cup by about ${hourText(cutoff)} to keep it that way.`;
     tone = 'is-good';
+  }
+
+  if (over) {
+    line = `${Math.round(total)} mg is over the ${ceiling} mg a day `
+         + (ceiling < DAILY_CEILING_MG ? 'guidance for your age. ' : 'figure health authorities use. ')
+         + line;
+    tone = 'is-warn';
   }
 
   return el('div.tile.tappable.caff-card', {
@@ -94,12 +125,12 @@ function buildCaffeine(s, key, now = new Date()) {
         icon('bolt', 15), el('h3', {}, 'Caffeine')),
       el('div.flex', { style: { gap: '8px' } },
         el('span.num', { style: { color: over ? 'var(--caution)' : 'var(--text)' } },
-          `${Math.round(total)} mg`),
+          `${Math.round(total)} / ${ceiling} mg`),
         icon('chevron', 13))),
 
     el('div.caff-bar', { style: { marginTop: '10px' } },
       el('div.caff-fill' + (over ? '.is-over' : ''), {
-        style: { width: Math.min(100, (total / DAILY_CEILING_MG) * 100) + '%' } })),
+        style: { width: Math.min(100, (total / ceiling) * 100) + '%' } })),
 
     el('div.fine.' + (tone || 'is-plain'), { style: { marginTop: '9px' } }, line));
 }

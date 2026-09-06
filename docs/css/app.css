@@ -3515,7 +3515,10 @@ button.src-tag { cursor: pointer; }
  * own edge, with the real input drawing a second box inside the first. The
  * outline belongs on the thing you can type into.
  */
-:root[data-skin="paper"] input:not([type=range]):not([type=checkbox]),
+/* Not [type=search]: those live inside .home-search, which is already the
+   box you tap. Outlining both drew an oval inside a rounded rectangle with
+   the magnifier stranded between them. */
+:root[data-skin="paper"] input:not([type=range]):not([type=checkbox]):not([type=search]),
 :root[data-skin="paper"] select,
 :root[data-skin="paper"] textarea,
 :root[data-skin="paper"] .home-search {
@@ -3608,7 +3611,17 @@ button.src-tag { cursor: pointer; }
 :root[data-skin="paper"] .food-fab.scrolling { opacity: .6; }
 
 /* ── odds and ends ───────────────────────────────────────────────────── */
-:root[data-skin="paper"] .home-search { border-radius: 16px; }
+/* The search wrapper is the box: it carries the outline, and the input
+   inside it stays bare. */
+:root[data-skin="paper"] .home-search {
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+:root[data-skin="paper"] .home-search input {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
 /* Opaque, not transparent. Content scrolls under this bar, and a see-through
    one let the Body screen's BMI figure sit on top of the wordmark. */
 :root[data-skin="paper"] .topbar { background: var(--bg); }
@@ -3942,3 +3955,22 @@ button.src-tag { cursor: pointer; }
 :root[data-skin="paper"] .brand { font-family: var(--cond); font-weight: 600; }
 :root[data-skin="paper"] .mini-row { border-top: 1.5px solid var(--line); }
 :root[data-skin="paper"] .mini-x { border: 1.5px solid var(--edge); }
+
+/*
+ * The weigh-in rows, which had collapsed into a column of single letters.
+ *
+ * A date, a number field and two buttons do not fit across a phone. The
+ * label is a flex child with min-width:0 — correct everywhere else, since
+ * it is what lets long food names ellipsize instead of pushing the calories
+ * off screen — but here it meant the label was allowed to shrink to the
+ * width of one character, and "Today" wrapped down the screen one letter
+ * per line.
+ *
+ * Wrapping is the honest fix rather than shrinking something further: the
+ * date gets the first line, the field and its buttons the second. Nothing
+ * is truncated and nothing is squeezed.
+ */
+.weigh-row { flex-wrap: wrap; row-gap: 10px; }
+.weigh-row .grow { flex: 1 1 100%; min-width: 0; }
+.weigh-row .num-in { flex: 1 1 auto; min-width: 96px; }
+.weigh-row .btn { flex: 0 0 auto; }

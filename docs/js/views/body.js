@@ -615,7 +615,7 @@ function openWeightHistory(ctx) {
          not belong beside the others can be seen rather than quietly
          moving the trend. */
       const late = r.hour != null && !isMorningWeigh(r.hour);
-      list.append(el('div.row', {},
+      list.append(el('div.row.weigh-row', {},
         el('span.grow', {},
           el('div.title', {}, dateLabel(r.date),
             late ? el('span.late-tag', {}, clockText(r.hour)) : null),

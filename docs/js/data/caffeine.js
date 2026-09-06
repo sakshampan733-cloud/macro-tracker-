@@ -164,6 +164,41 @@ export function latestHourFor(mg, bedHour, threshold = 50) {
  */
 export const DAILY_CEILING_MG = 400;
 
+/*
+ * The ceiling for this person, rather than for a generic adult.
+ *
+ * 400 mg is an adult figure and does not transfer to a sixteen-year-old:
+ * the paediatric guidance is around 100 mg a day, and adolescents clear
+ * caffeine more slowly, so the same cup sits in them longer. Showing a
+ * teenager a 400 mg bar with three coffees on it, three-quarters empty,
+ * would be the app telling them they had room.
+ *
+ * Same reasoning as the calorie floor and the BMI bands: where an adult
+ * convention is wrong for a growing body, the app uses the figure that
+ * applies rather than the one that is famous.
+ */
+export function ceilingFor(profile) {
+  const year = profile?.birthYear;
+  if (!year) return DAILY_CEILING_MG;
+  const years = new Date().getFullYear() - year;
+  if (years < 12) return 45;
+  if (years < 18) return 100;
+  return DAILY_CEILING_MG;
+}
+
+/*
+ * The last sensible time to drink today, and whether it has passed.
+ *
+ * Two numbers, both anchored on bedtime rather than on a fixed hour: the
+ * curfew is when a normal cup would still be down under the threshold by
+ * the time you sleep. It moves with your bedtime because that is the thing
+ * it is actually about.
+ */
+export function curfew(bedHour, { cupMg = 95 } = {}) {
+  if (bedHour == null) return null;
+  return latestHourFor(cupMg, bedHour) ?? bedHour;
+}
+
 export const hourText = h => {
   const hh = Math.floor((h + 24) % 24);
   const mm = Math.round(((h + 24) % 24 - hh) * 60);
