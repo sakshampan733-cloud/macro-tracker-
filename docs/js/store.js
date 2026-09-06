@@ -96,6 +96,24 @@ const EMPTY = () => ({
     microOpen: false,
     suppsOpen: false,
     lastCheckInSeen: null,
+
+    /*
+     * Nudges, off until asked for.
+     *
+     * The first thing a new person saw was the app asking them to weigh
+     * themselves — before they had logged a single meal, and before anything
+     * had earned the right to ask. Opening a food tracker for the first time
+     * should show you the food tracker.
+     *
+     * These are genuinely useful once somebody is using the app, which is why
+     * they exist and why they are one tap away in Settings. They are simply
+     * not an opening move. Anyone who already had them on keeps them: a
+     * stored value always wins over these defaults.
+     */
+    weighReminder: false,   // "worth weighing in" on the home screen
+    workoutReminder: false, // "did you train today?"
+    medReminder: false,     // overdue medication note
+    caffeineNote: false,    // caffeine still on board before bed
   },
 });
 

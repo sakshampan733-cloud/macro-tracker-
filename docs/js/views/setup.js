@@ -651,6 +651,28 @@ function backupsTile(ctx) {
   return tile;
 }
 
+/*
+ * One nudge, one switch.
+ *
+ * Written as a helper because the alternative was four near-identical
+ * twenty-line blocks, and four copies of a toggle is how three of them end
+ * up subtly different from the fourth.
+ */
+function nudge(ctx, key, title, why) {
+  const on = get().settings?.[key] === true;
+  return el('div.tile', {},
+    el('div.between', {},
+      el('div', { style: { flex: '1', paddingRight: '12px' } },
+        el('div', { style: { fontSize: '14px', fontWeight: '500' } }, title),
+        el('div.fine', { style: { marginTop: '3px' } }, why)),
+      el('button.btn.sm' + (on ? '.primary' : ''), {
+        onclick: () => {
+          commit(st => { st.settings[key] = st.settings[key] !== true; }, 'settings');
+          ctx.refresh();
+        },
+      }, on ? 'On' : 'Off')));
+}
+
 export function renderSettings(root, ctx) {
   const s = get();
   const p = s.profile;
@@ -806,6 +828,23 @@ export function renderSettings(root, ctx) {
               ctx.refresh();
             },
           }, s.settings.carryForward === true ? 'On' : 'Off')))),
+
+    group(ctx, 'nudges', 'Nudges',
+      'What the app is allowed to ask you for. All off to begin with.',
+      nudge(ctx, 'weighReminder', 'Ask me to weigh in',
+        'A card on the home screen when it has been a few days. Weigh-ins are '
+        + 'what turn the formula estimate into your real maintenance figure, so '
+        + 'this one earns its place \u2014 but only once you are actually logging.'),
+      nudge(ctx, 'workoutReminder', 'Ask about training',
+        'On the days you usually train, a card asking what you did. Uses the '
+        + 'training time set under Training.'),
+      nudge(ctx, 'medReminder', 'Remind me about medication',
+        'A note when something on your list has not been marked taken. The app '
+        + 'never says whether or when to take anything \u2014 only that the box '
+        + 'is unticked.'),
+      nudge(ctx, 'caffeineNote', 'Caffeine before bed',
+        'A note in the evening when enough caffeine is still on board to be '
+        + 'costing you sleep, based on your bedtime.')),
 
     group(ctx, 'food', 'Food',
       'Your library, suggestions, and glass size.',

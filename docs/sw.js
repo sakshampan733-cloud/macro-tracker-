@@ -6,7 +6,7 @@
  * to the network and fall back to whatever was cached last.
  */
 
-const CACHE = 'basal-2026.09.06-widget';
+const CACHE = 'basal-2026.09.06-nudges';
 
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',

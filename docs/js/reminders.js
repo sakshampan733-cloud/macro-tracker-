@@ -80,7 +80,7 @@ async function show(title, body, tag) {
 export function weighInDue(now = new Date()) {
   const s = get();
   if (!s.profile) return null;
-  if (s.settings?.weighReminder === false) return null;
+  if (s.settings?.weighReminder !== true) return null;
   const key = dayKey();
   if (peekDay(key).weight) return null;
   if (s.settings?.weighAsked === key) return null;

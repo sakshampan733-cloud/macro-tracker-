@@ -292,6 +292,7 @@ function weighAsk(key, ctx) {
 
 function workoutAsk(key, ctx) {
   const s = get();
+  if (s.settings?.workoutReminder !== true) return null;
   if (key !== dayKey()) return null;
   if (sessionFor(key)) return null;
   if (s.settings?.workoutAsked === key) return null;
@@ -759,7 +760,7 @@ function buildCoach(store, targets, key, ctx) {
      queue rather than getting a card of its own — and it is dismissible
      like anything else, because you may simply have taken it. */
   try {
-    const meds = overdueNote(key);
+    const meds = get().settings?.medReminder === true ? overdueNote(key) : null;
     if (meds) all = [meds, ...all];
   } catch { /* medication is optional; never let it break the card */ }
 
@@ -767,7 +768,7 @@ function buildCoach(store, targets, key, ctx) {
      presence there, which is why it has to earn its place by only
      appearing when the answer changes something. */
   try {
-    const caff = caffeineNote(key);
+    const caff = get().settings?.caffeineNote === true ? caffeineNote(key) : null;
     if (caff) all = [...all, caff];
   } catch { /* likewise */ }
 
