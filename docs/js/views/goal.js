@@ -58,8 +58,18 @@ export function goalTile(s, ctx) {
       el('div.between', {},
         el('div', {},
           el('div.micro', {}, st.reached ? 'Reached' : `${st.daysLeft} days left`),
+          /*
+           * Three numbers, in the order the question is asked: where this
+           * started, where you are, where it ends. It used to print only
+           * "current → target", which read as "start → target" and made a
+           * goal look like it had never moved — the left-hand number was
+           * changing under you while the bar sat at 0%, and nothing on the
+           * card said which was which.
+           */
           el('div.num', { style: { fontSize: '25px', marginTop: '3px' } },
-            `${st.current} → ${st.targetKg} kg`)),
+            `${st.current} → ${st.targetKg} kg`),
+          el('div.micro', { style: { marginTop: '2px' } },
+            `from ${st.startKg} kg`)),
         el('div', { style: { textAlign: 'right' } },
           el('div.micro', {}, 'Progress'),
           el('div.num', { style: { fontSize: '25px', marginTop: '3px', color: colour } }, pct + '%'))),
@@ -179,7 +189,55 @@ const PACES = [
 export function openGoalEditor(ctx) {
   const s = get();
   const existing = s.goal;
-  const startKg = weightSeries().slice(-1)[0]?.kg || s.profile.weightKg;
+/*
+ * Where this goal is measured from.
+ *
+ * An existing goal keeps the weight it was set from. That sounds obvious
+ * and was not the case: the line below used to take the latest weigh-in
+ * every time this screen saved, so editing a goal — changing the date,
+ * nudging the target — silently moved the baseline to wherever you were
+ * standing that morning and reset progress to nothing. The start *date*
+ * was preserved a few lines down, which is what makes it clearly a slip
+ * rather than a decision.
+ *
+ * It is also editable now. Somebody who started at 125.5 and set the goal
+ * a fortnight later had a baseline of 123.7 and no way to say so, which
+ * left the bar under-reporting a real 3.4 kg by design.
+ */
+/*
+ * The baseline comes from the trend, because progress is measured against
+ * the trend.
+ *
+ * This used to take the latest raw weigh-in while goalStatus compared it
+ * against the smoothed trend — two different measures of the same body.
+ * The trend lags, so it usually sits above a fresh reading, and a goal set
+ * on a good morning began life with the trend already *behind* its own
+ * baseline. progress came out negative, clamped to zero, and stayed there
+ * until the trend caught up: set a new goal at 122.1 and it read 0% while
+ * showing 123.7, which is exactly as broken as it sounds.
+ *
+ * Measuring both ends with the same instrument makes a new goal start at
+ * precisely 0% and move on the next weigh-in.
+ */
+  const series = weightSeries();
+  const trended = trendWeight(series.map(w => ({ date: w.date, kg: w.kg })));
+  const liveKg = trended.length ? trended[trended.length - 1].trend
+    : (series.slice(-1)[0]?.kg || s.profile.weightKg);
+  let startKg = existing?.startKg ?? liveKg;
+
+  const startInput = el('input.num-in', {
+    type: 'number', inputmode: 'decimal', step: '0.1', min: '20',
+    value: String(+startKg.toFixed(1)),
+    onchange: () => {
+      const v = +startInput.value;
+      /* render() redraws the feasibility line, which is the whole point
+         of changing this number — a different baseline means a different
+         weekly pace and possibly a different verdict on whether the date
+         is realistic. */
+      if (v > 20 && v < 400) { startKg = v; render(); }
+      else startInput.value = String(+startKg.toFixed(1));
+    },
+  });
 
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
   const defaultEnd = new Date(); defaultEnd.setDate(defaultEnd.getDate() + 60);
@@ -318,9 +376,16 @@ export function openGoalEditor(ctx) {
     body: el('div', {},
       el('div.tile', {},
         el('div.between', {},
-          el('div', {},
-            el('div.micro', {}, 'Starting from'),
-            el('div.num', { style: { fontSize: '23px', marginTop: '3px' } }, `${startKg} kg`)),
+          /*
+           * Editable, because it is the number progress is measured from
+           * and it is not always the one the app can work out. Somebody who
+           * started at 125.5 and set the goal a fortnight later is 3.4 kg
+           * in already; printing the trend at them as a fixed fact told
+           * them their real progress did not count.
+           */
+          el('div', { style: { flex: '0 0 130px' } },
+            el('div.micro', { style: { marginBottom: '5px' } }, 'Starting from'),
+            startInput),
           el('div', { style: { textAlign: 'right', flex: '0 0 130px' } },
             el('div.micro', { style: { marginBottom: '5px' } }, 'Target'),
             targetInput))),
@@ -368,6 +433,8 @@ export function openGoalEditor(ctx) {
           const f = goalFeasibility(startKg, target, days);
           commit(st => {
             st.goal = {
+              /* The number in the field, which for an existing goal is the
+                 one it already had. Never silently re-read from today. */
               startKg: +startKg.toFixed(1),
               targetKg: +target.toFixed(1),
               startDate: existing?.startDate || dayKey(),
