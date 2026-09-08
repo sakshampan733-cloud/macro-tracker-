@@ -112,6 +112,25 @@ html {
   background: var(--bg);   /* painted behind the shell so no strip shows */
 
   /*
+   * Nothing slides sideways. Ever.
+   *
+   * body had overflow-x:hidden and the document element did not, which in
+   * Safari is not enough — the html element still pans, and iOS puts an
+   * elastic rubber-band on top of it. The result is a page that gives a
+   * little when a thumb moves across it and springs back, most noticeable
+   * the moment a sheet opens and the scrolling container changes underfoot.
+   *
+   * overscroll-behavior-x is the part that kills the rubber-band; the
+   * overflow rule is what stops a genuinely too-wide child from being
+   * reachable at all. Both are needed: either alone leaves half the effect.
+   *
+   * Vertical overscroll is deliberately untouched — pull-to-refresh depends
+   * on it, and the bounce at the top of a list is worth having.
+   */
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+
+  /*
    * Stop iOS resizing the type on its own.
    *
    * WKWebView defaults this to `auto`, which lets it inflate text it decides
@@ -133,6 +152,8 @@ html {
 
 body {
   margin: 0; padding: 0;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
   height: 100%;
   height: 100dvh;          /* tracks the live viewport */
   overflow: hidden;        /* the shell never scrolls; #scroller does */
@@ -151,6 +172,9 @@ body {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+  /* The scrolling element needs its own say: a child that overflows here
+     would pan this box sideways regardless of what html and body allow. */
+  overscroll-behavior-x: none;
   padding-top: var(--safe-t);
 }
 
