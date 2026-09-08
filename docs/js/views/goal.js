@@ -68,8 +68,20 @@ export function goalTile(s, ctx) {
            */
           el('div.num', { style: { fontSize: '25px', marginTop: '3px' } },
             `${st.current} → ${st.targetKg} kg`),
-          el('div.micro', { style: { marginTop: '2px' } },
-            `from ${st.startKg} kg`)),
+          /*
+           * Say which number this is.
+           *
+           * It is the ten-day trend, and while you are losing quickly the
+           * trend necessarily sits above the scale — that is the entire
+           * point of it, and it looked like a fault. Unlabelled, next to a
+           * scale reading a kilo lower, it read as the app being stuck or
+           * ignoring the last weigh-in. Naming both, in the same place,
+           * turns a contradiction into an explanation.
+           */
+          el('div.micro', { style: { marginTop: '3px' } },
+            `trend, from ${st.startKg} kg`
+            + (st.lastKg != null && st.lastKg !== st.current
+                ? ` · scale says ${st.lastKg}` : ''))),
         el('div', { style: { textAlign: 'right' } },
           el('div.micro', {}, 'Progress'),
           el('div.num', { style: { fontSize: '25px', marginTop: '3px', color: colour } }, pct + '%'))),

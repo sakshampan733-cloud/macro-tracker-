@@ -1221,6 +1221,9 @@ export function goalStatus(store, profile, today = new Date()) {
   return {
     ...goal,
     current: +current.toFixed(1),
+    /* The raw scale reading behind the trend, so a screen can show both
+       and nobody has to wonder why they disagree. */
+    lastKg: series.length ? +series[series.length - 1].kg.toFixed(1) : null,
     remaining: +remaining.toFixed(1),
     progress,
     totalDays, elapsed, daysLeft,
