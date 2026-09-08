@@ -19,15 +19,16 @@ import { EFFORT } from '../data/exercises.js';
 import { openMealLogger } from './meallog.js';
 import { openMealBuilder } from './meal.js';
 import { whoopAdvice } from '../coachwhoop.js';
-import { overdueNote, detectedWorkout, workoutHourDue, weighInDue } from '../reminders.js';
+import { overdueNote, detectedWorkout, workoutHourDue, weighInDue, overdueDoses } from '../reminders.js';
 import { caffeineNote } from './supplements.js';
+import { syncSchedule } from '../notify.js';
 import { bandName } from '../applehealth.js';
 import {
   get, weightSeries, setWeight, totals, dayKey, sessionFor, nextUp, typeById, logSession, trainState, dayPending, openDay, startNewDay, keepDayOpen, rolloverAsked, shiftDay, MEALS, removeEntry, entryMacros, frequentFoods,
   recentFoods, mealsList, mealTotals, groupedEntries,
   favouriteFoods, toggleFavourite, isFavourite, toggleHidden, deleteFood, deleteMeal,
   scannedFoods, builtFoods, addWater, undoWater, peekDay, dismissNote, noteDismissed,
-  commit, noteActiveDay, exportJSON,
+  commit, noteActiveDay, exportJSON, takeDose, doseKey,
 } from '../store.js';
 import { dayTargets } from './today.js';
 import { openPortion } from './portion.js';
@@ -57,10 +58,11 @@ export function renderHome(root, ctx) {
     backupAsk(ctx),
     rolloverCard(key, ctx),
     weighAsk(key, ctx),
+    doseAsk(key, ctx),
     workoutAsk(key, ctx),
     header(key, ctx),
     readout(t, targets, ctx),
-    carryCard(targets),
+    carryCard(targets, key, ctx),
     coachCard(s, targets, key, ctx),
     actions(ctx),
     waterStrip(key, targets),
@@ -290,6 +292,85 @@ function weighAsk(key, ctx) {
 }
 
 
+/*
+ * A dose that has come due, asked about in the app.
+ *
+ * The notification covers the case where the phone is in a pocket. This
+ * covers the far more common one: you open Basal for some other reason at
+ * 21:20 and the evening dose is sitting there unmarked. Without this the
+ * only way to record it was to remember, navigate to Medication, and find
+ * the row — three deliberate acts to log something you had already done.
+ *
+ * Same card as "Did you train?" on purpose. It is the same kind of question
+ * — something happened or it did not, and the app cannot know which — so it
+ * should not look like a different kind of thing.
+ *
+ * Three answers, because two is not enough. "Taken" and "Skip" leave out
+ * the honest middle: the dose is in the kitchen and you are not. Ten
+ * minutes is what that person actually needs.
+ */
+function doseAsk(key, ctx) {
+  const s = get();
+  if (s.settings?.medReminder !== true) return null;
+  if (key !== dayKey()) return null;
+
+  const now = Date.now();
+  const snoozed = s.settings?.doseSnooze || {};
+
+  /* Due, or overdue, and not answered. A ten-minute grace before it appears
+     so it is not on screen the same second the notification fires. */
+  const due = overdueDoses(key, new Date(), 0)
+    .filter(d => {
+      const until = snoozed[doseKey(d.med.id, d.time)] || 0;
+      return until <= now;
+    });
+  if (!due.length) return null;
+
+  const d = due[0];
+  const label = d.med.nickname || d.med.name || 'Medication';
+  const more = due.length - 1;
+
+  const snooze = (mins) => {
+    commit(st => {
+      st.settings.doseSnooze = { ...(st.settings.doseSnooze || {}) };
+      st.settings.doseSnooze[doseKey(d.med.id, d.time)] = Date.now() + mins * 60000;
+    }, 'settings');
+    haptic('tap');
+    /* Push the notification back too, so the two agree with each other. */
+    syncSchedule().catch(() => {});
+    toast(`Asking again in ${mins} minutes.`);
+    ctx.refresh();
+  };
+
+  return el('div.tile.ask-card', {},
+    el('div.flex', {}, icon('pill', 17) || null, el('h3', {}, `${label} is due`)),
+    el('div.fine', { style: { marginTop: '5px' } },
+      d.med.mg ? `${d.med.mg} ${d.med.unit || 'mg'}, not marked yet.` : 'Not marked yet.'),
+    more > 0
+      ? el('div.fine', { style: { marginTop: '3px' } },
+          `${more} other ${more === 1 ? 'dose is' : 'doses are'} also waiting.`)
+      : null,
+
+    el('div.btn-row', { style: { marginTop: '12px' } },
+      el('button.btn.confirm.grow', {
+        onclick: () => {
+          takeDose(key, d.med.id, d.time);
+          haptic('good');
+          syncSchedule().catch(() => {});
+          toast('Marked.');
+          ctx.refresh();
+        },
+      }, 'Taken'),
+      el('button.btn.ghost', { onclick: () => snooze(10) }, '10 min'),
+      el('button.btn.ghost', {
+        'aria-label': 'Skip this dose',
+        /* Skipping hides it for the rest of the day without recording a
+           dose that did not happen. The report still shows it as missed,
+           which is the truth and the whole point of keeping the log. */
+        onclick: () => snooze(24 * 60),
+      }, 'Skip')));
+}
+
 function workoutAsk(key, ctx) {
   const s = get();
   if (s.settings?.workoutReminder !== true) return null;
@@ -343,12 +424,42 @@ function workoutAsk(key, ctx) {
  * supply, and asking here costs a second while the session is still fresh
  * — far better than the honest alternative, which is never being asked.
  */
+/*
+ * What the strap thought, offered as a starting point.
+ *
+ * The band already knows roughly how hard the day was — that is the whole
+ * of what strain measures — and the session was being logged with that
+ * number attached while still asking you to pick the effort from a flat
+ * list of three, as though nothing were known.
+ *
+ * Marked as a suggestion rather than pre-selected. Strain is a whole-day
+ * cardiovascular load: a heavy lifting session can leave it low, and a long
+ * easy walk can push it up, so it is evidence and not a verdict. You are
+ * the one who knows whether you left reps in the tank, and the app does not
+ * get to overwrite that — it only says what it saw and lets you agree.
+ *
+ * Thresholds are Whoop's own published bands (light under 10, moderate to
+ * 14, strenuous to 18), collapsed onto the three efforts this app records.
+ */
+function suggestEffort(seen) {
+  const st = seen?.strain;
+  if (st == null) return null;
+  if (st < 10) return 'easy';
+  if (st < 14) return 'solid';
+  return 'hard';
+}
+
 function openEffortAsk(key, typeId, ctx, seen = null) {
+  const hint = suggestEffort(seen);
   const sh = sheet({
     title: typeById(typeId)?.name || 'Session',
     body: el('div', {},
-      el('div.fine', { style: { marginBottom: '12px' } }, 'How did it go?'),
-      el('div', {}, ...EFFORT.map(e => el('button.row', {
+      el('div.fine', { style: { marginBottom: '12px' } },
+        hint
+          ? `How did it go? ${seen.band} recorded a strain of ${seen.strain.toFixed(1)}, `
+            + 'which usually reads as the one marked below.'
+          : 'How did it go?'),
+      el('div', {}, ...EFFORT.map(e => el('button.row' + (e.id === hint ? '.is-hint' : ''), {
         onclick: () => {
           logSession(key, { type: typeId, effort: e.id,
             /* Keep the strap's own numbers on the session — they are the
@@ -361,7 +472,10 @@ function openEffortAsk(key, typeId, ctx, seen = null) {
         },
       },
         el('span.grow', {},
-          el('div.title', {}, e.label),
+          el('div.title', {}, e.label,
+            e.id === hint
+              ? el('span.hint-tag', { style: { marginLeft: '7px' } }, 'from your band')
+              : null),
           el('div.sub', {}, e.note)),
         icon('chevron', 14)))),
       el('button.btn.ghost', { style: { marginTop: '12px', width: '100%' },
@@ -553,7 +667,9 @@ function readout(t, targets, ctx) {
     const over = ratio > 1.02;
     const pct = Math.min(1, ratio);
     return el('div.cup' + (over ? '.is-over' : ''), {},
-      el('div.cup-bar', {},
+      /* The track carries a wash of the macro's own colour, so an empty bar
+         still says which macro it belongs to. */
+      el('div.cup-bar', { style: { '--cup-tint': `color-mix(in srgb, ${colour} 9%, transparent)` } },
         el('i', { style: { height: (pct * 100).toFixed(1) + '%', background: over ? 'var(--warn)' : colour } }),
         over ? el('span.cup-over', {}, '+' + Math.round(have - want)) : null),
       el('div.cup-n', {}, Math.round(have) + ' g'),
@@ -596,9 +712,23 @@ function readout(t, targets, ctx) {
  * Tuesday and sees nothing carried should be told it was because Tuesday
  * was half-logged, not left to conclude the feature is broken.
  */
-function carryCard(targets) {
+function carryCard(targets, key, ctx) {
   const c = targets.carry;
   if (!c?.applied) return null;
+
+  /*
+   * Dismissable, per day.
+   *
+   * This explains why today's number is not the usual number, which is
+   * worth reading once and then never again — but it sat there permanently
+   * with nothing to close it, so the one card on the screen you had already
+   * finished with was the one you could not get rid of.
+   *
+   * Keyed to the day rather than a global setting: tomorrow's carry is a
+   * different explanation of a different number, and dismissing today's
+   * should not silence that.
+   */
+  if (get().settings?.carryDismissed === key) return null;
 
   const up = c.applied > 0;
   const amount = Math.abs(Math.round(c.applied));
@@ -611,8 +741,17 @@ function carryCard(targets) {
   return el('div.tile', {},
     el('div.between', {},
       el('div.micro', {}, up ? 'Carried forward' : 'Carried back'),
-      el('div.micro', { style: { color: up ? 'var(--good-ink)' : 'var(--warn)' } },
-        (up ? '+' : '−') + amount + ' kcal')),
+      el('div.flex', { style: { gap: '8px', alignItems: 'center' } },
+        el('div.micro', { style: { color: up ? 'var(--good-ink)' : 'var(--warn)' } },
+          (up ? '+' : '−') + amount + ' kcal'),
+        el('button.card-x', {
+          'aria-label': 'Dismiss',
+          onclick: () => {
+            commit(st => { st.settings.carryDismissed = key; }, 'settings');
+            haptic('tap');
+            ctx.refresh();
+          },
+        }, '×'))),
 
     el('div.fine', { style: { marginTop: '6px' } },
       from.length
@@ -860,7 +999,7 @@ function waterStrip(key, targets) {
 
     grid.replaceChildren();
     for (let i = 0; i < glasses; i++) {
-      const cls = i < full ? 'glass full' : (i === full && partial > 0.05 ? 'glass part' : 'glass');
+      const cls = i < full ? 'water-unit full' : (i === full && partial > 0.05 ? 'water-unit part' : 'water-unit');
       const node = el('div', { class: cls, 'aria-hidden': 'true' });
       if (i === full && partial > 0.05) node.style.setProperty('--lvl', Math.round(partial * 100) + '%');
       grid.append(node);

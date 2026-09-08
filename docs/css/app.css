@@ -110,6 +110,25 @@
 html {
   height: 100%;
   background: var(--bg);   /* painted behind the shell so no strip shows */
+
+  /*
+   * Stop iOS resizing the type on its own.
+   *
+   * WKWebView defaults this to `auto`, which lets it inflate text it decides
+   * is too small — a heuristic meant for desktop pages opened on a phone,
+   * and actively wrong for a layout built for the phone in the first place.
+   * The effect only shows on device, never in a desktop browser, which is
+   * what made it look like two unrelated bugs: the headline number grew
+   * until its last digit was clipped by the ticket, and screens whose
+   * content was already close to the full width started scrolling sideways
+   * with no way back.
+   *
+   * 100% rather than `none`: `none` also disables pinch-to-zoom in some
+   * versions, and taking zoom away from somebody who needs it to read the
+   * screen is a worse bug than the one being fixed.
+   */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -713,19 +732,34 @@ input.num-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 /* ── Water ──────────────────────────────────────────────────────────── */
 
 .water-grid { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
-.glass {
+/*
+ * A drinking glass, renamed away from a collision.
+ *
+ * This was `.glass`, and so is the frosted-panel style five hundred lines
+ * below — different meanings of the same English word, and CSS has no idea
+ * they are unrelated. The panel rule comes later, so it won: every water
+ * glass took a dark translucent background and a blur, which on the Paper
+ * skin rendered fourteen charcoal blocks where the drinks should be.
+ *
+ * The name is now unambiguous. `.glass` belongs to the panel, which is
+ * where the rest of the codebase already uses it.
+ */
+.water-unit {
   width: 22px; height: 30px;
   border: 1.5px solid var(--line-2);
   border-radius: 2px 2px 5px 5px;
   position: relative; overflow: hidden;
   background: var(--bg-2);
+  /* Never squeezed by the flex row: they wrap onto another line instead,
+     which is what makes fourteen of them readable at all. */
+  flex: none;
 }
-.glass.full { border-color: var(--m-water); }
-.glass.full::after {
+.water-unit.full { border-color: var(--m-water); }
+.water-unit.full::after {
   content: ''; position: absolute; inset: 2px;
   background: var(--m-water); opacity: .82; border-radius: 0 0 3px 3px;
 }
-.glass.part::after {
+.water-unit.part::after {
   content: ''; position: absolute; left: 2px; right: 2px; bottom: 2px;
   height: var(--lvl, 50%);
   background: var(--m-water); opacity: .55; border-radius: 0 0 3px 3px;
@@ -2482,7 +2516,8 @@ ol.steps li b { color: var(--text); font-weight: 600; }
 
 /* Water on Home: the same glasses, drawn as a strip. */
 .water-tile { padding: 13px 14px 14px; }
-.water-strip { --glass-h: 26px; }
+/* Renamed with the class it sizes — see .water-unit. */
+.water-strip .water-unit { height: 26px; }
 
 /* A coach note you can swipe away. */
 .coach-card { touch-action: pan-y; transition: transform .19s ease, opacity .19s ease; }
@@ -3401,6 +3436,18 @@ button.src-tag { cursor: pointer; }
   --cond: 'Fredoka', 'Nunito', ui-rounded, system-ui, sans-serif;
   --mono: 'Nunito', ui-rounded, system-ui, sans-serif;
 
+  /*
+   * No orb here, whatever is picked elsewhere.
+   *
+   * The wash belongs to the glass skin, where panes are translucent and a
+   * colour field behind them is the thing being looked through. Paper has
+   * no glass: everything is an opaque card with a hard outline on a flat
+   * ground, and a soft radial gradient underneath reads as a smudge on the
+   * page rather than depth. The orb picker still works — it is simply not
+   * what this skin is made of.
+   */
+  --ambient: none;
+
   --bg:        #F0E5D2;
   --bg-2:      #FFFDF8;
   --surface:   #FFFDF8;
@@ -3695,10 +3742,37 @@ button.src-tag { cursor: pointer; }
   gap: 10px;
 }
 
+/*
+ * Solid ink, not a clipped gradient.
+ *
+ * .tile-hero paints this number by clipping a gradient to the glyph shapes
+ * — background-clip:text over a transparent fill. That holds while the type
+ * is the narrow face it was designed for, and fails here: Fredoka is much
+ * wider, and letter-spacing:-.045em shortens the last character's advance,
+ * so its ink overhangs the element's box. The gradient stops at the box, so
+ * the overhanging sliver of the final digit is never painted at all — 1776
+ * renders with the right-hand side of the 6 sliced off, and only ever the
+ * last digit, which is what made it look like the card was clipping.
+ *
+ * A flat ink-on-paper skin has no business with a gradient headline anyway.
+ * Solid colour removes the mechanism rather than padding around it.
+ */
+:root[data-skin="paper"] .tile-hero .readout-main {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: var(--text);
+  color: var(--text);
+}
+
 :root[data-skin="paper"] .readout-top .readout-main {
   font-family: var(--cond);
   font-weight: 600;
-  font-size: 58px;
+  /* Scales with the screen rather than sitting at a size that happened to
+     fit the phone it was designed on. Fredoka is a much wider face than the
+     one this replaced, so a flat 58px left an SE with four digits and
+     nowhere to put the last one. */
+  font-size: clamp(42px, 15vw, 58px);
   letter-spacing: -.045em;
 }
 :root[data-skin="paper"] .readout-top .readout-side .v {
@@ -3714,6 +3788,28 @@ button.src-tag { cursor: pointer; }
   height: 62px;
 }
 :root[data-skin="paper"] .cup-bar i { border-radius: 0 0 10px 10px; }
+
+/*
+ * An empty gauge, not an empty box.
+ *
+ * At the start of the day all three of these are at zero, and a 62px card
+ * with a hard ink border and nothing inside it reads as a component that
+ * failed to load rather than a bar with nothing in it yet. It was the first
+ * thing on the home screen and it looked broken every morning.
+ *
+ * Two changes, both small. A faint tint of the macro's own colour makes the
+ * track legible as a container that belongs to protein or carbs. And the
+ * fill keeps a hairline at the bottom even at zero, so there is always
+ * something to grow from — the difference between "nothing yet" and
+ * "nothing here".
+ */
+:root[data-skin="paper"] .cup-bar {
+  background:
+    linear-gradient(var(--cup-tint, transparent), var(--cup-tint, transparent)),
+    var(--surface-2);
+}
+.cup-bar i { min-height: 3px; }
+
 :root[data-skin="paper"] .cup-n {
   font-family: var(--cond); font-weight: 600; font-size: 16px; margin-top: 12px;
 }
@@ -3974,3 +4070,216 @@ button.src-tag { cursor: pointer; }
 .weigh-row .grow { flex: 1 1 100%; min-width: 0; }
 .weigh-row .num-in { flex: 1 1 auto; min-width: 96px; }
 .weigh-row .btn { flex: 0 0 auto; }
+
+/* ── The opening ──────────────────────────────────────────────────────
+ *
+ * Covers the cold-start gap with the app's own icon rather than an empty
+ * ground: the ticket arrives, then the three macro stamps land on it in
+ * order, the way a stamp is actually pressed — down hard, small bounce,
+ * settle. It is the same object the home screen is built around, so the
+ * app reads as assembling itself instead of appearing from nothing.
+ *
+ * Sized in ms to be over before it is in the way: the last stamp lands at
+ * 620ms and app.js usually removes the whole thing before the animation
+ * would have finished on its own. Nothing here blocks the first draw —
+ * the splash sits on top and is discarded, it is not a gate.
+ */
+#splash {
+  position: fixed; inset: 0; z-index: 9999;
+  display: grid; place-items: center;
+  background: var(--bg);
+  /* Painted immediately by the inline theme script above, so this matches
+     the ground the app is about to draw and there is no flash between. */
+  transition: opacity .34s ease, visibility .34s;
+}
+#splash.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+
+#splash-art { overflow: visible; }
+
+#splash-ticket {
+  transform-origin: 50% 50%;
+  animation: splash-ticket .5s cubic-bezier(.22, 1.2, .36, 1) both;
+}
+
+/* Each stamp drops from above the card and bounces once on landing.
+   Staggered so they read as three separate presses, not one group. */
+#splash .stamp {
+  transform-origin: 50% 50%;
+  animation: splash-stamp .42s cubic-bezier(.3, 1.5, .5, 1) both;
+}
+#splash .stamp:nth-of-type(1) { animation-delay: .30s; }
+#splash .stamp:nth-of-type(2) { animation-delay: .40s; }
+#splash .stamp:nth-of-type(3) { animation-delay: .50s; }
+
+@keyframes splash-ticket {
+  from { opacity: 0; transform: scale(.86) translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes splash-stamp {
+  0%   { opacity: 0; transform: translateY(-46px) scale(1.35); }
+  60%  { opacity: 1; transform: translateY(0) scale(.92); }
+  100% { opacity: 1; transform: none; }
+}
+
+/*
+ * Motion is decoration here, and decoration is the first thing to go.
+ * Somebody who has asked the system to stop animating things still gets
+ * the icon and the same covered gap — it simply does not move.
+ */
+@media (prefers-reduced-motion: reduce) {
+  #splash-ticket, #splash .stamp { animation: none; }
+  #splash { transition: opacity .2s ease, visibility .2s; }
+}
+
+/* ── Switches ─────────────────────────────────────────────────────────
+ *
+ * A real switch, not a button reading "On".
+ *
+ * The button version made you read a word to learn a state, and the word
+ * was ambiguous under a thumb: "On" could equally be the label of what
+ * pressing it would do. A switch is understood without reading — position
+ * and colour carry it.
+ *
+ * The geometry is derived, not typed. The first version hand-computed the
+ * knob's travel for each skin and got both slightly wrong: the knob sat a
+ * pixel high in its track and stopped short of the right edge, which is
+ * precisely the sort of thing that reads as "off" without being nameable.
+ * Now the track size, inset and knob size are variables and the travel
+ * falls out of them, so a skin that changes the border width cannot put
+ * the knob in the wrong place.
+ *
+ * Built on a real checkbox so it is keyboard-reachable and announces its
+ * own state; the input is invisible but present, and covers the control.
+ */
+.sw {
+  --sw-w: 51px;
+  --sw-h: 31px;
+  --sw-inset: 3px;
+  --sw-knob: 25px;
+  /* Whatever is left over once the knob and both insets are accounted for. */
+  --sw-travel: calc(var(--sw-w) - var(--sw-knob) - var(--sw-inset) * 2);
+
+  position: relative; display: inline-block; flex: none;
+  width: var(--sw-w); height: var(--sw-h);
+}
+.sw input {
+  position: absolute; inset: 0; opacity: 0; margin: 0;
+  width: 100%; height: 100%; cursor: pointer; z-index: 1;
+}
+.sw-track {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  transition: background .22s ease, border-color .22s ease;
+  pointer-events: none;
+}
+.sw-knob {
+  position: absolute;
+  top: 50%; left: var(--sw-inset);
+  width: var(--sw-knob); height: var(--sw-knob);
+  border-radius: 50%;
+  background: #FFFDF8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .28);
+  /* Centred by translation rather than by a top value, so it stays centred
+     whatever the border widths of the skin do to the track. */
+  transform: translateY(-50%);
+  transition: transform .22s cubic-bezier(.3, 1.4, .5, 1);
+  pointer-events: none;
+}
+.sw input:checked ~ .sw-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.sw input:checked ~ .sw-knob {
+  transform: translateY(-50%) translateX(var(--sw-travel));
+}
+.sw input:focus-visible ~ .sw-track {
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(217, 69, 47, .3));
+}
+.sw input:disabled ~ .sw-track { opacity: .45; }
+.sw input:disabled { cursor: default; }
+
+/* Paper draws its controls with the same hard outline as everything else.
+   Only the inset changes — the travel recomputes itself. */
+:root[data-skin="paper"] .sw { --sw-inset: 2px; }
+:root[data-skin="paper"] .sw-track {
+  border: 2px solid var(--edge);
+  background: var(--surface-2);
+}
+:root[data-skin="paper"] .sw-knob {
+  background: var(--bg-2);
+  border: 2px solid var(--edge);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-track, .sw-knob { transition: none; }
+}
+
+/* ── Settings rows ────────────────────────────────────────────────────
+ *
+ * A destination, not a lid.
+ *
+ * These replaced accordion headers. An accordion answers "what is in here"
+ * by pushing everything below it down the page; a row answers it by taking
+ * you there and leaving the list where it was. With eleven sections the
+ * difference is the whole navigability of the screen.
+ *
+ * Grouped into a single card with hairlines between, the way a settings
+ * list is read everywhere else on the phone — one object with parts, rather
+ * than eleven separate floating tiles.
+ */
+.set-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 16px; text-align: left; cursor: pointer;
+  background: var(--surface); border: 0;
+  border-radius: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .14s ease;
+}
+.set-row + .set-row { border-top: 1px solid var(--line); }
+.set-row:first-of-type { border-radius: var(--r, 16px) var(--r, 16px) 0 0; }
+.set-row:last-of-type  { border-radius: 0 0 var(--r, 16px) var(--r, 16px); }
+.set-row:hover  { background: var(--surface-2); }
+.set-row:active { background: var(--surface-2); transform: scale(.995); }
+.set-row .set-title { font-size: 15px; font-weight: 500; color: var(--text); }
+.set-row .set-sub {
+  font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.45;
+}
+.set-row .set-chev { flex: none; color: var(--dim); display: flex; }
+
+/* Paper draws a real card with a real edge, so the group gets the outline
+   and the rows divide it rather than floating on it. */
+:root[data-skin="paper"] .set-row {
+  background: var(--surface);
+  border-left: 2px solid var(--edge);
+  border-right: 2px solid var(--edge);
+}
+:root[data-skin="paper"] .set-row:first-of-type {
+  border-top: 2px solid var(--edge);
+  border-radius: 18px 18px 0 0;
+}
+:root[data-skin="paper"] .set-row:last-of-type {
+  border-bottom: 2px solid var(--edge);
+  border-radius: 0 0 18px 18px;
+  box-shadow: 0 4px 0 var(--edge);
+}
+:root[data-skin="paper"] .set-row + .set-row { border-top: 2px solid var(--line-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .set-row { transition: none; }
+  .set-row:active { transform: none; }
+}
+
+/* The option the band points at. A tint and a tag, not a pre-selection:
+   strain is a whole-day cardiovascular number, so it is evidence about a
+   session and never a verdict on one. */
+.row.is-hint { background: var(--surface-2); }
+.hint-tag {
+  font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--accent); font-weight: 600; vertical-align: middle;
+}
+:root[data-skin="paper"] .row.is-hint {
+  box-shadow: inset 3px 0 0 var(--accent);
+}

@@ -12,12 +12,13 @@ import {
 import {
   get, commit, day, totals, byMeal, MEALS, METHODS, dayKey, shiftDay,
   removeEntry, addWater, undoWater, entryMacros, setWeight, saveMeal, peekDay,
-  subscribe,
+  subscribe, dismissNote, noteDismissed,
 } from '../store.js';
 import { bestTDEE, macroTargets, waterTarget, applyCustom } from '../nutrition.js';
 import { carryFor, applyCarry, macroTrend } from '../carry.js';
 import { supplementTargetShift } from '../data/supplements.js';
 import { bandName } from '../applehealth.js';
+import { haptic } from '../feedback.js';
 import { dayFactor } from '../whoop.js';
 import { openPortion } from './portion.js';
 import { openDish } from './dish.js';
@@ -231,6 +232,20 @@ function nowCard(s, targets, key, ctx) {
   if (!advice || !advice.primary) return null;
 
   const p = advice.primary;
+
+  /*
+   * Dismissed here means dismissed everywhere.
+   *
+   * The same note is offered by Home's coach card and by this one, keyed on
+   * its headline, so closing it in one place closes it in the other. Before,
+   * only Home had a way to close anything: the identical sentence sat
+   * permanently at the top of Detail, and reading it twice on two screens
+   * with no way to be finished with it is what made it feel like a
+   * notification that would not go away.
+   */
+  const noteId = String(p.headline || '').slice(0, 80);
+  if (noteDismissed(key, noteId)) return null;
+
   const accent = { warn: 'var(--warn)', good: 'var(--good)', info: 'var(--m-p)' }[p.tone] || 'var(--accent)';
 
   const card = el('div.now-card', {});
@@ -244,7 +259,16 @@ function nowCard(s, targets, key, ctx) {
   // Element.append() renders null as the literal word — use the helper that
   // filters, the same trap that produced a stray "null" in the rails before.
   append(card,
-    el('div.now-head', { style: { color: accent } }, p.headline),
+    el('div.between', { style: { alignItems: 'flex-start', gap: '10px' } },
+      el('div.now-head', { style: { color: accent } }, p.headline),
+      el('button.card-x', {
+        'aria-label': 'Dismiss this note',
+        onclick: () => {
+          dismissNote(key, noteId);
+          haptic('tap');
+          ctx.refresh();
+        },
+      }, '\u00D7')),
     el('div.fine', {}, p.body),
     advice.rest.length
       ? el('button.btn.sm.ghost', {
@@ -638,7 +662,7 @@ function waterTile(t, targets, key, ctx) {
 
     grid.replaceChildren();
     for (let i = 0; i < glasses; i++) {
-      const cls = i < full ? 'glass full' : (i === full && partial > 0.05 ? 'glass part' : 'glass');
+      const cls = i < full ? 'water-unit full' : (i === full && partial > 0.05 ? 'water-unit part' : 'water-unit');
       const node = el('div', { class: cls, 'aria-hidden': 'true' });
       if (i === full && partial > 0.05) node.style.setProperty('--lvl', Math.round(partial * 100) + '%');
       grid.append(node);
