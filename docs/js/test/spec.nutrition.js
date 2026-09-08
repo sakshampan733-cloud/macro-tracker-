@@ -271,7 +271,11 @@ describe('Remaining', () => {
 
 describe('Trend weight', () => {
   it('smooths a noisy series and lags the raw value', () => {
-    const raw = [80, 81, 79.5, 80.5, 79, 80, 78.5].map((kg, i) => ({ date: 'd' + i, kg }));
+    /* Real dates, one day apart. The trend weights by elapsed days, so a
+       placeholder like 'd0' exercises only the unparseable-date fallback
+       and tells you nothing about the smoothing. */
+    const raw = [80, 81, 79.5, 80.5, 79, 80, 78.5]
+      .map((kg, i) => ({ date: `2026-09-0${i + 1}`, kg }));
     const out = trendWeight(raw);
     eq(out.length, 7);
     eq(out[0].trend, 80, 'seeded on the first reading');
@@ -286,8 +290,54 @@ describe('Trend weight', () => {
     eq(trendWeight([]).length, 0);
   });
 
+  /*
+   * The bug this pair exists for.
+   *
+   * The average used to step once per weigh-in regardless of the gap, so
+   * "ten-day half-life" meant ten readings. Somebody weighing twice a week
+   * got a trend a third of the intended speed and a goal frozen at 0% while
+   * they were visibly losing weight.
+   */
+  it('a gap of days counts as days, not as one reading', () => {
+    const drop = [{ kg: 100 }, { kg: 96 }];
+    const daily = trendWeight(drop.map((p, i) => ({ ...p, date: `2026-09-0${i + 1}` })));
+    const weekly = trendWeight([
+      { date: '2026-09-01', kg: 100 }, { date: '2026-09-08', kg: 96 },
+    ]);
+    ok(weekly.at(-1).trend < daily.at(-1).trend,
+       'a week apart moves the trend further than a day apart');
+  });
+
+  it('survives a date it cannot read, rather than turning the series to NaN', () => {
+    const out = trendWeight([
+      { date: '2026-09-01', kg: 80 }, { date: 'not a date', kg: 79 },
+      { date: '2026-09-03', kg: 78 },
+    ]);
+    ok(out.every(p => Number.isFinite(p.trend)), 'every trend point is a real number');
+  });
+
+  /*
+   * The complaint this pins down: "I logged a huge drop and the bar did not
+   * move." The old average was seeded with the first reading, so early on
+   * the seed dominated and a 13.7 kg fall registered as under a kilo.
+   */
+  it('a large drop moves the trend a large amount, even on the second reading', () => {
+    const out = trendWeight([
+      { date: '2026-09-01', kg: 123.7 }, { date: '2026-09-02', kg: 110 },
+    ]);
+    const moved = out[0].trend - out[1].trend;
+    ok(moved > 5, `a 13.7 kg drop should move the trend several kg, moved ${moved.toFixed(1)}`);
+    /* Still damped: one reading a day later is not yet the whole story. */
+    ok(out[1].trend > 110, 'but not all the way to the raw value');
+  });
+
+  it('a single weigh-in is its own trend, with nothing to average against', () => {
+    eq(trendWeight([{ date: '2026-09-07', kg: 110 }])[0].trend, 110);
+  });
+
   it('a shorter half-life follows the scale more closely', () => {
-    const raw = [80, 80, 80, 80, 84].map((kg, i) => ({ date: 'd' + i, kg }));
+    const raw = [80, 80, 80, 80, 84]
+      .map((kg, i) => ({ date: `2026-09-0${i + 1}`, kg }));
     const fast = trendWeight(raw, 3).at(-1).trend;
     const slow = trendWeight(raw, 20).at(-1).trend;
     ok(fast > slow, 'the fast average reacts harder to the jump');

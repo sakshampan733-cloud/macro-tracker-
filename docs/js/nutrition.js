@@ -833,13 +833,64 @@ export function remaining(targets, totals) {
  * scale lies and people quit. An exponentially weighted moving average with
  * a ~10-day half-life shows the signal underneath.
  */
-export function trendWeight(series, halfLife = 10) {
+export function trendWeight(series, halfLifeDays = 10) {
   if (!series.length) return [];
-  const alpha = 1 - Math.pow(0.5, 1 / halfLife);
-  let ema = series[0].kg;
+
+  /*
+   * A time-decayed average, not a seeded one.
+   *
+   * Two bugs lived in the previous version, and the second was the one
+   * people actually felt.
+   *
+   * The first: it stepped once per weigh-in whatever the gap, so a
+   * "ten-day half-life" really meant ten readings. Weigh twice a week and
+   * the trend moved at a third of the intended speed.
+   *
+   * The second: it was seeded with the first reading and every later value
+   * only nudged it. Early on the seed dominates completely — somebody
+   * logging 123.7 and then 110 the next day saw the trend move 0.9 kg and a
+   * goal bar reading 4%. The bar was not broken; it was faithfully
+   * reporting an average that had barely noticed.
+   *
+   * Both go away by computing what the trend was always meant to be: the
+   * average of the readings, weighted by how recent each one is. Each step
+   * decays the running totals by elapsed time and adds the new point, then
+   * divides. With one reading it is that reading. With many it settles to
+   * exactly the same curve the old exponential average gave — the
+   * difference is entirely in the early days, where the old one was wrong.
+   *
+   * `sum` and `weight` decay together, which is what makes it
+   * self-normalising: there is no starting value left to be anchored to.
+   */
+  const dayOf = (d) => {
+    const t = new Date(d).getTime();
+    return Number.isFinite(t) ? t : null;
+  };
+
+  let sum = 0;
+  let weight = 0;
+  let prevTime = dayOf(series[0].date);
+
   return series.map((pt, i) => {
-    ema = i === 0 ? pt.kg : ema + alpha * (pt.kg - ema);
-    return { ...pt, trend: +ema.toFixed(2) };
+    const t = dayOf(pt.date);
+    /*
+     * An unreadable date must not poison the series. Date.parse returns
+     * NaN for anything it does not recognise, and NaN spreads: one bad
+     * entry and every trend after it is NaN, which shows up as a blank
+     * weight chart, no maintenance figure and a goal stuck at zero rather
+     * than as an error anybody could act on. One day's step is the safe
+     * reading of "we do not know when this was".
+     */
+    const days = (i === 0) ? 0
+      : (t !== null && prevTime !== null) ? Math.max(0, (t - prevTime) / 86400000)
+      : 1;
+
+    const decay = Math.pow(0.5, days / halfLifeDays);
+    sum = sum * decay + pt.kg;
+    weight = weight * decay + 1;
+
+    if (t !== null) prevTime = t;
+    return { ...pt, trend: +(sum / weight).toFixed(2) };
   });
 }
 

@@ -28,7 +28,7 @@
  * Date-shaped for the same reason the app version is: two numbers are
  * easier to reason about when one of them tells you when it was written.
  */
-export const FOODS_VERSION = 2026090602;
+export const FOODS_VERSION = 2026090701;
 
 export const GROUPS = [
   'Protein', 'Grains', 'Legumes', 'Dairy & Egg', 'Vegetables',
@@ -367,6 +367,21 @@ export const FOODS = [
     140,7.0,18.0,4.5,6.2,1.9,1.4,450,[['1 katori (150 g)',150]]),
   F('chole','Chole / chana masala','Prepared','veg','as-served','C',
     155,7.5,20.0,5.5,6.8,2.6,1.3,510,[['1 katori (150 g)',150]]),
+  /*
+   * The plate, not the two halves added together.
+   *
+   * Somebody eating this is not weighing the bread apart from the curry —
+   * they are eating a plate somebody handed them. Logging it as chole plus
+   * kulcha means guessing two weights instead of one, and the guess that
+   * matters least (how much curry) is the one that is hardest to make.
+   *
+   * Grade D because it is street food: the butter on the tawa is at the
+   * cook's discretion and varies more than anything else in the dish.
+   */
+  F('chole-kulche','Chole kulche (plate)','Eating out','veg','as-served','D',
+    225,7.5,33.0,7.0,4.5,2.8,2.4,490,
+    [['1 plate, 2 kulche (360 g)',360],['half plate (180 g)',180]],
+    'chhole kulche chana kulcha chole kulcha matar kulcha'),
   F('chana-boiled','Kala chana, boiled','Legumes','veg','cooked','A',
     164,8.9,27.4,2.6,7.6,4.8,0.3,7,[['1 katori (140 g)',140]]),
   F('sprouts-moong','Moong, sprouted (germinated whole)','Legumes','veg','raw','A',
@@ -1261,7 +1276,8 @@ export const FOODS = [
   F('missi-roti','Missi roti','Prepared','veg','as-served','C',
     274,9.0,44.0,8.0,5.0,1.5,2.0,380,[['1 roti (70 g)',70]]),
   F('kulcha','Kulcha','Prepared','veg','as-served','D',
-    291,8.0,50.0,7.0,2.0,3.5,3.0,460,[['1 kulcha (90 g)',90]]),
+    291,8.0,50.0,7.0,2.0,3.5,3.0,460,[['1 kulcha (90 g)',90],['2 kulche (180 g)',180]],
+    'kulche'),
   F('butter-roti','Tandoori butter roti','Prepared','veg','as-served','C',
     287,8.5,48.0,8.0,5.5,1.5,3.5,350,[['1 roti (55 g)',55]]),
 
