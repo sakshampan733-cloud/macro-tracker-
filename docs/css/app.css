@@ -3804,6 +3804,26 @@ button.src-tag { cursor: pointer; }
 }
 
 /* ── the cups, as stamps ─────────────────────────────────────────────── */
+/*
+ * Two stacked cards need a gap wider than their own shadow.
+ *
+ * Paper draws every card with a hard 2px outline and a 4px drop shadow
+ * sitting directly beneath it. Screens that append tiles one after another
+ * left no margin between them, so the shadow of one landed on the top
+ * border of the next: two ink lines a few pixels apart, which reads as one
+ * card overlapping another rather than as two cards touching. Most
+ * noticeable under a grid, where a full-width tile follows a pair.
+ *
+ * The margin only applies where nothing else has set one, so screens that
+ * already space their own tiles are untouched.
+ */
+:root[data-skin="paper"] .tile + .tile,
+:root[data-skin="paper"] .ah-grid + .tile,
+:root[data-skin="paper"] .tile + .note,
+:root[data-skin="paper"] .note + .tile {
+  margin-top: max(12px, var(--tile-gap, 0px));
+}
+
 :root[data-skin="paper"] .cup-bar {
   border: 2px solid var(--edge);
   border-radius: 14px;

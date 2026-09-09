@@ -56,7 +56,30 @@ export function logScanned(food, ctx, { onSaved } = {}) {
     openPortion(toItem(food), { dateKey: ctx.date || dayKey(), onSaved: done });
     return 'portion';
   }
-  toast('No nutrition on that entry — fill it in once.');
+
+  /*
+   * Three different failures used to share one sentence.
+   *
+   * "No nutrition on that entry" was said whether the product was missing
+   * its panel, missing from the database entirely, or the lookup never
+   * reached the network at all. The first is a fact about the product; the
+   * last is a fact about the phone, and telling somebody to type a label
+   * out by hand because their signal dropped is both wrong and infuriating
+   * — the data was there, sitting behind a request that failed.
+   *
+   * The destination is the same builder in every case, because there is
+   * nothing else useful to do with a scan that came back empty. What
+   * changes is that the message now names which of the three happened, so
+   * retrying is an option somebody can reach for.
+   */
+  if (food.offline) {
+    toast('Could not reach the food database — check your connection and scan again.', 'err');
+  } else if (!food.found) {
+    toast('That barcode is not in the database yet. Fill it in once and it is yours.');
+  } else {
+    toast('No nutrition on that entry — fill it in once.');
+  }
+
   openBuilder({ food, barcode: food.barcode, onSaved: done });
   return 'builder';
 }

@@ -25,6 +25,9 @@ import {
   healthBars, healthLine, miniSpark, appleChart, activityRings, dualLine,
 } from '../charts.js';
 import { haptic } from '../feedback.js';
+/* Which Health story this build can tell: read from the phone, or pushed
+   in from elsewhere. The copy on several cards depends on it. */
+import { canReadHealth } from '../healthkit.js';
 import { openReport } from './report.js';
 import { openAppleHealth } from './apple.js';
 import { sleepTile, sleepSchedule, sleepHours, clockText } from './sleep.js';
@@ -989,8 +992,11 @@ function appleVitals(s, ctx, scoped, sum) {
     anyRing
       ? activityRings(ringData)
       : el('div.fine', {},
-          'Your Shortcut is not sending the ring data yet. Add Active Energy, '
-          + 'Exercise Minutes and Stand Hours to it and the rings fill in.')));
+          canReadHealth()
+            ? 'No ring data on this phone yet. Health fills these in once your watch '
+              + 'has recorded a day of Move, Exercise and Stand.'
+            : 'Your Shortcut is not sending the ring data yet. Add Active Energy, '
+              + 'Exercise Minutes and Stand Hours to it and the rings fill in.')));
 
   /*
    * Resting rather than total, on this view only.
@@ -1013,7 +1019,10 @@ function appleVitals(s, ctx, scoped, sum) {
   wrap.append(cards.length
     ? el('div.ah-grid', {}, ...cards)
     : el('div.tile', {}, el('div.fine', {},
-        'Nothing from your Apple Watch yet. Run the Shortcut once on your phone.')));
+        canReadHealth()
+          ? 'Nothing from your Apple Watch yet. It arrives on its own once Health has '
+            + 'a day recorded — pull down to check now.'
+          : 'Nothing from your Apple Watch yet. Run the Shortcut once on your phone.')));
 
   /* Sleep stages, in Apple's own vocabulary — Health calls them Core,
      Deep and REM, and a Watch owner reading "Light" would wonder which
@@ -1037,8 +1046,11 @@ function appleVitals(s, ctx, scoped, sum) {
           `${st.label} ${st.value.toFixed(1)}h`))),
       (today.remH || today.swsH) ? null
         : el('div.fine', { style: { marginTop: '8px' } },
-            'Your Shortcut is sending total sleep only. Add REM and Deep to it '
-            + 'and the stages fill in.')));
+            canReadHealth()
+              ? 'Health is returning total sleep only for these nights \u2014 stage detail '
+                + 'appears when your watch records it.'
+              : 'Your Shortcut is sending total sleep only. Add REM and Deep to it '
+                + 'and the stages fill in.')));
     wrap.append(sleepTile(s, ctx.date || dayKey(), ctx));
   }
 
@@ -1169,7 +1181,9 @@ function vitalsSection(s, ctx) {
           ? 'Connect both. Whoop measures recovery, strain and blood oxygen; Apple fills '
           + 'the one gap Whoop\u2019s API leaves, which is your step count.'
           : mode === 'apple'
-          ? 'Your watch pushes to the relay through a Shortcut — the app walks you through it.'
+          ? (canReadHealth()
+              ? 'Read straight from Health on this phone. Nothing to set up and nothing sent anywhere.'
+              : 'Your watch pushes to the relay through a Shortcut — the app walks you through it.')
           : 'Connect Whoop for live sync, or load a CSV export if you would rather not set up the relay.',
         buttons)));
 
@@ -1183,7 +1197,9 @@ function vitalsSection(s, ctx) {
           ? 'Connect both. Whoop measures recovery, strain and blood oxygen; Apple fills '
           + 'the one gap Whoop\u2019s API leaves, which is your step count.'
           : mode === 'apple'
-          ? 'Your watch pushes to the relay through a Shortcut — the app walks you through it.'
+          ? (canReadHealth()
+              ? 'Read straight from Health on this phone. Nothing to set up and nothing sent anywhere.'
+              : 'Your watch pushes to the relay through a Shortcut — the app walks you through it.')
           : 'Connect Whoop for live sync, or load a CSV export if you would rather not set up the relay.',
         buttons)));
   }
@@ -1414,6 +1430,11 @@ function vitalsSection(s, ctx) {
   const recentRec = seriesFor(scoped, 'recovery', 14);
   if (recentRec.length > 3) {
     wrap.append(el('div.tile.tappable', {
+      /* Follows a plain wrapper rather than another tile, so the stacked
+         rule in the stylesheet does not reach it — and without a gap the
+         card above drops its shadow onto this one's top border, which
+         reads as two cards overlapping. */
+      style: { marginTop: '12px' },
       role: 'button', tabIndex: 0,
       onclick: () => openMetric(s, 'recovery', ctx),
       onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetric(s, 'recovery', ctx); } },
