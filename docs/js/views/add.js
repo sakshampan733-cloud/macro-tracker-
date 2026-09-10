@@ -72,12 +72,34 @@ export function logScanned(food, ctx, { onSaved } = {}) {
    * changes is that the message now names which of the three happened, so
    * retrying is an option somebody can reach for.
    */
+  /* A nameless entry is stored as "Unknown product <barcode>", which is a
+     useful placeholder in a list and a terrible thing to read back in a
+     sentence. */
+  const raw = (food.n || food.name || '').trim();
+  const name = /^unknown product/i.test(raw) ? '' : raw;
   if (food.offline) {
     toast('Could not reach the food database — check your connection and scan again.', 'err');
   } else if (!food.found) {
     toast('That barcode is not in the database yet. Fill it in once and it is yours.');
+  } else if (!food.complete) {
+    /*
+     * Found, named, and blank on the back.
+     *
+     * Open Food Facts is crowdsourced, so a product can be registered by
+     * one person and never have its nutrition panel typed in by anyone.
+     * The old wording — "no nutrition on that entry" — was accurate and
+     * read as "not in the database", which is the opposite of what
+     * happened: the app knows exactly what this is, it just has no numbers
+     * for it. Saying which half is missing is the difference between a
+     * dead end and one minute of typing.
+     */
+    toast(name
+      ? `${name} is in the database, but nobody has added its nutrition panel. Type it once and it is saved.`
+      : 'That product is in the database, but its nutrition panel is empty. Type it once and it is saved.');
   } else {
-    toast('No nutrition on that entry — fill it in once.');
+    toast(name
+      ? `${name} has calories but not the full protein, carbs and fat. Fill the gaps once.`
+      : 'That entry has calories but not the full macro split. Fill the gaps once.');
   }
 
   openBuilder({ food, barcode: food.barcode, onSaved: done });
